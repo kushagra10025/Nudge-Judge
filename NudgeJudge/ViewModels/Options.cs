@@ -23,7 +23,7 @@ public sealed record BrowserOption(Guid Id, string Name, string Detail)
     public static string BrowserDetail(BrowserProfile b)
     {
         var parts = new List<string>();
-        if (b.IsPrivate) parts.Add("private");
+        if (b.IsPrivate) parts.Add("Private window");
         if (!string.IsNullOrWhiteSpace(b.ProfileLabel)) parts.Add(b.ProfileLabel!);
         return string.Join(" · ", parts);
     }

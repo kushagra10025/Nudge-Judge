@@ -123,12 +123,38 @@ public static class PatternCompiler
         {
             return Fail("Lookarounds, backreferences and atomic groups aren't supported: they make matching slow and unsafe.");
         }
-        catch (ArgumentException ex)
+        catch (RegexParseException ex)
         {
-            return Fail("Invalid regular expression: " + ex.Message);
+            return Fail(DescribeRegexError(ex));
+        }
+        catch (ArgumentException)
+        {
+            return Fail("Not a valid regular expression.");
         }
 
         return Ok(url => regex.IsMatch(url.AbsoluteUri));
+    }
+
+    /// <summary>Plain-language version of .NET's parser message, pointing at the character that broke it.</summary>
+    internal static string DescribeRegexError(RegexParseException ex)
+    {
+        var problem = ex.Error switch
+        {
+            RegexParseError.InsufficientClosingParentheses => "a ( is never closed",
+            RegexParseError.InsufficientOpeningParentheses => "there's a ) with no ( before it",
+            RegexParseError.UnterminatedBracket => "a [ is never closed",
+            RegexParseError.UnescapedEndingBackslash => @"it ends with a lone \ (write \\ to match a backslash)",
+            RegexParseError.QuantifierAfterNothing => @"a *, + or ? has nothing before it to repeat (put \ in front to match the character itself)",
+            RegexParseError.NestedQuantifiersNotParenthesized => "two repeat marks are stacked, like a** (wrap the first part in brackets)",
+            RegexParseError.ReversedCharacterRange => "a range like [z-a] runs backwards",
+            RegexParseError.ReversedQuantifierRange => "a count like {5,2} runs backwards",
+            RegexParseError.UnrecognizedEscape => @"it uses an escape like \q that doesn't exist",
+            _ => null,
+        };
+        var where = ex.Offset > 0 ? $" (at character {ex.Offset})" : "";
+        return problem is null
+            ? $"Not a valid regular expression{where}."
+            : $"Not a valid regular expression: {problem}{where}.";
     }
 
     internal static Regex BuildRegex(string pattern, bool caseSensitive)

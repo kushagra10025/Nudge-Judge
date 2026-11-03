@@ -32,11 +32,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public string ConfigPath { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RoutingLabel), nameof(RoutingDetail))]
+    [NotifyPropertyChangedFor(nameof(RoutingLabel), nameof(RoutingDetail), nameof(SignalLabel), nameof(SignalDetail),
+        nameof(SignalOn), nameof(SignalOff))]
     public partial bool RoutingEnabled { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RoutingDetail))]
+    [NotifyPropertyChangedFor(nameof(RoutingDetail), nameof(SignalDetail))]
     public partial BrowserOption? PrimaryBrowser { get; set; }
 
     [ObservableProperty] public partial decimal? ChooserGroupingSeconds { get; set; }
@@ -45,7 +46,19 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] public partial ThemeOption Theme { get; set; }
 
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
-    [ObservableProperty] public partial bool IsRegistered { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn), nameof(SignalOff))]
+    public partial bool IsRegistered { get; set; }
+
+    /// <summary>NudgeJudge isn't the system's default browser, so no links reach it whatever routing says.</summary>
+    public bool NeedsSetup => !IsRegistered;
+
+    // The sidebar signal shows the one state that matters most: not receiving links at all, then on/off.
+    public bool SignalOn => IsRegistered && RoutingEnabled;
+    public bool SignalOff => IsRegistered && !RoutingEnabled;
+    public string SignalLabel => IsRegistered ? RoutingLabel : "Not default yet";
+    public string SignalDetail => IsRegistered ? RoutingDetail : "Links can't reach it";
 
     public string RoutingLabel => RoutingEnabled ? "Routing on" : "Routing off";
 

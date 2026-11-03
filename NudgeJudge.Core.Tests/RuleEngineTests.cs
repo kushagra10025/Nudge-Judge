@@ -54,6 +54,19 @@ public class PatternCompilerTests
     public void Regex_rejects_backtracking_constructs(string pattern) =>
         Assert.False(PatternCompiler.Compile(MatchKind.Regex, pattern).Success);
 
+    [Theory]
+    [InlineData("^https://(unclosed", "a ( is never closed (at character 18)")]
+    [InlineData("a)b", "there's a ) with no ( before it")]
+    [InlineData("[abc", "a [ is never closed")]
+    [InlineData("*.example", "has nothing before it to repeat")]
+    public void Regex_errors_are_plain_language(string pattern, string expected)
+    {
+        var error = PatternCompiler.Compile(MatchKind.Regex, pattern).Error!;
+        Assert.StartsWith("Not a valid regular expression", error);
+        Assert.Contains(expected, error);
+        Assert.DoesNotContain("Invalid pattern", error); // .NET's own wording stays out of the UI
+    }
+
     [Fact]
     public void Regex_classic_redos_pattern_runs_in_linear_time()
     {

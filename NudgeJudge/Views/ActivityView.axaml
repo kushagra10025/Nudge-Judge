@@ -1,11 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:NudgeJudge.ViewModels"
+             xmlns:v="using:NudgeJudge.Views"
              xmlns:c="using:NudgeJudge.Controls"
              x:Class="NudgeJudge.Views.ActivityView"
              x:DataType="vm:ActivityViewModel">
 
   <Grid RowDefinitions="Auto,Auto,*" Margin="32,28,32,0">
+    <v:UndoToast Grid.RowSpan="3" ZIndex="1" DataContext="{Binding Undo}" />
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
       <StackPanel Spacing="4">
         <TextBlock Classes="h1" Text="Activity" />
@@ -33,6 +35,11 @@
           <TextBlock Classes="h2" Text="Nothing routed yet" />
           <TextBlock Classes="body muted"
                      Text="When another app opens a link, it shows up here along with the rule that handled it, or the browser you picked." />
+          <StackPanel Spacing="10" Margin="0,8,0,0" IsVisible="{Binding Settings.NeedsSetup}">
+            <TextBlock Classes="body muted"
+                       Text="Links only arrive once NudgeJudge is your default browser." />
+            <Button Content="Open setup" Command="{Binding OpenSetupCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
         </StackPanel>
         <StackPanel IsVisible="{Binding NoFilterResults}" Spacing="8" Margin="12,24" HorizontalAlignment="Left">
           <TextBlock Classes="muted" Text="{Binding Filter, StringFormat='Nothing matches “{0}”.'}" />
@@ -43,18 +50,25 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="vm:ActivityItemViewModel">
               <Border Classes="row" Margin="0,0,0,2">
-                <Grid ColumnDefinitions="72,84,*">
+                <Grid ColumnDefinitions="72,96,*">
                   <TextBlock Classes="mono faint small" Text="{Binding Time}" VerticalAlignment="Top" Margin="0,2,0,0"
                              ToolTip.Tip="{Binding FullTime}" />
-                  <Panel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Left">
-                    <Border Classes="badge route" IsVisible="{Binding IsRouted}"><TextBlock Text="{Binding OutcomeLabel}" /></Border>
-                    <Border Classes="badge" IsVisible="{Binding IsAsked}"><TextBlock Text="{Binding OutcomeLabel}" /></Border>
-                    <Border Classes="badge stop" IsVisible="{Binding IsProblem}"><TextBlock Text="{Binding OutcomeLabel}" /></Border>
-                  </Panel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="0,4,0,0">
+                    <Panel Width="8" Height="8" VerticalAlignment="Center">
+                      <Ellipse Classes="status" Fill="{DynamicResource RouteBrush}" IsVisible="{Binding IsRouted}" />
+                      <Ellipse Classes="status" Fill="{DynamicResource InkBrush}" IsVisible="{Binding IsChosen}" />
+                      <Ellipse Classes="status" Stroke="{DynamicResource InkFaintBrush}" StrokeThickness="1.5" IsVisible="{Binding IsAsked}" />
+                      <Ellipse Classes="status" Fill="{DynamicResource StopBrush}" IsVisible="{Binding IsProblem}" />
+                    </Panel>
+                    <TextBlock Classes="small muted" Text="{Binding OutcomeLabel}" Classes.error="{Binding IsProblem}"
+                               VerticalAlignment="Center" FontWeight="Medium" />
+                  </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="3">
                     <TextBlock Text="{Binding Host}" FontWeight="SemiBold" />
                     <SelectableTextBlock Classes="mono faint" FontSize="12" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="small muted" Text="{Binding RouteText}" TextWrapping="Wrap" />
+                    <TextBlock Classes="small muted" TextWrapping="Wrap">
+                      <Run Text="{Binding RoutePrefix}" /><Run Text="{Binding RoutePattern}" FontFamily="{StaticResource MonoFont}" /><Run Text="{Binding RouteSuffix}" />
+                    </TextBlock>
                   </StackPanel>
                 </Grid>
               </Border>

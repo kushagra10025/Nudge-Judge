@@ -24,13 +24,16 @@ public sealed partial class BrowsersViewModel : ViewModelBase
         _discovery = discovery;
         _router = router;
         Editor = new BrowserEditorViewModel(config, dialogs, this);
+        Undo = new UndoBar(dispatcher);
         config.Changed += (_, _) => dispatcher.Post(Reload);
         Reload();
     }
 
     public ObservableCollection<BrowserItemViewModel> Browsers { get; } = [];
     public BrowserEditorViewModel Editor { get; }
+    public UndoBar Undo { get; }
     public bool HasBrowsers => Browsers.Count > 0;
+    public bool NoBrowsers => !HasBrowsers;
     public bool HasSampleBrowsers => Browsers.Any(b => b.IsSample);
 
     [ObservableProperty] public partial string? StatusMessage { get; set; }
@@ -134,11 +137,21 @@ public sealed partial class BrowsersViewModel : ViewModelBase
     internal void Delete(BrowserItemViewModel item)
     {
         if (Editor.EditingId == item.Id) Editor.Close();
+        var index = _config.Current.Browsers.FindIndex(b => b.Id == item.Id);
+        if (index < 0) return;
+        var removed = _config.Current.Browsers[index].Clone();
+        var wasPrimary = _config.Current.Settings.PrimaryBrowserId == item.Id;
         _config.Update(c =>
         {
-            c.Browsers.RemoveAll(b => b.Id == item.Id);
-            if (c.Settings.PrimaryBrowserId == item.Id) c.Settings.PrimaryBrowserId = c.Browsers.FirstOrDefault()?.Id;
+            c.Browsers.RemoveAt(index);
+            if (wasPrimary) c.Settings.PrimaryBrowserId = c.Browsers.FirstOrDefault()?.Id;
         });
+        Undo.Show($"Removed {removed.Name}", () => _config.Update(c =>
+        {
+            if (c.Browsers.Any(b => b.Id == removed.Id)) return;
+            c.Browsers.Insert(Math.Min(index, c.Browsers.Count), removed);
+            if (wasPrimary) c.Settings.PrimaryBrowserId = removed.Id;
+        }));
     }
 
     internal void MakePrimary(BrowserItemViewModel item) =>
@@ -173,6 +186,7 @@ public sealed partial class BrowsersViewModel : ViewModelBase
             Browsers.Add(new BrowserItemViewModel(this, b, uses, cfg.Settings.PrimaryBrowserId == b.Id));
         }
         OnPropertyChanged(nameof(HasBrowsers));
+        OnPropertyChanged(nameof(NoBrowsers));
         OnPropertyChanged(nameof(HasSampleBrowsers));
         SyncEditingFlags();
     }
@@ -188,7 +202,7 @@ public sealed partial class BrowserItemViewModel(BrowsersViewModel owner, Browse
     public string ArgumentsSuffix => HasArguments ? "  " + Arguments : "";
     public bool IsPrivate { get; } = browser.IsPrivate;
     public string? ProfileLabel { get; } = string.IsNullOrWhiteSpace(browser.ProfileLabel) ? null : browser.ProfileLabel;
-    public bool HasProfile => ProfileLabel is not null;
+    public bool HasProfile => ProfileLabel is not null && !Name.Contains(ProfileLabel, StringComparison.OrdinalIgnoreCase);
     public bool IsSample { get; } = browser.Source == BrowserSource.Sample;
     public bool IsDiscovered { get; } = browser.Source == BrowserSource.Discovered;
     public bool IsPrimary { get; } = isPrimary;

@@ -63,20 +63,40 @@
           </ListBoxItem>
         </ListBox>
 
-        <!-- Routing signal -->
+        <!-- Routing signal: not receiving links, then on / off -->
         <Border Grid.Row="2" Background="{StaticResource PanelRaisedBrush}" CornerRadius="8" Padding="12">
-          <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+          <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
             <Panel Width="14" Height="14" Margin="0,2,10,0" VerticalAlignment="Top">
-              <Ellipse Fill="{StaticResource PanelProceedBrush}" IsVisible="{Binding Settings.RoutingEnabled}" />
-              <Ellipse Fill="{StaticResource PanelStopBrush}" IsVisible="{Binding !Settings.RoutingEnabled}" />
+              <Ellipse Fill="{StaticResource PanelProceedBrush}" IsVisible="{Binding Settings.SignalOn}" />
+              <Ellipse Fill="{StaticResource PanelStopBrush}" IsVisible="{Binding Settings.SignalOff}" />
+              <Ellipse Stroke="{StaticResource PanelMutedBrush}" StrokeThickness="2" IsVisible="{Binding Settings.NeedsSetup}" />
             </Panel>
-            <TextBlock Grid.Column="1" Text="{Binding Settings.RoutingLabel}" FontWeight="SemiBold"
+            <TextBlock Grid.Column="1" Text="{Binding Settings.SignalLabel}" FontWeight="SemiBold" TextWrapping="Wrap"
                        Foreground="{StaticResource PanelInkBrush}" />
             <ToggleSwitch Grid.Column="2" Grid.RowSpan="2" IsChecked="{Binding Settings.RoutingEnabled}"
                           OnContent="" OffContent="" MinWidth="0" Margin="0,-6,-8,0" VerticalAlignment="Top"
-                          AutomationProperties.Name="Route links by rules" />
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.RoutingDetail}" FontSize="12"
+                          ToolTip.Tip="Route links by rules" AutomationProperties.Name="Route links by rules">
+              <!-- The panel is dark in every theme, so the switch uses panel ink rather than the page's -->
+              <ToggleSwitch.Resources>
+                <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#DCE8E1" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F2F7F4" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C3D3CA" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#DCE8E1" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#0F1F18" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#0F1F18" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#0F1F18" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#21382E" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#8DA89A" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#DCE8E1" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#8DA89A" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#DCE8E1" />
+              </ToggleSwitch.Resources>
+            </ToggleSwitch>
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.SignalDetail}" FontSize="12"
                        TextWrapping="Wrap" Foreground="{StaticResource PanelMutedBrush}" Margin="0,2,0,0" />
+            <Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="panel-link" Content="Set up"
+                    Command="{Binding OpenSetupCommand}" IsVisible="{Binding Settings.NeedsSetup}" Margin="0,8,0,0" />
           </Grid>
         </Border>
       </Grid>

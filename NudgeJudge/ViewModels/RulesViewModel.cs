@@ -18,8 +18,10 @@ public sealed partial class RulesViewModel : ViewModelBase
     private readonly IWindowService _windows;
 
     public RulesViewModel(IConfigStore config, RuleEngine engine, ISystemBoot boot, ChooserViewModel chooser,
-        IWindowService windows, IUiDispatcher dispatcher)
+        IWindowService windows, IUiDispatcher dispatcher, SettingsViewModel settings)
     {
+        Settings = settings;
+        Undo = new UndoBar(dispatcher);
         _config = config;
         _engine = engine;
         _boot = boot;
@@ -34,6 +36,10 @@ public sealed partial class RulesViewModel : ViewModelBase
     public ObservableCollection<RuleItemViewModel> Rules { get; } = [];
     public ObservableCollection<BrowserOption> Browsers { get; } = [];
     public RuleEditorViewModel Editor { get; }
+    public UndoBar Undo { get; }
+
+    /// <summary>For the setup checklist's last step (is NudgeJudge the default browser?).</summary>
+    public SettingsViewModel Settings { get; }
 
     public bool HasRules => Rules.Count > 0;
     public bool HasBrowsers => Browsers.Count > 0;
@@ -41,11 +47,19 @@ public sealed partial class RulesViewModel : ViewModelBase
     /// <summary>First run: nothing configured yet and the user hasn't picked samples or an empty start.</summary>
     public bool ShowWelcome => _config.Current.Settings.OfferSamples && !HasRules && !HasBrowsers;
 
-    /// <summary>No rules and nowhere to send links yet, so finding browsers comes first.</summary>
-    public bool ShowNoBrowsers => !HasRules && !HasBrowsers && !ShowWelcome;
+    /// <summary>No rules yet: a three-step checklist (browsers, first rule, default browser) instead of a blank page.</summary>
+    public bool ShowSetup => !HasRules && !ShowWelcome;
 
-    /// <summary>Browsers are set up but there are no rules: invite the first one.</summary>
-    public bool ShowNoRules => !HasRules && HasBrowsers;
+    public bool NeedsBrowsers => !HasBrowsers;
+    public string BrowsersStepDetail => Browsers.Count switch
+    {
+        0 => "Rules send links to one of these, so they come first.",
+        1 => "1 browser ready.",
+        var n => $"{n} browsers ready.",
+    };
+
+    /// <summary>Routing is off but there are rules: say so above the list, which otherwise looks live.</summary>
+    public bool ShowRoutingOff => HasRules && RoutingOffNotice is not null;
 
     public bool HasSampleRules => _config.Current.Rules.Any(r => r.IsSample == true);
 
@@ -115,6 +129,12 @@ public sealed partial class RulesViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void TurnOnRouting() => _config.Update(c => c.Settings.RoutingEnabled = true);
+
+    [RelayCommand]
+    private void OpenSetup() => _windows.ShowMainWindow(AppPage.Settings);
+
+    [RelayCommand]
     private void FindBrowsers()
     {
         if (_config.Current.Settings.OfferSamples) StartEmpty();
@@ -142,7 +162,15 @@ public sealed partial class RulesViewModel : ViewModelBase
     internal void Delete(RuleItemViewModel item)
     {
         if (Editor.EditingId == item.Id) Editor.Close();
-        _config.Update(c => c.Rules.RemoveAll(r => r.Id == item.Id));
+        var index = _config.Current.Rules.FindIndex(r => r.Id == item.Id);
+        if (index < 0) return;
+        var removed = _config.Current.Rules[index].Clone();
+        _config.Update(c => c.Rules.RemoveAt(index));
+        Undo.Show($"Deleted rule {index + 1}  ·  {removed.Pattern}", () => _config.Update(c =>
+        {
+            if (c.Rules.Any(r => r.Id == removed.Id)) return;
+            c.Rules.Insert(Math.Min(index, c.Rules.Count), removed);
+        }));
     }
 
     internal void Move(RuleItemViewModel item, int delta) => _config.Update(c =>
@@ -179,14 +207,16 @@ public sealed partial class RulesViewModel : ViewModelBase
         RoutingOffNotice = cfg.Settings.RoutingEnabled
             ? null
             : cfg.FindBrowser(cfg.Settings.PrimaryBrowserId) is { } primary
-                ? $"Routing is off. Right now every link opens in {primary.Name}; this shows where it would go."
-                : "Routing is off. Right now every link goes to the chooser; this shows where it would go.";
+                ? $"Routing is off, so these rules are paused. Every link opens in {primary.Name}."
+                : "Routing is off, so these rules are paused. Every link goes to the chooser.";
 
         OnPropertyChanged(nameof(HasRules));
         OnPropertyChanged(nameof(HasBrowsers));
         OnPropertyChanged(nameof(ShowWelcome));
-        OnPropertyChanged(nameof(ShowNoBrowsers));
-        OnPropertyChanged(nameof(ShowNoRules));
+        OnPropertyChanged(nameof(ShowSetup));
+        OnPropertyChanged(nameof(NeedsBrowsers));
+        OnPropertyChanged(nameof(BrowsersStepDetail));
+        OnPropertyChanged(nameof(ShowRoutingOff));
         OnPropertyChanged(nameof(HasSampleRules));
         OnPropertyChanged(nameof(ShowTester));
         Editor.SyncBrowsers();
@@ -299,10 +329,13 @@ public sealed partial class RuleItemViewModel : ViewModelBase
     public bool BrowserMissing { get; }
     public string? PatternError { get; }
     public bool HasProblem => PatternError is not null || BrowserMissing;
-    public string? Problem => PatternError ?? (BrowserMissing ? "The browser for this rule was removed." : null);
+    public string? Problem => PatternError ?? (BrowserMissing ? "Its browser was removed." : null);
     public string? ExpiryText { get; }
     public bool IsTemporary => ExpiryText is not null;
     public bool IsSample { get; }
+    public bool HasBadges => IsTemporary || IsSample;
+    public bool HasPatternError => PatternError is not null;
+    public bool ShowBrowserFix => BrowserMissing && PatternError is null;
     public bool IsExpired { get; }
     public bool CanMoveUp { get; }
     public bool CanMoveDown { get; }

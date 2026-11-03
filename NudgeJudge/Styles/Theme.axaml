@@ -43,6 +43,44 @@
       <SolidColorBrush x:Key="StopBrush" Color="#BF2F35" />
       <SolidColorBrush x:Key="StopSoftBrush" Color="#F9E0E1" />
       <SolidColorBrush x:Key="SelectionBrush" Color="#F6D58F" />
+      <SolidColorBrush x:Key="DisabledInkBrush" Color="#98A69E" />
+      <!-- "On" is ink, not amber: amber stays for a route being set -->
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#13201A" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#13201A" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#13201A" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#13201A" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FFFFFF" />
+
+      <!-- Text fields: focus is an ink edge on the surface, never a fill change -->
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#13201A" />
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF" />
+
+      <!-- Secondary buttons: outlined on the surface, so they never read as disabled -->
+      <SolidColorBrush x:Key="ButtonBackground" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#F4F7F5" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#E6ECE8" />
+      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#B4C1B9" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#66766D" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#66766D" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#D5DDD8" />
+      <SolidColorBrush x:Key="ButtonForeground" Color="#13201A" />
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#13201A" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#13201A" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#98A69E" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Dark">
       <SolidColorBrush x:Key="GroundBrush" Color="#0D1411" />
@@ -63,6 +101,44 @@
       <SolidColorBrush x:Key="StopBrush" Color="#EA5A5F" />
       <SolidColorBrush x:Key="StopSoftBrush" Color="#3A1618" />
       <SolidColorBrush x:Key="SelectionBrush" Color="#6B4E12" />
+      <SolidColorBrush x:Key="DisabledInkBrush" Color="#53665B" />
+      <!-- "On" is ink, not amber: amber stays for a route being set -->
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#141E19" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#141E19" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#141E19" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#141E19" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#141E19" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#141E19" />
+
+      <!-- Text fields: focus is an ink edge on the surface, never a fill change -->
+      <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#141E19" />
+
+      <!-- Secondary buttons: outlined on the surface, so they never read as disabled -->
+      <SolidColorBrush x:Key="ButtonBackground" Color="#141E19" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#19251F" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#0A100D" />
+      <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="#34453C" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#84978C" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#84978C" />
+      <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="#24322B" />
+      <SolidColorBrush x:Key="ButtonForeground" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#53665B" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
 
@@ -70,12 +146,6 @@
   <SolidColorBrush x:Key="AccentButtonForeground" Color="#1A1305" />
   <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#1A1305" />
   <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#1A1305" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#1A1305" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#1A1305" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#1A1305" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1A1305" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1A1305" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1A1305" />
   <CornerRadius x:Key="ControlCornerRadius">5</CornerRadius>
   <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
 
@@ -85,6 +155,7 @@
   <StreamGeometry x:Key="Icon.Activity">M4 6H6 M10 6H20 M4 12H6 M10 12H20 M4 18H6 M10 18H16</StreamGeometry>
   <StreamGeometry x:Key="Icon.Settings">M4 7H13 M17 7H20 M15 4.5V9.5 M4 17H7 M11 17H20 M9 14.5V19.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Arrow">M5 12H19 M13.5 6.5L19 12L13.5 17.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Check">M5 12.5L10 17.5L19 7.5</StreamGeometry>
   <StreamGeometry x:Key="Icon.Plus">M12 5V19 M5 12H19</StreamGeometry>
   <StreamGeometry x:Key="Icon.Trash">M5 7H19 M10 7V4.5H14V7 M7 7L8 20H16L17 7 M10.5 11V16 M13.5 11V16</StreamGeometry>
   <StreamGeometry x:Key="Icon.Up">M12 19V5 M6.5 10.5L12 5L17.5 10.5</StreamGeometry>

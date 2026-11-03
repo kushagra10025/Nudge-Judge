@@ -48,9 +48,9 @@ public partial class App : Application
         chooser.Attach(windows);
         var settings = new SettingsViewModel(config, new StubDefaultBrowserRegistrar(), new AvaloniaThemeService(), dispatcher);
         var main = new MainWindowViewModel(
-            new RulesViewModel(config, engine, boot, chooser, windows, dispatcher),
+            new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
-            new ActivityViewModel(activity, dispatcher),
+            new ActivityViewModel(activity, dispatcher, settings, windows),
             settings,
             config);
 

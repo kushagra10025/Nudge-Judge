@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NudgeJudge.ViewModels"
+             xmlns:c="using:NudgeJudge.Controls"
+             x:Class="NudgeJudge.Views.UndoToast"
+             x:DataType="vm:UndoBar"
+             HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
+             IsVisible="{Binding IsOpen}">
+  <Border Classes="toast" MaxWidth="560">
+    <Grid ColumnDefinitions="*,Auto,Auto">
+      <TextBlock Text="{Binding Message}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+      <Button Grid.Column="1" Content="Undo" FontWeight="SemiBold" Command="{Binding UndoCommand}" />
+      <Button Grid.Column="2" Classes="icon" Command="{Binding DismissCommand}" Margin="2,0,0,0"
+              ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+        <c:Icon Data="{StaticResource Icon.Close}" Width="14" Height="14" />
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>

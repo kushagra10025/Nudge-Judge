@@ -79,7 +79,7 @@
     <Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="Border.badge > TextBlock">
+  <Style Selector="Border.badge TextBlock">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
@@ -87,19 +87,24 @@
   <Style Selector="Border.badge.route">
     <Setter Property="Background" Value="{DynamicResource RouteSoftBrush}" />
   </Style>
-  <Style Selector="Border.badge.route > TextBlock">
+  <Style Selector="Border.badge c|Icon">
+    <Setter Property="Width" Value="11" />
+    <Setter Property="Height" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
+  </Style>
+  <Style Selector="Border.badge.route TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource RouteInkBrush}" />
   </Style>
   <Style Selector="Border.badge.proceed">
     <Setter Property="Background" Value="{DynamicResource ProceedSoftBrush}" />
   </Style>
-  <Style Selector="Border.badge.proceed > TextBlock">
+  <Style Selector="Border.badge.proceed TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource ProceedBrush}" />
   </Style>
   <Style Selector="Border.badge.stop">
     <Setter Property="Background" Value="{DynamicResource StopSoftBrush}" />
   </Style>
-  <Style Selector="Border.badge.stop > TextBlock">
+  <Style Selector="Border.badge.stop TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource StopBrush}" />
   </Style>
 
@@ -177,6 +182,21 @@
     <Setter Property="Fill" Value="{StaticResource PanelLampBrush}" />
   </Style>
 
+  <!-- Button on the signalling panel -->
+  <Style Selector="Button.panel-link">
+    <Setter Property="Background" Value="{StaticResource PanelHoverBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PanelLineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Button.panel-link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PanelMutedBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+  </Style>
+
   <!-- Rows -->
   <Style Selector="Border.row">
     <Setter Property="Background" Value="Transparent" />
@@ -192,8 +212,74 @@
   <Style Selector="Border.row.editing">
     <Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
   </Style>
+  <Style Selector="Border.row :is(Control).actions">
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+  <Style Selector="Border.row:pointerover :is(Control).actions, Border.row:focus-within :is(Control).actions, Border.row.editing :is(Control).actions">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
   <Style Selector=":is(Control).dimmed">
     <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- Notices: a neutral strip with one lamp. The lamp carries the meaning, not the fill. -->
+  <Style Selector="Border.notice">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,6,6,6" />
+    <Setter Property="MinHeight" Value="40" />
+  </Style>
+  <Style Selector="Border.notice TextBlock.text">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+  </Style>
+  <Style Selector="Border.notice Ellipse.lamp">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="{DynamicResource InkFaintBrush}" />
+  </Style>
+  <Style Selector="Border.notice.stop Ellipse.lamp">
+    <Setter Property="Fill" Value="{DynamicResource StopBrush}" />
+  </Style>
+
+  <!-- Status lamps (Activity outcomes) -->
+  <Style Selector="Ellipse.status">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Undo toast: a slip of the signalling panel at the foot of the page -->
+  <Style Selector="Border.toast">
+    <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="16,6,6,6" />
+    <Setter Property="BoxShadow" Value="0 8 24 0 #330B1A12" />
+  </Style>
+  <Style Selector="Border.toast TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Border.toast Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+  </Style>
+  <Style Selector="Border.toast Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+  </Style>
+
+  <!-- Editor drawer scrim (narrow windows) -->
+  <Style Selector="Border.scrim">
+    <Setter Property="Background" Value="{DynamicResource GroundBrush}" />
+    <Setter Property="Opacity" Value="0.72" />
   </Style>
 
   <!-- Rule number as a junction marker -->
@@ -205,7 +291,7 @@
     <Setter Property="BorderBrush" Value="{DynamicResource LineStrongBrush}" />
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
   </Style>
-  <Style Selector="Border.junction > TextBlock">
+  <Style Selector="Border.junction TextBlock">
     <Setter Property="HorizontalAlignment" Value="Center" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="FontSize" Value="12" />
@@ -215,6 +301,18 @@
   <Style Selector="Border.junction.lit">
     <Setter Property="Background" Value="{DynamicResource RouteBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource RouteBrush}" />
+  </Style>
+  <Style Selector="Border.junction.done">
+    <Setter Property="BorderBrush" Value="{DynamicResource ProceedBrush}" />
+  </Style>
+  <Style Selector="Border.junction > c|Icon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="StrokeThickness" Value="2.2" />
+    <Setter Property="Foreground" Value="{DynamicResource ProceedBrush}" />
+  </Style>
+  <Style Selector=":is(Control).paused Border.junction">
+    <Setter Property="Opacity" Value="0.45" />
   </Style>
   <Style Selector="Border.junction.lit > TextBlock">
     <Setter Property="Foreground" Value="{StaticResource OnLampBrush}" />
@@ -242,6 +340,10 @@
   <Style Selector="Button.platform">
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <!-- Same height whether or not a card has a detail line, so the two columns line up -->
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="MinHeight" Value="58" />
     <Setter Property="Padding" Value="12,10" />
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />

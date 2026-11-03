@@ -9,6 +9,14 @@
     <Style Selector="Grid.setting">
       <Setter Property="Margin" Value="20,16" />
     </Style>
+    <!-- Cards span the page like the other lists; descriptions keep a readable measure -->
+    <Style Selector="Grid.setting TextBlock.body">
+      <Setter Property="MaxWidth" Value="600" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Grid.setting > StackPanel">
+      <Setter Property="Margin" Value="0,0,24,0" />
+    </Style>
     <Style Selector="TextBlock.section">
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -18,8 +26,34 @@
   </UserControl.Styles>
 
   <ScrollViewer>
-    <StackPanel Margin="32,28,32,32" MaxWidth="760" HorizontalAlignment="Left">
-      <TextBlock Classes="h1" Text="Settings" />
+    <StackPanel Margin="32,28,32,32">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="h1" Text="Settings" />
+        <TextBlock Classes="muted" FontSize="13" Text="Changes save as you make them." />
+      </StackPanel>
+
+      <!-- First, because nothing else works until links reach NudgeJudge -->
+      <TextBlock Classes="section" Text="Default browser" />
+      <Border Classes="surface">
+        <Grid Classes="setting" ColumnDefinitions="Auto,*,Auto">
+          <Panel Width="10" Height="10" Margin="0,5,12,0" VerticalAlignment="Top">
+            <Ellipse Fill="{DynamicResource ProceedBrush}" IsVisible="{Binding IsRegistered}" />
+            <Ellipse Stroke="{DynamicResource InkFaintBrush}" StrokeThickness="1.5" IsVisible="{Binding NeedsSetup}" />
+          </Panel>
+          <StackPanel Grid.Column="1" Spacing="2">
+            <TextBlock Classes="label" Text="NudgeJudge is your default browser" IsVisible="{Binding IsRegistered}" />
+            <TextBlock Classes="label" Text="NudgeJudge isn't your default browser yet" IsVisible="{Binding NeedsSetup}" />
+            <TextBlock Classes="body muted" Text="{Binding RegistrationMessage}" />
+          </StackPanel>
+          <Button Grid.Column="2" Classes="accent" Command="{Binding RegisterCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
+                  IsVisible="{Binding NeedsSetup}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Data="{StaticResource Icon.Shield}" />
+              <TextBlock Text="Make default" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
 
       <TextBlock Classes="section" Text="Routing" />
       <Border Classes="surface">
@@ -84,28 +118,13 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="section" Text="System" />
+      <TextBlock Classes="section" Text="Files" />
       <Border Classes="surface">
-        <StackPanel>
-          <Grid Classes="setting" ColumnDefinitions="*,Auto">
-            <StackPanel Spacing="2">
-              <TextBlock Classes="label" Text="Default browser" />
-              <TextBlock Classes="body muted" Text="{Binding RegistrationMessage}" />
-            </StackPanel>
-            <Button Grid.Column="1" Command="{Binding RegisterCommand}" VerticalAlignment="Center" IsEnabled="{Binding !IsRegistered}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource Icon.Shield}" />
-                <TextBlock Text="Make NudgeJudge the default" />
-              </StackPanel>
-            </Button>
-          </Grid>
-          <Rectangle Classes="divider" />
-          <Grid Classes="setting" RowDefinitions="Auto,Auto">
-            <TextBlock Classes="label" Text="Configuration file" />
-            <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
-                                 Text="{Binding ConfigPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
-          </Grid>
-        </StackPanel>
+        <Grid Classes="setting" RowDefinitions="Auto,Auto">
+          <TextBlock Classes="label" Text="Configuration file" />
+          <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
+                               Text="{Binding ConfigPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
+        </Grid>
       </Border>
     </StackPanel>
   </ScrollViewer>

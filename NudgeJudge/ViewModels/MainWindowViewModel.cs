@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Services;
 
@@ -42,4 +43,6 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     };
 
     public void Navigate(AppPage page) => SelectedPageIndex = (int)page;
+
+    [RelayCommand] private void OpenSetup() => Navigate(AppPage.Settings);
 }
