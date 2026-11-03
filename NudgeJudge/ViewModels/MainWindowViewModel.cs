@@ -16,6 +16,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Settings = settings;
         ConfigProblem = config.LoadError;
 
+        rules.KnownSources = () => activity.KnownSources;
         rules.FindBrowsersRequested += (_, _) =>
         {
             Navigate(AppPage.Browsers);

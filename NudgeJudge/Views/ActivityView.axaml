@@ -31,7 +31,7 @@
       </Grid>
     </Border>
 
-    <TextBox Grid.Row="2" Text="{Binding Filter}" PlaceholderText="Filter by link, rule or browser" MaxWidth="420"
+    <TextBox Grid.Row="2" Text="{Binding Filter}" PlaceholderText="Filter by link, rule, browser or app" MaxWidth="420"
              HorizontalAlignment="Left" Margin="0,0,0,12" IsVisible="{Binding !IsEmpty}"
              AutomationProperties.Name="Filter activity">
       <TextBox.InnerLeftContent>
@@ -80,10 +80,22 @@
                                VerticalAlignment="Center" FontWeight="Medium" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="3">
-                    <TextBlock Text="{Binding Host}" FontWeight="SemiBold" />
+                    <!-- Host, then the app the link came from: rules can route on either -->
+                    <Grid ColumnDefinitions="Auto,*">
+                      <TextBlock Text="{Binding Host}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,*" Margin="10,0,0,0" IsVisible="{Binding HasSource}"
+                            ToolTip.Tip="{Binding SourceDetail}" VerticalAlignment="Center">
+                        <TextBlock Classes="small faint" Text="from" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <c:Icon Grid.Column="1" Data="{StaticResource Icon.App}" Width="12" Height="12" StrokeThickness="2"
+                                Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBlock Grid.Column="2" Classes="small muted" Text="{Binding SourceName}" FontWeight="Medium"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   AutomationProperties.Name="Opened from" />
+                      </Grid>
+                    </Grid>
                     <SelectableTextBlock Classes="mono faint" FontSize="12" Text="{Binding Url}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Classes="small muted" TextWrapping="Wrap">
-                      <Run Text="{Binding RoutePrefix}" /><Run Text="{Binding RoutePattern}" FontFamily="{StaticResource MonoFont}" /><Run Text="{Binding RouteSuffix}" />
+                      <Run Text="{Binding RoutePrefix}" /><Run Text="{Binding RouteName}" Foreground="{DynamicResource InkBrush}" /><Run Text="{Binding RoutePattern}" FontFamily="{StaticResource MonoFont}" /><Run Text="{Binding RouteSuffix}" />
                     </TextBlock>
                   </StackPanel>
                   <!-- Shown on hover and keyboard focus (Styles.axaml) -->

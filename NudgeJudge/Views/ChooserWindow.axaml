@@ -43,7 +43,7 @@
     <Panel Grid.Row="1" IsVisible="{Binding HasSelection}"><Panel DataContext="{Binding SelectedTab}">
     <StackPanel Margin="24,20,24,0" Spacing="6" x:DataType="vm:ChooserTabViewModel">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBlock Classes="small faint" Text="No rule matched" />
+        <TextBlock Classes="small faint" Text="{Binding OriginText}" TextTrimming="CharacterEllipsis" MaxWidth="460" />
         <Border Classes="badge stop" IsVisible="{Binding IsInsecure}" ToolTip.Tip="This link isn't encrypted (http)">
           <TextBlock Text="Not secure" />
         </Border>
@@ -112,8 +112,12 @@
           </Panel></Panel>
         </Grid>
         <Panel IsVisible="{Binding SavesRule}"><Panel DataContext="{Binding SelectedTab}">
-          <TextBlock Classes="error" x:DataType="vm:ChooserTabViewModel"
-                     Text="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+          <StackPanel x:DataType="vm:ChooserTabViewModel" Spacing="8">
+            <TextBlock Classes="error" Text="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+            <!-- The same link can deserve a different browser depending on where it was clicked -->
+            <CheckBox Content="{Binding OnlyFromSourceLabel}" IsChecked="{Binding OnlyFromSource}" IsVisible="{Binding HasSource}"
+                      Margin="0,-4,0,0" AutomationProperties.Name="Only links from this app" />
+          </StackPanel>
         </Panel></Panel>
 
         <Grid ColumnDefinitions="*,Auto,Auto">

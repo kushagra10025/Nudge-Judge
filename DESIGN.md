@@ -45,7 +45,19 @@ Settings opens with the default-browser card for the same reason: nothing else w
 
 ## Match-kind glyphs
 
-[Controls/MatchKindGlyph.cs](NudgeJudge/Controls/MatchKindGlyph.cs): domain = filled square, wildcard = open diamond, path prefix = arrowhead, regex = ring with dot. Show them next to every pattern.
+[Controls/MatchKindGlyph.cs](NudgeJudge/Controls/MatchKindGlyph.cs): domain = filled square, wildcard = open diamond, path prefix = arrowhead, regex = ring with dot. Show them next to every pattern. Source-app conditions use the `Icon.App` stroke icon (a window with content lines) in the same places.
+
+## Rules: name first, conditions underneath
+
+A rule row leads with the rule's **name** (semibold, UI font): names are required, because a compound rule has no single pattern to show. Under it, [Controls/ConditionSummary.cs](NudgeJudge/Controls/ConditionSummary.cs) draws the conditions as one trimmed line: glyph or app icon, values in mono, connecting words ("or", "from", "and") in the faint text face. The full line is the tooltip.
+
+The editor's **When** section lays conditions on a track like junctions on the line: each condition's glyph sits in a 16 px gutter, a 1.5 px Track line runs from it to the next, and the join word ("and"/"or", semibold muted) sits on the line between them. The "Match all/any of these" choice appears only with two or more conditions. Alternatives within a condition are stacked fields; every field after the first shows a faint "or" inside it. Errors sit under the field they belong to. Conditions are not boxed: the editor is already a panel, and cards never nest.
+
+The rule name is suggested from the first link pattern and app ("acme.io from Microsoft Teams") until the user types their own, so the required field never starts empty. Clearing it disables Save and says why.
+
+## Source app
+
+Where a link came from is shown as "from ▤ Microsoft Teams" (faint "from", muted name, path in the tooltip) beside the host in Activity, and in the chooser's eyebrow line ("No rule matched this link from Microsoft Teams"). The chooser's footer offers "Only links from …" when saving a rule. The tester takes an optional app beside the link.
 
 ## Icons
 

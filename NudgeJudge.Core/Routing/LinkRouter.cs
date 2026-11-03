@@ -11,8 +11,11 @@ public enum RouteKind { Launched, NeedsChoice, Rejected, Failed }
 
 public sealed record RouteDecision(RouteKind Kind, Uri? Url, string? Message = null);
 
+/// <summary>A link waiting for the user to choose, and the app it came from.</summary>
+public sealed record IncomingLink(Uri Url, SourceApp? Source = null);
+
 /// <summary>
-/// The single entry point for incoming links (command line today, IPC later).
+/// The single entry point for incoming links (this launch's command line, or one forwarded by a later launch).
 /// Validate, then pass through, match or ask.
 /// </summary>
 public sealed class LinkRouter(
@@ -25,14 +28,16 @@ public sealed class LinkRouter(
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
     /// <summary>Raised (on the caller's thread) when no rule matches and the user must choose.</summary>
-    public event EventHandler<Uri>? ChoiceRequested;
+    public event EventHandler<IncomingLink>? ChoiceRequested;
 
-    public RouteDecision Route(string? rawUrl)
+    /// <param name="source">The app that opened the link, when known. Rules can match on it.</param>
+    public RouteDecision Route(string? rawUrl, SourceApp? source = null)
     {
+        source = SourceApp.Sanitize(source);
         var validation = UrlValidator.Validate(rawUrl);
         if (!validation.IsValid)
         {
-            Log(Truncate(rawUrl), ActivityOutcome.Rejected, detail: validation.Error);
+            Log(new(Now, Truncate(rawUrl), ActivityOutcome.Rejected, Detail: validation.Error, Source: source));
             return new RouteDecision(RouteKind.Rejected, null, validation.Error);
         }
 
@@ -43,43 +48,41 @@ public sealed class LinkRouter(
         {
             var primary = cfg.FindBrowser(cfg.Settings.PrimaryBrowserId);
             if (primary is not null)
-                return Launch(primary, url, ActivityOutcome.PassedThrough);
+                return Launch(primary, url, source, ActivityOutcome.PassedThrough);
             // No primary browser configured: fall through to asking rather than dropping the link.
         }
         else
         {
-            var result = engine.Match(url, cfg.Rules);
+            var result = engine.Match(url, cfg.Rules, source);
             if (result.Rule is { } rule)
             {
                 var browser = cfg.FindBrowser(rule.BrowserId);
                 if (browser is not null)
-                    return Launch(browser, url, ActivityOutcome.Routed, result.RuleIndex + 1, rule.Pattern);
-                Log(url.AbsoluteUri, ActivityOutcome.Failed, ruleNumber: result.RuleIndex + 1, pattern: rule.Pattern,
-                    detail: "The rule's browser no longer exists. Asking instead.");
+                    return Launch(browser, url, source, ActivityOutcome.Routed, result.RuleIndex + 1, rule.Name);
+                Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: result.RuleIndex + 1, RuleName: rule.Name,
+                    Detail: "The rule's browser no longer exists. Asking instead.", Source: source));
             }
         }
 
-        Log(url.AbsoluteUri, ActivityOutcome.Asked);
-        ChoiceRequested?.Invoke(this, url);
+        Log(new(Now, url.AbsoluteUri, ActivityOutcome.Asked, Source: source));
+        ChoiceRequested?.Invoke(this, new IncomingLink(url, source));
         return new RouteDecision(RouteKind.NeedsChoice, url);
     }
 
     /// <summary>Opens a URL the user explicitly chose a browser for (chooser window).</summary>
-    public RouteDecision OpenChosen(Uri url, BrowserProfile browser) => Launch(browser, url, ActivityOutcome.Chosen);
+    public RouteDecision OpenChosen(Uri url, BrowserProfile browser, SourceApp? source = null) =>
+        Launch(browser, url, SourceApp.Sanitize(source), ActivityOutcome.Chosen);
 
-    /// <summary>Creates a rule from a chooser decision. <paramref name="lifetime"/> null means permanent.</summary>
-    public Rule AddRule(MatchKind type, string pattern, Guid browserId, TimeSpan? lifetime, bool untilReboot, ISystemBoot boot)
+    /// <summary>
+    /// Saves a rule made from a chooser decision. <paramref name="lifetime"/> null means permanent.
+    /// Temporary rules go first so they can override permanent ones while they live.
+    /// </summary>
+    public Rule AddRule(Rule rule, TimeSpan? lifetime, bool untilReboot, ISystemBoot boot)
     {
-        var rule = new Rule
-        {
-            MatchKind = type,
-            Pattern = pattern.Trim(),
-            BrowserId = browserId,
-            CreatedAt = _time.GetUtcNow(),
-            ExpiresAt = lifetime is { } l ? _time.GetUtcNow() + l : null,
-            ExpiresAfterBootId = untilReboot ? boot.CurrentBootId : null,
-        };
-        // Temporary rules go first so they can override permanent ones while they live.
+        var now = _time.GetUtcNow();
+        rule.CreatedAt = now;
+        rule.ExpiresAt = lifetime is { } l ? now + l : null;
+        rule.ExpiresAfterBootId = untilReboot ? boot.CurrentBootId : null;
         config.Update(c =>
         {
             if (rule.IsTemporary) c.Rules.Insert(0, rule);
@@ -88,25 +91,27 @@ public sealed class LinkRouter(
         return rule;
     }
 
-    private RouteDecision Launch(BrowserProfile browser, Uri url, ActivityOutcome outcome, int? ruleNumber = null, string? pattern = null)
+    private RouteDecision Launch(BrowserProfile browser, Uri url, SourceApp? source, ActivityOutcome outcome, int? ruleNumber = null,
+        string? ruleName = null)
     {
         try
         {
             launcher.Launch(browser, url);
-            Log(url.AbsoluteUri, outcome, browser.Name, ruleNumber, pattern, browserId: browser.Id);
+            Log(new(Now, url.AbsoluteUri, outcome, browser.Name, ruleNumber, BrowserId: browser.Id, RuleName: ruleName, Source: source));
             return new RouteDecision(RouteKind.Launched, url);
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
             var message = $"Couldn't start {browser.Name}: {ex.Message}";
-            Log(url.AbsoluteUri, ActivityOutcome.Failed, browser.Name, ruleNumber, pattern, message, browser.Id);
+            Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, browser.Name, ruleNumber, Detail: message, BrowserId: browser.Id,
+                RuleName: ruleName, Source: source));
             return new RouteDecision(RouteKind.Failed, url, message);
         }
     }
 
-    private void Log(string url, ActivityOutcome outcome, string? browser = null, int? ruleNumber = null, string? pattern = null, string? detail = null,
-        Guid? browserId = null) =>
-        activity.Add(new ActivityEntry(_time.GetUtcNow(), url, outcome, browser, ruleNumber, pattern, detail, browserId));
+    private DateTimeOffset Now => _time.GetUtcNow();
+
+    private void Log(ActivityEntry entry) => activity.Add(entry);
 
     private static string Truncate(string? s) =>
         s is null ? "(empty)" : s.Length <= 200 ? s : s[..200] + "…";

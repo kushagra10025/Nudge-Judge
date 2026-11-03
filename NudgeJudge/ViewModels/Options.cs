@@ -16,6 +16,21 @@ public sealed record MatchKindOption(MatchKind Kind, string Label, string Hint, 
     public override string ToString() => Label;
 }
 
+public sealed record JoinOption(RuleJoin Join, string Label)
+{
+    public static IReadOnlyList<JoinOption> All { get; } = [new(RuleJoin.All, "all"), new(RuleJoin.Any, "any")];
+    public static JoinOption For(RuleJoin join) => All.First(o => o.Join == join);
+    public override string ToString() => Label;
+}
+
+/// <summary>"is" or "is not", worded for the condition's field.</summary>
+public sealed record OperatorOption(bool Negate, string Label)
+{
+    public static IReadOnlyList<OperatorOption> Link { get; } = [new(false, "matches"), new(true, "doesn't match")];
+    public static IReadOnlyList<OperatorOption> Source { get; } = [new(false, "is"), new(true, "is not")];
+    public override string ToString() => Label;
+}
+
 public sealed record BrowserOption(Guid Id, string Name, string Detail)
 {
     public static BrowserOption From(BrowserProfile b) => new(b.Id, b.Name, BrowserDetail(b));

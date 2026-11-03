@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using NudgeJudge.Core.Config;
+using NudgeJudge.Core.Models;
 
 namespace NudgeJudge.Core.Routing;
 
@@ -20,6 +21,9 @@ public enum ActivityOutcome
     Failed,
 }
 
+/// <param name="RulePattern">The matching rule's pattern. Only in entries written before rules had names.</param>
+/// <param name="RuleName">The matching rule's name.</param>
+/// <param name="Source">The app the link was opened from, when it could be told.</param>
 public sealed record ActivityEntry(
     DateTimeOffset Timestamp,
     string Url,
@@ -28,7 +32,9 @@ public sealed record ActivityEntry(
     int? RuleNumber = null,
     string? RulePattern = null,
     string? Detail = null,
-    Guid? BrowserId = null);
+    Guid? BrowserId = null,
+    string? RuleName = null,
+    SourceApp? Source = null);
 
 /// <summary>
 /// Thread-safe log of what happened to each link (newest last), capped at <see cref="Capacity"/> entries.

@@ -28,7 +28,8 @@ public sealed partial class RulesViewModel : ViewModelBase
         _chooser = chooser;
         _windows = windows;
         // The editor only compares against the test link while the tester is showing it.
-        Editor = new RuleEditorViewModel(config, engine, Browsers, () => IsTesterOpen ? TestUrl : "");
+        Editor = new RuleEditorViewModel(config, engine, Browsers, () =>
+            IsTesterOpen && UrlValidator.Validate(TestUrl).Url is { } url ? new LinkContext(url, TestSourceApp) : null);
         config.Changed += (_, _) => dispatcher.Post(Reload);
         Reload();
     }
@@ -74,6 +75,23 @@ public sealed partial class RulesViewModel : ViewModelBase
     public partial bool IsTesterOpen { get; set; }
 
     [ObservableProperty] public partial string TestUrl { get; set; } = "";
+
+    /// <summary>Optional: test as if the link came from this app (a program name such as ms-teams.exe).</summary>
+    [ObservableProperty] public partial string TestSource { get; set; } = "";
+
+    /// <summary>Program names seen in Activity, offered in the tester and the editor.</summary>
+    public ObservableCollection<string> KnownApps => Editor.KnownApps;
+
+    /// <summary>Where known apps come from (the Activity log). Set by the main window.</summary>
+    public Func<IEnumerable<SourceApp>>? KnownSources
+    {
+        get => Editor.KnownSources;
+        set => Editor.KnownSources = value;
+    }
+
+    private SourceApp? TestSourceApp =>
+        string.IsNullOrWhiteSpace(TestSource) ? null : KnownSources?.Invoke().FirstOrDefault(a => string.Equals(a.Name, TestSource.Trim(), StringComparison.OrdinalIgnoreCase))
+                                                     ?? new SourceApp(TestSource.Trim());
     [ObservableProperty] public partial IReadOnlyList<RouteStop> TestStops { get; set; } = [];
     [ObservableProperty] public partial string? TestDestination { get; set; }
     [ObservableProperty] public partial bool TestIdle { get; set; }
@@ -92,6 +110,12 @@ public sealed partial class RulesViewModel : ViewModelBase
         Editor.RefreshTestVerdict();
     }
 
+    partial void OnTestSourceChanged(string value)
+    {
+        RunTest();
+        Editor.RefreshTestVerdict();
+    }
+
     partial void OnIsTesterOpenChanged(bool value)
     {
         RunTest();
@@ -107,6 +131,7 @@ public sealed partial class RulesViewModel : ViewModelBase
         if (_config.Current.Settings.OfferSamples) StartEmpty();
         var url = IsTesterOpen ? UrlValidator.Validate(TestUrl).Url : null;
         var suggestion = url is not null && !TestMatched ? PatternCompiler.SuggestWildcard(url) : "";
+        Editor.SuggestedSource = IsTesterOpen ? TestSourceApp : null;
         Editor.OpenNew(suggestion, Browsers.FirstOrDefault()?.Id);
         SyncEditingFlags();
     }
@@ -119,9 +144,12 @@ public sealed partial class RulesViewModel : ViewModelBase
     {
         if (_config.Current.Settings.OfferSamples) StartEmpty();
         TestUrl = source.Url.AbsoluteUri;
+        TestSource = source.Source?.Name ?? "";
         IsTesterOpen = true;
         var browser = Browsers.FirstOrDefault(b => b.Id == source.BrowserId)
                       ?? Browsers.FirstOrDefault(b => b.Name == source.BrowserName);
+        // The app it came from is one click away ("Opened from") rather than assumed: most rules are about the link.
+        Editor.SuggestedSource = source.Source;
         Editor.OpenNew(PatternCompiler.SuggestWildcard(source.Url), browser?.Id);
         SyncEditingFlags();
     }
@@ -181,7 +209,7 @@ public sealed partial class RulesViewModel : ViewModelBase
         if (index < 0) return;
         var removed = _config.Current.Rules[index].Clone();
         _config.Update(c => c.Rules.RemoveAt(index));
-        Undo.Show($"Deleted rule {index + 1}  ·  {removed.Pattern}", () => _config.Update(c =>
+        Undo.Show($"Deleted rule {index + 1}  ·  {removed.Name}", () => _config.Update(c =>
         {
             if (c.Rules.Any(r => r.Id == removed.Id)) return;
             c.Rules.Insert(Math.Min(index, c.Rules.Count), removed);
@@ -217,6 +245,11 @@ public sealed partial class RulesViewModel : ViewModelBase
             var compiled = _engine.Compile(rule);
             Rules.Add(new RuleItemViewModel(this, rule, i + 1, cfg.Rules.Count,
                 browser?.Name, compiled.Error, ExpiryText(rule, now), rule.IsExpired(now, _boot)));
+        }
+        if (KnownSources?.Invoke() is { } known)
+        {
+            KnownApps.Clear();
+            foreach (var name in known.Select(a => a.Name).Distinct(StringComparer.OrdinalIgnoreCase)) KnownApps.Add(name);
         }
 
         RoutingOffNotice = cfg.Settings.RoutingEnabled
@@ -264,7 +297,8 @@ public sealed partial class RulesViewModel : ViewModelBase
             return;
         }
 
-        var result = _engine.Match(validation.Url!, rules);
+        var source = TestSourceApp;
+        var result = _engine.Match(validation.Url!, rules, source);
         TestStops = result.Evaluations.Select((e, i) => new RouteStop((i + 1).ToString(), e.State switch
         {
             RuleEvaluationState.Matched => RouteStopState.Matched,
@@ -283,14 +317,14 @@ public sealed partial class RulesViewModel : ViewModelBase
         {
             var browser = _config.Current.FindBrowser(rule.BrowserId)?.Name ?? "a missing browser";
             TestDestination = browser;
-            TestHeadline = $"Rule {result.RuleIndex + 1} opens this in {browser}";
-            TestDetail = $"{MatchKindOption.For(rule.MatchKind).Label}  {rule.Pattern}  ·  matched in {timing}";
+            TestHeadline = $"{rule.Name} (rule {result.RuleIndex + 1}) opens this in {browser}";
+            TestDetail = $"{RuleSummary.DescribeText(rule)}  ·  matched in {timing}";
             if (result.RuleIndex < Rules.Count) Rules[result.RuleIndex].IsTestMatch = true;
         }
         else
         {
             TestDestination = null;
-            TestHeadline = "No rule matches, so NudgeJudge will ask";
+            TestHeadline = source is null ? "No rule matches, so NudgeJudge will ask" : $"No rule matches this link from {source.DisplayName}, so NudgeJudge will ask";
             TestDetail = rules.Count == 0 ? "Add a rule to route links like this automatically." : $"Checked {rules.Count} rules in {timing}";
         }
     }
@@ -311,21 +345,21 @@ public sealed partial class RuleItemViewModel : ViewModelBase
     private readonly bool _loading = true;
 
     public RuleItemViewModel(RulesViewModel owner, Rule rule, int number, int count, string? browserName,
-        string? patternError, string? expiryText, bool isExpired)
+        string? ruleError, string? expiryText, bool isExpired)
     {
         _owner = owner;
         Id = rule.Id;
         Number = number;
-        Kind = rule.MatchKind;
-        KindLabel = MatchKindOption.For(rule.MatchKind).Label;
-        Pattern = rule.Pattern;
-        Name = rule.Name;
+        Name = string.IsNullOrWhiteSpace(rule.Name) ? "Untitled rule" : rule.Name;
+        Summary = RuleSummary.Describe(rule);
+        SummaryText = RuleSummary.DescribeText(rule);
         BrowserName = browserName ?? "Missing browser";
         BrowserMissing = browserName is null;
-        PatternError = patternError;
+        RuleError = ruleError;
         ExpiryText = expiryText;
         IsExpired = isExpired;
         IsSample = rule.IsSample == true;
+        UsesSource = rule.Conditions.Any(c => c.Field == ConditionField.SourceApp);
         CanMoveUp = number > 1;
         CanMoveDown = number < count;
         IsEnabled = rule.Enabled;
@@ -334,23 +368,25 @@ public sealed partial class RuleItemViewModel : ViewModelBase
 
     public Guid Id { get; }
     public int Number { get; }
-    public MatchKind Kind { get; }
-    public string KindLabel { get; }
-    public string Pattern { get; }
+
+    /// <summary>The rule's name: the row's headline.</summary>
     public string Name { get; }
-    public bool HasName => !string.IsNullOrWhiteSpace(Name);
-    public string NameSuffix => HasName ? "  ·  " + Name : "";
+
+    /// <summary>The conditions, drawn under the name (glyphs, patterns, apps).</summary>
+    public IReadOnlyList<SummaryPart> Summary { get; }
+    public string SummaryText { get; }
+    public bool UsesSource { get; }
     public string BrowserName { get; }
     public bool BrowserMissing { get; }
-    public string? PatternError { get; }
-    public bool HasProblem => PatternError is not null || BrowserMissing;
-    public string? Problem => PatternError ?? (BrowserMissing ? "Its browser was removed." : null);
+    public string? RuleError { get; }
+    public bool HasProblem => RuleError is not null || BrowserMissing;
+    public string? Problem => RuleError ?? (BrowserMissing ? "Its browser was removed." : null);
     public string? ExpiryText { get; }
     public bool IsTemporary => ExpiryText is not null;
     public bool IsSample { get; }
     public bool HasBadges => IsTemporary || IsSample;
-    public bool HasPatternError => PatternError is not null;
-    public bool ShowBrowserFix => BrowserMissing && PatternError is null;
+    public bool HasRuleError => RuleError is not null;
+    public bool ShowBrowserFix => BrowserMissing && RuleError is null;
     public bool IsExpired { get; }
     public bool CanMoveUp { get; }
     public bool CanMoveDown { get; }

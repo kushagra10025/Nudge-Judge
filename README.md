@@ -8,15 +8,18 @@ Built with [Avalonia UI](https://avaloniaui.net/) and .NET 10 (C#), using a stri
 
 ## Features
 
-- **Rules, checked top to bottom.** The first rule that matches picks the browser. Four match types:
-  - **Wildcard:** `*.atlassian.net`, `github.com/acme/*` (a leading `*.` also matches the bare domain)
-  - **Exact domain:** `www.youtube.com`
-  - **Path prefix:** `github.com/acme` matches `/acme` and `/acme/…` but not `/acmecorp`
-  - **Regular expression:** matched against the full URL
-- **Live rule tester.** Open "Test a link" on the Rules page (Ctrl+T), paste a link, and a route diagram shows it running past each rule, which rule caught it, and how long matching took.
-- **Chooser for unmatched links.** Links that arrive in a burst queue up as tabs. Press 1–9 to pick a browser and Esc to skip. You can open a link once, or save the choice as a rule for N hours, until restart, or permanently.
+- **Rules, checked top to bottom.** The first rule that matches picks the browser. Every rule has a name (shown in the list and in Activity) and one or more conditions, joined by **all** or **any**. Each condition can be negated ("doesn't match", "is not") and holds any number of alternatives, OR'd together. For example, *YouTube from Teams*: link is `www.youtube.com` or `youtu.be`, **and** opened from `ms-teams.exe`, opens in Chrome. A plain *YouTube* rule below it then sends every other YouTube link to Firefox.
+  - **Link conditions** use one of four match types:
+    - **Wildcard:** `*.atlassian.net`, `github.com/acme/*` (a leading `*.` also matches the bare domain)
+    - **Exact domain:** `www.youtube.com`
+    - **Path prefix:** `github.com/acme` matches `/acme` and `/acme/…` but not `/acmecorp`
+    - **Regular expression:** matched against the full URL
+  - **Opened from conditions** match the app the link was clicked in: a program name with or without `.exe` (`ms-teams`, `slack`), its title (`Microsoft Teams`), a pattern (`*teams*`) or a full path. Program names you've seen in Activity are suggested as you type.
+- **Source app detection.** When an app opens a link, NudgeJudge walks up its own process tree past openers and shells (`xdg-open`, `gio`, `sh`, `OpenWith.exe`, …) to the app that started it. If that chain is broken (the opener exited first), it falls back to the app that owns the foreground window (Windows), then to the `CHROME_DESKTOP` hint Electron apps leave in the environment (Linux). Friendly names come from the program's file description (Windows) or its `.desktop` file (Linux). Detection is best effort: when it can't tell, the link still routes, and "opened from" conditions simply don't match. A link forwarded to the running instance carries the source with it.
+- **Live rule tester.** Open "Test a link" on the Rules page (Ctrl+T), paste a link (and optionally the app it came from), and a route diagram shows it running past each rule, which rule caught it, and how long matching took.
+- **Chooser for unmatched links.** Links that arrive in a burst queue up as tabs. Press 1–9 to pick a browser and Esc to skip. You can open a link once, or save the choice as a rule for N hours, until restart, or permanently. When the chooser knows which app the link came from, it can limit the saved rule to links from that app.
 - **Browser profiles.** Each entry is a program plus arguments, so one browser can appear several times: a specific profile, a private window, extra flags.
-- **Activity log.** Shows every link handled, with the rule or choice that sent it where it went. It's kept between runs in `activity.log` next to the config (one JSON object per line, owner-only). Settings → Activity sets how many entries to keep (100 by default; the oldest are deleted past that) or turns logging off. "Create rule" on an entry opens the rule editor with a pattern suggested from the link and the browser it went to.
+- **Activity log.** Shows every link handled, the app it was opened from, and the rule or choice that sent it where it went. It's kept between runs in `activity.log` next to the config (one JSON object per line, owner-only). Settings → Activity sets how many entries to keep (100 by default; the oldest are deleted past that) or turns logging off. "Create rule" on an entry opens the rule editor with a pattern suggested from the link and the browser it went to; "Opened from" then starts with that entry's app.
 - **Tray menu.** Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit.
 - **Light and dark themes**, following the system by default.
 - **Default-browser setup** from Settings → "Make default":
@@ -68,11 +71,13 @@ The config file is stored at:
 ```
 NudgeJudge.Core/          Plain .NET library with no UI dependencies
   Models/                 Rule, BrowserProfile, AppSettings, AppConfig
-  Rules/                  PatternCompiler (pattern → matcher), RuleEngine (ordered matching + per-rule trace)
+  Rules/                  PatternCompiler (pattern → matcher), SourceAppPattern (app name → matcher),
+                          RuleEngine (conditions → one predicate; ordered matching + per-rule trace)
   Security/               UrlValidator
   Config/                 JsonConfigStore, AppPaths (per-OS paths, private atomic writes), SampleData
   Browsers/               BrowserLauncher (argv-only launch); Discovery/ finds installed browsers, private modes and profiles
-  Platform/               SystemBoot (detects reboots for "until restart" rules); default-browser registrars (Linux xdg-mime,
+  Platform/               SystemBoot (detects reboots for "until restart" rules); SourceAppDetector + per-OS process tables
+                          (which app opened the link); default-browser registrars (Linux xdg-mime,
                           Windows registry + Default Apps, macOS stub), AppLaunchCommand, ICommandRunner
   Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog + its rolling file
   Ipc/                    Single instance: InstanceLock, InstanceServer/InstanceClient, wire protocol, Unix socket and named-pipe transports
@@ -96,7 +101,8 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 
 **Working**
 
-- [x] Rule engine: four match types, ordered first-match-wins, per-rule trace, cached compiled patterns
+- [x] Rule engine: named rules with compound conditions (all/any, negation, OR'd alternatives) on the link (four match types) and the source app; ordered first-match-wins, per-rule trace, cached compiled patterns. Configs from before conditions are upgraded on load (the pattern becomes a link condition and, when unnamed, the name)
+- [x] Source app detection on Linux (`/proc` parent chain, `.desktop` names, `CHROME_DESKTOP`) and Windows (Toolhelp parent chain with recycled-pid check, file descriptions, foreground window), logged in Activity and forwarded over the single-instance channel
 - [x] Temporary rules that expire after N hours or at reboot (Linux `boot_id`; uptime-based on other platforms)
 - [x] URL validation, argv-only browser launch, ReDoS-safe matching
 - [x] JSON config with atomic, owner-only writes; keeps a copy of a corrupt file and starts from defaults
@@ -105,10 +111,10 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - [x] Tray icon and menu, keep-running-in-tray setting, routing on/off with a primary browser for pass-through
 - [x] Light, dark and follow-system themes
 - [x] Browser scanning: Linux `.desktop` entries (including Snap and Flatpak) and Windows `StartMenuInternet`, with a private-window entry per browser and Firefox profiles (both `profiles.ini` and the new profile manager) and Chrome/Chromium-family profiles when there's more than one. A scan that adds browsers removes the sample browsers and rules
-- [x] Default-browser registration: Linux (`.desktop` entry + `xdg-mime`) and Windows (Capabilities registration + Default Apps hand-off). Status is checked whenever the main window comes forward and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering)
+- [x] Default-browser registration: Linux (`.desktop` entry + `xdg-mime`) and Windows (Capabilities registration + Default Apps hand-off). Status is checked whenever the main window comes forward and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering). When .NET is a per-user install the app's own launcher can't find without `DOTNET_ROOT` (e.g. `~/.dotnet`, set only in a shell profile), the handler is registered as `<that runtime>/dotnet NudgeJudge.Desktop.dll`, because desktop apps start link handlers without the terminal's environment
 - [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
 - [x] Single instance with secure local messaging: the first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second. Unix domain socket in an owner-only directory (`$XDG_RUNTIME_DIR/nudgejudge` on Linux), socket `0600`, peer uid checked with `SO_PEERCRED` on Linux; per-user named pipe on Windows (current-user ACL, server owner verified, first-instance check against squatting). A fresh random token per session is stored in a `0600` file and checked in constant time; messages are size-, count- and time-limited; every URL is validated again on receipt. If no server answers within 5 seconds, a launch handles its links itself rather than drop them
-- [x] 155 core unit tests and 21 headless UI tests
+- [x] 191 core unit tests and 29 headless UI tests
 
 **Limitations right now**
 

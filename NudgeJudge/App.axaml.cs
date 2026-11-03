@@ -24,6 +24,9 @@ public partial class App : Application
     /// </summary>
     public InstanceClaim? Instance { get; init; }
 
+    /// <summary>The app that opened the links on this launch's command line, when the entry point could tell.</summary>
+    public NudgeJudge.Core.Models.SourceApp? LaunchSource { get; init; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -77,9 +80,9 @@ public partial class App : Application
         windows.KeepRunningInBackground = () => config.Current.Settings.RunInBackground;
         DataContext = new AppViewModel(settings, windows);
 
-        router.ChoiceRequested += (_, url) => dispatcher.Post(() =>
+        router.ChoiceRequested += (_, link) => dispatcher.Post(() =>
         {
-            chooser.Enqueue(url);
+            chooser.Enqueue(link.Url, link.Source);
             windows.ShowChooser();
         });
 
@@ -108,7 +111,7 @@ public partial class App : Application
 
         // Launched with links (as the default browser is). Links forwarded by later launches join the same chooser.
         foreach (var url in launch.Urls)
-            router.Route(url);
+            router.Route(url, LaunchSource);
 
         // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
         Dispatcher.UIThread.Post(ExitIfIdle);
@@ -126,8 +129,9 @@ public partial class App : Application
                 windows.ShowMainWindow();
                 break;
             case InstanceCommand.Open:
+                // The source is the sender's say-so; Route sanitizes it like any other input.
                 foreach (var url in request.Urls)
-                    router.Route(url);
+                    router.Route(url, request.Source);
                 break;
         }
         return InstanceReply.Success;

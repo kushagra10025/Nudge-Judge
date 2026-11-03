@@ -59,7 +59,10 @@ public sealed class JsonConfigStore : IConfigStore
         try
         {
             var bytes = File.ReadAllBytes(_path);
-            return JsonSerializer.Deserialize(bytes, ConfigJsonContext.Default.AppConfig) ?? new AppConfig();
+            var config = JsonSerializer.Deserialize(bytes, ConfigJsonContext.Default.AppConfig) ?? new AppConfig();
+            // Older files keep one pattern per rule. Upgrade in memory; the next save writes the new shape.
+            config.Upgrade();
+            return config;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {

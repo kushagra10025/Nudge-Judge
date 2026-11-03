@@ -117,10 +117,10 @@ public class RuleEngineTests
         var engine = new RuleEngine(new FakeBoot("b1"));
         var rules = new List<Rule>
         {
-            new() { MatchKind = MatchKind.Domain, Pattern = "other.com" },
-            new() { MatchKind = MatchKind.Wildcard, Pattern = "*.acme.io", Enabled = false },
-            new() { MatchKind = MatchKind.Wildcard, Pattern = "*.acme.io" },
-            new() { MatchKind = MatchKind.Wildcard, Pattern = "*" },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Domain, "other.com")] },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*.acme.io")], Enabled = false },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*.acme.io")] },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*")] },
         };
 
         var result = engine.Match(new Uri("https://jira.acme.io"), rules);
@@ -137,8 +137,8 @@ public class RuleEngineTests
         var engine = new RuleEngine(new FakeBoot("now"));
         var rules = new List<Rule>
         {
-            new() { Pattern = "*", ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1) },
-            new() { Pattern = "*", ExpiresAfterBootId = "earlier-boot" },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*")], ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1) },
+            new() { Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*")], ExpiresAfterBootId = "earlier-boot" },
         };
         Assert.False(engine.Match(new Uri("https://a.com"), rules).IsMatch);
     }

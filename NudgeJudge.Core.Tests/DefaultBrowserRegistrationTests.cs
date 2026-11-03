@@ -277,6 +277,27 @@ public sealed class RegistrationPlumbingTests
     }
 
     [Fact]
+    public void A_per_user_runtime_is_launched_through_its_own_host()
+    {
+        // .NET lives in ~/.dotnet and only ~/.bashrc sets DOTNET_ROOT. Desktop apps (VS Code, mail, chat) start the
+        // link handler without it, so the app's own launcher can't find .NET: run the dll on that runtime's host.
+        const string app = "/src/NudgeJudge.Desktop/bin/Debug/net10.0/NudgeJudge.Desktop";
+        Assert.Equal(["/home/me/.dotnet/dotnet", app + ".dll"],
+            AppLaunchCommand.Resolve(app, app + ".dll", null, "/home/me/.dotnet", ["/usr/lib/dotnet", "/usr/share/dotnet"]));
+    }
+
+    [Fact]
+    public void A_runtime_the_launcher_finds_by_itself_keeps_the_plain_launcher()
+    {
+        const string app = "/opt/nj/NudgeJudge.Desktop";
+        Assert.Equal([app], AppLaunchCommand.Resolve(app, app + ".dll", null, "/usr/lib/dotnet/", ["/usr/lib/dotnet", "/usr/share/dotnet"]));
+        // Self-contained: the runtime sits in the app's own folder.
+        Assert.Equal([app], AppLaunchCommand.Resolve(app, app + ".dll", null, "/opt/nj", ["/usr/share/dotnet"]));
+        // Runtime location unknown: nothing better to offer.
+        Assert.Equal([app], AppLaunchCommand.Resolve(app, app + ".dll", null, null, ["/usr/share/dotnet"]));
+    }
+
+    [Fact]
     public void Launch_command_prefers_the_appimage_file()
     {
         Assert.Equal(["/home/me/NudgeJudge.AppImage"],

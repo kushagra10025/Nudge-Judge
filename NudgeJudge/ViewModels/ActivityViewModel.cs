@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NudgeJudge.Core.Models;
 using NudgeJudge.Core.Routing;
 using NudgeJudge.Core.Security;
 using NudgeJudge.Services;
@@ -9,7 +10,7 @@ using NudgeJudge.Services;
 namespace NudgeJudge.ViewModels;
 
 /// <summary>What "Create rule" on an Activity entry hands to the Rules page.</summary>
-public sealed record RuleFromActivity(Uri Url, Guid? BrowserId, string? BrowserName);
+public sealed record RuleFromActivity(Uri Url, Guid? BrowserId, string? BrowserName, SourceApp? Source = null);
 
 public sealed partial class ActivityViewModel : ViewModelBase
 {
@@ -38,6 +39,10 @@ public sealed partial class ActivityViewModel : ViewModelBase
 
     /// <summary>Most recent few, for the tray and the sidebar.</summary>
     public IEnumerable<ActivityItemViewModel> Recent => _all.Take(5);
+
+    /// <summary>Apps links have come from, newest first, one per program name. Offered when writing rules.</summary>
+    public IEnumerable<SourceApp> KnownSources =>
+        _log.Snapshot().Reverse().Select(e => e.Source).OfType<SourceApp>().DistinctBy(a => a.Name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Raised when the user asks for a rule built from an entry. The main window takes it to the Rules page.</summary>
     public event EventHandler<RuleFromActivity>? CreateRuleRequested;
@@ -78,7 +83,7 @@ public sealed partial class ActivityViewModel : ViewModelBase
     internal void CreateRule(ActivityItemViewModel item)
     {
         if (item.RuleUrl is { } url)
-            CreateRuleRequested?.Invoke(this, new RuleFromActivity(url, item.BrowserId, item.BrowserName));
+            CreateRuleRequested?.Invoke(this, new RuleFromActivity(url, item.BrowserId, item.BrowserName, item.Entry.Source));
     }
 
     private void Add(ActivityEntry entry)
@@ -149,9 +154,20 @@ public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityV
         _ => "Failed",
     };
 
-    // Route line in three runs, so the pattern can be set in mono like everywhere else.
+    // Route line in runs: "Rule 2  YouTube from Teams  →  Chrome". Entries from before rules had names show
+    // the pattern instead, set in mono like patterns everywhere else.
     public string RoutePrefix { get; } = entry.Outcome == ActivityOutcome.Routed ? $"Rule {entry.RuleNumber}  " : "";
-    public string RoutePattern { get; } = entry.Outcome == ActivityOutcome.Routed ? entry.RulePattern ?? "" : "";
+    public string RouteName { get; } = entry.Outcome == ActivityOutcome.Routed ? entry.RuleName ?? "" : "";
+    public string RoutePattern { get; } = entry.Outcome == ActivityOutcome.Routed && entry.RuleName is null ? entry.RulePattern ?? "" : "";
+
+    /// <summary>The app the link was opened from, or null when it couldn't be told.</summary>
+    public string? SourceName { get; } = entry.Source?.DisplayName;
+    public bool HasSource => SourceName is not null;
+
+    /// <summary>The program behind the name: its file name and, when known, its full path.</summary>
+    public string? SourceDetail { get; } = entry.Source is { } s
+        ? s.Path is { } p ? $"{s.Name}\n{p}" : s.Name
+        : null;
 
     public string RouteSuffix { get; } = entry.Outcome switch
     {
@@ -164,7 +180,7 @@ public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityV
 
     public string RouteText { get; } = entry.Outcome switch
     {
-        ActivityOutcome.Routed => $"Rule {entry.RuleNumber}  {entry.RulePattern}  →  {entry.BrowserName}",
+        ActivityOutcome.Routed => $"Rule {entry.RuleNumber}  {entry.RuleName ?? entry.RulePattern}  →  {entry.BrowserName}",
         ActivityOutcome.Chosen => $"You chose {entry.BrowserName}",
         ActivityOutcome.PassedThrough => $"Routing off  →  {entry.BrowserName}",
         ActivityOutcome.Asked => "No rule matched, so the chooser opened",
@@ -192,5 +208,7 @@ public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityV
     internal bool Matches(string filter) =>
         string.IsNullOrWhiteSpace(filter) ||
         Url.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-        RouteText.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        RouteText.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+        (SourceDetail?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (SourceName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false);
 }

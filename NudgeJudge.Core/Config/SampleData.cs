@@ -11,6 +11,7 @@ namespace NudgeJudge.Core.Config;
 /// </summary>
 public static class SampleData
 {
+    // Single-pattern templates, as the first versions shipped them (used to recognise old, unflagged samples).
     private static readonly (string Name, MatchKind Kind, string Pattern)[] RuleTemplates =
     [
         ("Work tracker", MatchKind.Wildcard, "*.atlassian.net"),
@@ -18,6 +19,9 @@ public static class SampleData
         ("Banking", MatchKind.Regex, @"^https://([a-z0-9-]+\.)*mybank\.example/"),
         ("Video", MatchKind.Domain, "www.youtube.com"),
     ];
+
+    /// <summary>Program names Microsoft Teams runs as (new and classic on Windows, the community client on Linux).</summary>
+    private static readonly string[] TeamsApps = ["ms-teams.exe", "Teams.exe", "teams-for-linux"];
 
     /// <summary>The config a fresh install starts with: empty, with the example setup still on offer.</summary>
     public static AppConfig FirstRun() => new() { Settings = new AppSettings { OfferSamples = true } };
@@ -68,14 +72,23 @@ public static class SampleData
 
         Guid[] targets = [chromeWork.Id, chromeWork.Id, firefoxPrivate.Id, firefox.Id];
         config.Browsers.AddRange([firefox, chrome, chromeWork, firefoxPrivate]);
-        config.Rules.AddRange(RuleTemplates.Select((t, i) => new Rule
+        var rules = RuleTemplates.Select((t, i) => new Rule
         {
             Name = t.Name,
-            MatchKind = t.Kind,
-            Pattern = t.Pattern,
+            Conditions = [RuleCondition.Link(t.Kind, t.Pattern)],
             BrowserId = targets[i],
             IsSample = true,
-        }));
+        }).ToList();
+        // A compound rule, ahead of the plain "Video" one: video links from Teams open in the work profile.
+        rules.Insert(3, new Rule
+        {
+            Name = "Video from Teams",
+            Join = RuleJoin.All,
+            Conditions = [RuleCondition.Link(MatchKind.Domain, "www.youtube.com", "youtu.be"), RuleCondition.Source(TeamsApps)],
+            BrowserId = chromeWork.Id,
+            IsSample = true,
+        });
+        config.Rules.AddRange(rules);
         if (config.FindBrowser(config.Settings.PrimaryBrowserId) is null)
             config.Settings.PrimaryBrowserId = firefox.Id;
     }
@@ -119,7 +132,8 @@ public static class SampleData
     private static bool IsSampleRule(Rule rule, HashSet<Guid> sampleBrowserIds) =>
         rule.IsSample ??
         (sampleBrowserIds.Contains(rule.BrowserId) &&
-         RuleTemplates.Any(t => t.Name == rule.Name && t.Kind == rule.MatchKind && t.Pattern == rule.Pattern));
+         rule.Conditions is [{ Field: ConditionField.Link, Values: [var pattern] } only] &&
+         RuleTemplates.Any(t => t.Name == rule.Name && t.Kind == only.MatchKind && t.Pattern == pattern));
 
     private static BrowserProfile? ClosestReal(BrowserProfile sample, List<BrowserProfile> real)
     {

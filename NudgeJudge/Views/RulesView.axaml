@@ -181,17 +181,14 @@
                       <TextBlock Text="{Binding Number}" />
                     </Border>
 
+                    <!-- The name leads; the conditions read underneath as one line -->
                     <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center" Classes.dimmed="{Binding IsDimmed}">
-                      <Grid ColumnDefinitions="20,*">
-                        <c:MatchKindGlyph Kind="{Binding Kind}" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center"
-                                          HorizontalAlignment="Left" ToolTip.Tip="{Binding KindLabel}" />
-                        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Pattern}" FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Pattern}" />
-                      </Grid>
-                      <TextBlock Classes="small faint" Margin="20,0,0,0" TextTrimming="CharacterEllipsis">
-                        <Run Text="{Binding KindLabel}" /><Run Text="{Binding NameSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
-                      </TextBlock>
-                      <WrapPanel Margin="20,3,0,0" ItemSpacing="6" LineSpacing="4" IsVisible="{Binding HasBadges}">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding Name}" />
+                      <c:ConditionSummary Parts="{Binding Summary}" FontSize="12" Foreground="{DynamicResource InkFaintBrush}"
+                                          GlyphBrush="{DynamicResource InkMutedBrush}" ValueBrush="{DynamicResource InkMutedBrush}"
+                                          ToolTip.Tip="{Binding SummaryText}" />
+                      <WrapPanel Margin="0,3,0,0" ItemSpacing="6" LineSpacing="4" IsVisible="{Binding HasBadges}">
                         <Border Classes="badge" IsVisible="{Binding IsTemporary}">
                           <StackPanel Orientation="Horizontal" Spacing="4">
                             <c:Icon Data="{StaticResource Icon.Clock}" />
@@ -202,10 +199,10 @@
                           <TextBlock Text="Sample" />
                         </Border>
                       </WrapPanel>
-                      <TextBlock Classes="error" Margin="20,1,0,0" Text="{Binding PatternError}" TextWrapping="NoWrap"
-                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+                      <TextBlock Classes="error" Margin="0,1,0,0" Text="{Binding RuleError}" TextWrapping="NoWrap"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RuleError}" IsVisible="{Binding HasRuleError}" />
                       <!-- The destination already says "Missing browser" in red; the row offers the fix -->
-                      <Button Classes="ghost" Padding="6,1" Margin="14,0,0,0" FontSize="12" HorizontalAlignment="Left"
+                      <Button Classes="ghost" Padding="6,1" Margin="-6,0,0,0" FontSize="12" HorizontalAlignment="Left"
                               Content="Pick a browser" Command="{Binding EditCommand}" IsVisible="{Binding ShowBrowserFix}"
                               ToolTip.Tip="This rule's browser was removed" />
                     </StackPanel>
@@ -264,7 +261,7 @@
             </Button>
           </Grid>
 
-          <Grid ColumnDefinitions="*,Auto" Margin="0,0,4,0">
+          <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,4,0">
             <TextBox x:Name="TestUrlBox" Classes="mono" Text="{Binding TestUrl}"
                      PlaceholderText="Paste a link, e.g. https://jira.acme.io/browse/OPS-1"
                      AutomationProperties.Name="Test link">
@@ -272,7 +269,16 @@
                 <c:Icon Data="{StaticResource Icon.Search}" Margin="10,0,2,0" Foreground="{DynamicResource InkFaintBrush}" />
               </TextBox.InnerLeftContent>
             </TextBox>
-            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding SendTestToChooserCommand}"
+            <!-- Optional: rules can depend on the app a link came from -->
+            <AutoCompleteBox Grid.Column="1" Classes="mono" Width="200" Margin="8,0,0,0" Text="{Binding TestSource}"
+                             ItemsSource="{Binding KnownApps}" FilterMode="Contains" MinimumPrefixLength="0"
+                             PlaceholderText="From any app" AutomationProperties.Name="Test source app"
+                             ToolTip.Tip="Test as if the link came from this app, e.g. ms-teams.exe">
+              <AutoCompleteBox.InnerLeftContent>
+                <c:Icon Data="{StaticResource Icon.App}" Margin="10,0,2,0" Foreground="{DynamicResource InkFaintBrush}" />
+              </AutoCompleteBox.InnerLeftContent>
+            </AutoCompleteBox>
+            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding SendTestToChooserCommand}"
                     ToolTip.Tip="Open this link in the chooser, as if no rule matched">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Data="{StaticResource Icon.Open}" />
@@ -302,7 +308,7 @@
     <!-- Editor -->
     <Panel x:Name="EditorHost" Grid.Row="0" DataContext="{Binding Editor}">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <Border x:Name="EditorPanel" Classes="panel" Width="340" Padding="20" VerticalAlignment="Top"
+    <Border x:Name="EditorPanel" Classes="panel" Width="360" Padding="20" VerticalAlignment="Top"
             IsVisible="{Binding IsOpen}" x:DataType="vm:RuleEditorViewModel">
       <StackPanel Spacing="16">
         <Grid ColumnDefinitions="*,Auto">
@@ -314,39 +320,155 @@
         </Grid>
 
         <StackPanel Spacing="6">
-          <TextBlock Classes="label" Text="Match" />
-          <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch">
-            <ComboBox.ItemTemplate>
-              <DataTemplate DataType="vm:MatchKindOption">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <c:MatchKindGlyph Kind="{Binding Kind}" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Label}" />
-                </StackPanel>
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-          <TextBlock Classes="body faint small" Text="{Binding Kind.Hint}" />
+          <TextBlock Classes="label" Text="Name" />
+          <TextBox Text="{Binding Name}" PlaceholderText="e.g. YouTube from Teams" AutomationProperties.Name="Rule name"
+                   MaxLength="120" />
+          <TextBlock Classes="error" Text="{Binding NameError}" IsVisible="{Binding HasNameError}" TextWrapping="Wrap" />
         </StackPanel>
 
-        <StackPanel Spacing="6">
-          <TextBlock Classes="label" Text="Pattern" />
-          <TextBox Classes="mono" Text="{Binding Pattern}" PlaceholderText="{Binding Kind.Example}" AutomationProperties.Name="Pattern" />
-          <TextBlock Classes="error" Text="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+        <!-- Conditions sit on a track, like junctions on the line; the join word sits on the track between them -->
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto" MinHeight="28">
+            <TextBlock Classes="label" Text="When" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowJoin}">
+              <TextBlock Classes="small muted" Text="Match" VerticalAlignment="Center" />
+              <ComboBox ItemsSource="{Binding Joins}" SelectedItem="{Binding Join}" MinWidth="0" Padding="10,2,8,2"
+                        FontSize="12" AutomationProperties.Name="Match all or any conditions" />
+              <TextBlock Classes="small muted" Text="of these" VerticalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding Conditions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:ConditionEditorViewModel">
+                <StackPanel>
+                  <Grid ColumnDefinitions="16,*" Height="28" IsVisible="{Binding ShowJoinLabel}">
+                    <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="small" Text="{Binding JoinLabel}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                  </Grid>
+                  <Grid ColumnDefinitions="16,*">
+                    <!-- The track continues below this glyph to the join word and the next condition -->
+                    <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center"
+                               Margin="0,28,0,0" IsVisible="{Binding !IsLast}" />
+                    <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
+                      <c:MatchKindGlyph Kind="{Binding Kind.Kind}" Foreground="{DynamicResource InkMutedBrush}"
+                                        IsVisible="{Binding IsLink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <c:Icon Data="{StaticResource Icon.App}" Width="14" Height="14" StrokeThickness="2"
+                              Foreground="{DynamicResource InkMutedBrush}" IsVisible="{Binding IsSource}" />
+                    </Panel>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="6">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Operators}" SelectedItem="{Binding Operator}"
+                                  MinWidth="0" Padding="10,2,8,2" FontSize="12" HorizontalAlignment="Left"
+                                  AutomationProperties.Name="{Binding Heading, StringFormat='{}{0} operator'}" />
+                        <Button Grid.Column="2" Classes="ghost icon danger" Command="{Binding RemoveCommand}"
+                                ToolTip.Tip="Remove this condition" AutomationProperties.Name="Remove condition">
+                          <c:Icon Data="{StaticResource Icon.Trash}" />
+                        </Button>
+                      </Grid>
+
+                      <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch"
+                                IsVisible="{Binding IsLink}" AutomationProperties.Name="Match type">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate DataType="vm:MatchKindOption">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <c:MatchKindGlyph Kind="{Binding Kind}" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding Label}" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+
+                      <!-- Alternatives, OR'd: each after the first says so inside its field -->
+                      <ItemsControl ItemsSource="{Binding Values}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:ConditionValueViewModel">
+                            <StackPanel Spacing="4">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsLink}"
+                                         PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Pattern">
+                                  <TextBox.InnerLeftContent>
+                                    <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
+                                               IsVisible="{Binding ShowOr}" />
+                                  </TextBox.InnerLeftContent>
+                                </TextBox>
+                                <AutoCompleteBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsSource}"
+                                                 ItemsSource="{Binding Condition.KnownApps}" FilterMode="Contains" MinimumPrefixLength="0"
+                                                 PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Source app">
+                                  <AutoCompleteBox.InnerLeftContent>
+                                    <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
+                                               IsVisible="{Binding ShowOr}" />
+                                  </AutoCompleteBox.InnerLeftContent>
+                                </AutoCompleteBox>
+                                <Button Grid.Column="1" Classes="ghost icon" Margin="4,0,0,0" Command="{Binding RemoveCommand}"
+                                        IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this alternative"
+                                        AutomationProperties.Name="Remove alternative">
+                                  <c:Icon Data="{StaticResource Icon.Close}" />
+                                </Button>
+                              </Grid>
+                              <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                      <Grid ColumnDefinitions="Auto,*">
+                        <Button Classes="ghost" Padding="6,2" Margin="-6,0,0,0" FontSize="12" Command="{Binding AddValueCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                            <TextBlock Text="{Binding AddValueLabel}" />
+                          </StackPanel>
+                        </Button>
+                        <CheckBox Grid.Column="1" Content="Case-sensitive" IsChecked="{Binding CaseSensitive}" FontSize="12"
+                                  IsVisible="{Binding ShowCaseSensitive}" HorizontalAlignment="Right" MinHeight="0" />
+                      </Grid>
+                      <TextBlock Classes="body faint small" Text="{Binding Hint}" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Classes="body faint small" Text="{Binding RuleError}" IsVisible="{Binding HasRuleError}" />
+
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <Button Command="{Binding AddLinkConditionCommand}" Padding="10,4" FontSize="12"
+                    ToolTip.Tip="Add a condition on the link" AutomationProperties.Name="Add link condition">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                <TextBlock Text="Link" />
+              </StackPanel>
+            </Button>
+            <Button Command="{Binding AddSourceConditionCommand}" Padding="10,4" FontSize="12"
+                    ToolTip.Tip="Add a condition on the app the link was opened from"
+                    AutomationProperties.Name="Add source app condition">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                <TextBlock Text="Opened from" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
           <StackPanel Orientation="Horizontal" Spacing="6"
                       IsVisible="{Binding TestVerdict, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <Panel Width="8" Height="8" VerticalAlignment="Center">
               <Ellipse Fill="{DynamicResource ProceedBrush}" IsVisible="{Binding TestVerdictMatches}" />
               <Ellipse Fill="{DynamicResource LineStrongBrush}" IsVisible="{Binding !TestVerdictMatches}" />
             </Panel>
-            <TextBlock Classes="small muted" Text="{Binding TestVerdict}" />
+            <TextBlock Classes="small muted" Text="{Binding TestVerdict}" TextWrapping="Wrap" />
           </StackPanel>
-          <CheckBox Content="Case-sensitive" IsChecked="{Binding CaseSensitive}" IsVisible="{Binding ShowCaseSensitive}" />
         </StackPanel>
 
         <StackPanel Spacing="6">
           <TextBlock Classes="label" Text="Open in" />
           <ComboBox ItemsSource="{Binding Browsers}" SelectedItem="{Binding Browser}" HorizontalAlignment="Stretch"
-                    PlaceholderText="Choose a browser">
+                    PlaceholderText="Choose a browser" AutomationProperties.Name="Open in">
             <ComboBox.ItemTemplate>
               <DataTemplate DataType="vm:BrowserOption">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -358,11 +480,6 @@
           </ComboBox>
           <TextBlock Classes="body faint small" IsVisible="{Binding HasNoBrowsers}"
                      Text="No browsers yet. Add or scan for them on the Browsers page." />
-        </StackPanel>
-
-        <StackPanel Spacing="6">
-          <TextBlock Classes="label" Text="Name" />
-          <TextBox Text="{Binding Name}" PlaceholderText="Optional, e.g. Work tracker" />
         </StackPanel>
 
         <Border Classes="badge route" Padding="10,8" CornerRadius="6" IsVisible="{Binding IsTemporary}">

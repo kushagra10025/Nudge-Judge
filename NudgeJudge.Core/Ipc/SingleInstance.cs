@@ -1,11 +1,15 @@
 using System.Net.Sockets;
 using NudgeJudge.Core.Config;
+using NudgeJudge.Core.Models;
 
 namespace NudgeJudge.Core.Ipc;
 
-/// <summary>The command line, split into links and flags.</summary>
+/// <summary>The command line, split into links and flags, plus the app that launched us (when there are links).</summary>
 public sealed record LaunchArguments(IReadOnlyList<string> Urls, bool Background)
 {
+    /// <summary>The app that opened these links, detected at startup. Forwarded with them.</summary>
+    public SourceApp? Source { get; init; }
+
     public static LaunchArguments Parse(IEnumerable<string> args)
     {
         var list = args.ToList();
@@ -43,7 +47,7 @@ public static class InstanceClient
     public static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(15);
 
     public static async Task<(DeliveryResult Result, string? Error)> SendAsync(
-        InstanceEndpoint endpoint, InstanceCommand command, IReadOnlyList<string> urls, CancellationToken ct = default)
+        InstanceEndpoint endpoint, InstanceCommand command, IReadOnlyList<string> urls, SourceApp? source = null, CancellationToken ct = default)
     {
         string token;
         try
@@ -69,7 +73,7 @@ public static class InstanceClient
         {
             try
             {
-                await InstanceProtocol.WriteRequestAsync(stream, new InstanceRequest(InstanceProtocol.Version, token, command, urls), ct);
+                await InstanceProtocol.WriteRequestAsync(stream, new InstanceRequest(InstanceProtocol.Version, token, command, urls, source), ct);
                 using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 wait.CancelAfter(ReplyTimeout);
                 var reply = await InstanceProtocol.ReadReplyAsync(stream, wait.Token);
@@ -186,7 +190,7 @@ public static class SingleInstance
             if (launch.ForwardCommand is not { } command)
                 return new InstanceClaim(endpoint, null, forwarded: true, null); // Already running; nothing to say.
 
-            var (result, error) = InstanceClient.SendAsync(endpoint, command, launch.Urls).GetAwaiter().GetResult();
+            var (result, error) = InstanceClient.SendAsync(endpoint, command, launch.Urls, launch.Source).GetAwaiter().GetResult();
             switch (result)
             {
                 case DeliveryResult.Delivered:

@@ -259,7 +259,8 @@ public sealed class ActivityLogTests : IDisposable
         Assert.Equal((int)AppPage.Rules, app.Main.SelectedPageIndex);
         Assert.True(rules.Editor.IsOpen);
         Assert.True(rules.Editor.IsNew);
-        Assert.Equal("*.acme.io", rules.Editor.Pattern);
+        Assert.Equal("*.acme.io", rules.Editor.Conditions.Single().FirstValue);
+        Assert.Equal("acme.io", rules.Editor.Name); // a suggested name, so the required field never starts empty
         Assert.Equal(app.Chrome.Id, rules.Editor.Browser?.Id);
         Assert.Equal(url.AbsoluteUri, rules.TestUrl);
         Assert.Equal("Matches the test link", rules.Editor.TestVerdict);
@@ -269,7 +270,8 @@ public sealed class ActivityLogTests : IDisposable
         Settle(window);
 
         var rule = Assert.Single(app.Config.Current.Rules);
-        Assert.Equal("*.acme.io", rule.Pattern);
+        Assert.Equal("*.acme.io", Assert.Single(rule.Conditions).Values.Single());
+        Assert.Equal("acme.io", rule.Name);
         Assert.Equal(app.Chrome.Id, rule.BrowserId);
 
         // The next link like it routes by itself.
@@ -288,7 +290,7 @@ public sealed class ActivityLogTests : IDisposable
         Settle(window);
 
         Assert.Equal(app.Chrome.Id, app.Main.Rules.Editor.Browser?.Id);
-        Assert.Equal("*.example.org", app.Main.Rules.Editor.Pattern);
+        Assert.Equal("*.example.org", app.Main.Rules.Editor.Conditions.Single().FirstValue);
     }
 
     [AvaloniaFact]
@@ -315,7 +317,12 @@ public sealed class ActivityLogTests : IDisposable
         {
             Config.Current.Browsers.AddRange([Firefox, Chrome]);
             if (withRule)
-                Config.Current.Rules.Add(new Rule { MatchKind = MatchKind.Wildcard, Pattern = "*.example.com", BrowserId = Firefox.Id });
+                Config.Current.Rules.Add(new Rule
+                {
+                    Name = "Example sites",
+                    Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*.example.com")],
+                    BrowserId = Firefox.Id,
+                });
             settings?.Invoke(Config.Current.Settings);
 
             var dispatcher = new InlineDispatcher();

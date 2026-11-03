@@ -35,13 +35,13 @@ public class SampleDataTests
     public void Adding_samples_keeps_existing_rules_first_and_existing_primary()
     {
         var mine = Real("Firefox", "/usr/bin/firefox");
-        var own = new Rule { Name = "Mine", Pattern = "example.org", BrowserId = mine.Id };
+        var own = new Rule { Name = "Mine", Conditions = [RuleCondition.Link(MatchKind.Domain, "example.org")], BrowserId = mine.Id };
         var c = new AppConfig { Browsers = [mine], Rules = [own], Settings = { PrimaryBrowserId = mine.Id } };
 
         SampleData.AddTo(c);
 
         Assert.Same(own, c.Rules[0]);
-        Assert.Equal(5, c.Rules.Count);
+        Assert.Equal(6, c.Rules.Count);
         Assert.Equal(mine.Id, c.Settings.PrimaryBrowserId);
         Assert.All(c.Rules.Skip(1), r => Assert.NotNull(c.FindBrowser(r.BrowserId)));
     }
@@ -79,7 +79,7 @@ public class SampleDataTests
         video.IsSample = false;
         var work = c.Rules.Single(r => r.Name == "Work tracker");
         work.IsSample = false;
-        var own = new Rule { Name = "Mine", Pattern = "example.org", BrowserId = Sample(c, "Chrome").Id };
+        var own = new Rule { Name = "Mine", Conditions = [RuleCondition.Link(MatchKind.Domain, "example.org")], BrowserId = Sample(c, "Chrome").Id };
         c.Rules.Add(own);
 
         var firefox = Real("Firefox", "firefox");
@@ -118,8 +118,9 @@ public class SampleDataTests
     public void Legacy_configs_without_flag_still_lose_untouched_sample_rules()
     {
         var c = SampleData.Create();
+        c.Rules.RemoveAll(r => r.Conditions.Count > 1); // the compound sample came after the flag
         foreach (var r in c.Rules) r.IsSample = null; // written before IsSample existed
-        c.Rules[0].Pattern = "*.mycompany.net";       // the user changed this one
+        c.Rules[0].Conditions[0].Values[0] = "*.mycompany.net"; // the user changed this one
         c.Browsers.Add(Real("Firefox", "firefox"));
 
         SampleData.RemoveSamples(c);

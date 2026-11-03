@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NudgeJudge.Core.Models;
 using NudgeJudge.Core.Security;
 
 namespace NudgeJudge.Core.Ipc;
@@ -15,7 +16,12 @@ public enum InstanceCommand
     Show,
 }
 
-public sealed record InstanceRequest(int Version, string Token, InstanceCommand Command, IReadOnlyList<string> Urls);
+/// <param name="Source">
+/// The app that opened the links, as seen by the launch that received them (only that process can tell).
+/// Optional and untrusted: the receiver sanitizes it before use.
+/// </param>
+public sealed record InstanceRequest(int Version, string Token, InstanceCommand Command, IReadOnlyList<string> Urls,
+    SourceApp? Source = null);
 
 public sealed record InstanceReply(bool Ok, string? Error = null)
 {

@@ -56,7 +56,7 @@ public sealed partial class ChooserViewModel : ViewModelBase
     public string WaitingText => Tabs.Count switch { 0 => "", 1 => "1 link waiting", var n => $"{n} links waiting" };
 
     /// <summary>Adds an unmatched link. Links arriving in a burst queue behind the current tab instead of stealing focus.</summary>
-    public void Enqueue(Uri url)
+    public void Enqueue(Uri url, SourceApp? source = null)
     {
         var existing = Tabs.FirstOrDefault(t => t.Url == url);
         if (existing is not null)
@@ -70,7 +70,7 @@ public sealed partial class ChooserViewModel : ViewModelBase
         var inBurst = Tabs.Count > 0 && now - _lastArrival <= grouping;
         _lastArrival = now;
 
-        var tab = new ChooserTabViewModel(this, url, now);
+        var tab = new ChooserTabViewModel(this, url, now, source);
         Tabs.Add(tab);
         if (!inBurst || SelectedTab is null) SelectedTab = tab;
         NotifyTabs();
@@ -85,7 +85,7 @@ public sealed partial class ChooserViewModel : ViewModelBase
 
         if (Remember.SavesRule && !tab.ValidatePattern()) return;
 
-        var result = _router.OpenChosen(tab.Url, browser);
+        var result = _router.OpenChosen(tab.Url, browser, tab.Source);
         if (result.Kind != RouteKind.Launched)
         {
             tab.Error = result.Message;
@@ -97,7 +97,7 @@ public sealed partial class ChooserViewModel : ViewModelBase
             TimeSpan? lifetime = Remember.Kind == RememberKind.Hours
                 ? TimeSpan.FromHours(_config.Current.Settings.TemporaryRuleHours)
                 : null;
-            _router.AddRule(tab.Kind.Kind, tab.Pattern, browser.Id, lifetime, Remember.Kind == RememberKind.UntilRestart, _boot);
+            _router.AddRule(tab.ToRule(browser.Id), lifetime, Remember.Kind == RememberKind.UntilRestart, _boot);
         }
 
         Remove(tab);
@@ -178,11 +178,12 @@ public sealed partial class ChooserTabViewModel : ViewModelBase
 {
     private readonly ChooserViewModel _owner;
 
-    public ChooserTabViewModel(ChooserViewModel owner, Uri url, DateTimeOffset arrived)
+    public ChooserTabViewModel(ChooserViewModel owner, Uri url, DateTimeOffset arrived, SourceApp? source = null)
     {
         _owner = owner;
         Url = url;
         Arrived = arrived;
+        Source = source;
         Kind = MatchKindOption.All[0];
         Pattern = PatternCompiler.SuggestWildcard(url);
     }
@@ -194,6 +195,15 @@ public sealed partial class ChooserTabViewModel : ViewModelBase
     public string Rest => Url.IsDefaultPort ? Url.PathAndQuery + Url.Fragment : $":{Url.Port}{Url.PathAndQuery}{Url.Fragment}";
     public string FullUrl => Url.AbsoluteUri;
     public bool IsInsecure => Url.Scheme == Uri.UriSchemeHttp;
+
+    /// <summary>The app the link came from, when known.</summary>
+    public SourceApp? Source { get; }
+    public bool HasSource => Source is not null;
+    public string OriginText => Source is { } s ? $"No rule matched this link from {s.DisplayName}" : "No rule matched";
+    public string OnlyFromSourceLabel => Source is { } s ? $"Only links from {s.DisplayName}" : "";
+
+    /// <summary>Saving a rule: limit it to links from <see cref="Source"/> as well.</summary>
+    [ObservableProperty] public partial bool OnlyFromSource { get; set; }
 
     [ObservableProperty] public partial MatchKindOption Kind { get; set; }
     [ObservableProperty] public partial string Pattern { get; set; }
@@ -213,6 +223,20 @@ public sealed partial class ChooserTabViewModel : ViewModelBase
     partial void OnKindChanged(MatchKindOption value) => PatternError = null;
 
     [RelayCommand] private void Close() => _owner.Remove(this);
+
+    /// <summary>The rule the chooser saves: this tab's pattern, plus the source app when asked for.</summary>
+    internal Rule ToRule(Guid browserId)
+    {
+        var fromSource = OnlyFromSource && Source is not null;
+        var rule = new Rule
+        {
+            Name = RuleNaming.Suggest(Pattern, fromSource ? Source!.DisplayName : null),
+            Conditions = [RuleCondition.Link(Kind.Kind, Pattern.Trim())],
+            BrowserId = browserId,
+        };
+        if (fromSource) rule.Conditions.Add(RuleCondition.Source(Source!.Name));
+        return rule;
+    }
 
     internal bool ValidatePattern()
     {
