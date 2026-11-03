@@ -114,7 +114,7 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - [x] Default-browser registration: Linux (`.desktop` entry + `xdg-mime`) and Windows (Capabilities registration + Default Apps hand-off). Status is checked whenever the main window comes forward and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering). When .NET is a per-user install the app's own launcher can't find without `DOTNET_ROOT` (e.g. `~/.dotnet`, set only in a shell profile), the handler is registered as `<that runtime>/dotnet NudgeJudge.Desktop.dll`, because desktop apps start link handlers without the terminal's environment
 - [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
 - [x] Single instance with secure local messaging: the first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second. Unix domain socket in an owner-only directory (`$XDG_RUNTIME_DIR/nudgejudge` on Linux), socket `0600`, peer uid checked with `SO_PEERCRED` on Linux; per-user named pipe on Windows (current-user ACL, server owner verified, first-instance check against squatting). A fresh random token per session is stored in a `0600` file and checked in constant time; messages are size-, count- and time-limited; every URL is validated again on receipt. If no server answers within 5 seconds, a launch handles its links itself rather than drop them
-- [x] 191 core unit tests and 29 headless UI tests
+- [x] 194 core unit tests and 29 headless UI tests
 
 **Limitations right now**
 

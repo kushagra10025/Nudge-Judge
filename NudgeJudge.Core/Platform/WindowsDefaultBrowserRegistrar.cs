@@ -114,14 +114,15 @@ internal static class WindowsRegistration
     public sealed record Plan(string OpenCommand, IReadOnlyList<Value> Values);
 
     /// <summary>Null when the command can't be written as a Windows command line.</summary>
-    public static Plan? Build(IReadOnlyList<string> command)
+    /// <param name="fileExists">Checks for the app's own launcher (see <see cref="IconFile"/>); defaults to the file system.</param>
+    public static Plan? Build(IReadOnlyList<string> command, Func<string, bool>? fileExists = null)
     {
         // Windows paths can't contain quotes, so plain quoting is unambiguous.
         if (command.Any(a => a.Length == 0 || a.Contains('"') || a.Any(char.IsControl))) return null;
 
         var program = string.Join(' ', command.Select(a => $"\"{a}\""));
         var open = program + " \"%1\"";
-        var icon = $"\"{command[0]}\",0";
+        var icon = $"\"{IconFile(command, fileExists ?? File.Exists)}\",0";
 
         return new Plan(open,
         [
@@ -145,5 +146,26 @@ internal static class WindowsRegistration
 
             new(@"Software\RegisteredApplications", AppName, CapabilitiesKey),
         ]);
+    }
+
+    /// <summary>
+    /// The file whose icon Windows shows for NudgeJudge. Usually the program itself. When the command is the shared
+    /// <c>dotnet.exe</c> host running our dll (a per-user .NET install the launcher can't find on its own), that
+    /// would be .NET's generic icon, so use the app's launcher next to the dll, which carries NudgeJudge's icon.
+    /// Stays on <c>dotnet.exe</c> only when there's no launcher (built with UseAppHost off), rather than naming a
+    /// missing file.
+    /// </summary>
+    internal static string IconFile(IReadOnlyList<string> command, Func<string, bool> fileExists)
+    {
+        var program = command[0];
+        var name = program[(program.LastIndexOfAny(['\\', '/']) + 1)..];
+        if (command.Count >= 2 &&
+            string.Equals(name, "dotnet.exe", StringComparison.OrdinalIgnoreCase) &&
+            command[1].EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            var launcher = command[1][..^4] + ".exe";
+            if (fileExists(launcher)) return launcher;
+        }
+        return program;
     }
 }

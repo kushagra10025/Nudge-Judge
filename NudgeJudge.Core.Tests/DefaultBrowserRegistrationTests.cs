@@ -395,6 +395,38 @@ public sealed class WindowsRegistrationPlanTests
     }
 
     [Fact]
+    public void Icon_is_the_program_itself()
+    {
+        var plan = WindowsRegistration.Build([Exe], _ => true)!;
+        Assert.Equal($"\"{Exe}\",0", ValueOf(plan, WindowsRegistration.CapabilitiesKey, "ApplicationIcon"));
+    }
+
+    [Fact]
+    public void Through_the_dotnet_host_the_icon_comes_from_the_apps_own_launcher()
+    {
+        // A per-user .NET install is registered as "dotnet.exe NudgeJudge.Desktop.dll". Default Apps must still
+        // show NudgeJudge's icon, not .NET's.
+        const string host = @"C:\Users\me\AppData\Local\Microsoft\dotnet\dotnet.exe";
+        const string launcher = @"C:\Apps\NudgeJudge\NudgeJudge.Desktop.exe";
+        var plan = WindowsRegistration.Build([host, @"C:\Apps\NudgeJudge\NudgeJudge.Desktop.dll"], path => path == launcher)!;
+
+        var icon = $"\"{launcher}\",0";
+        Assert.Equal(icon, ValueOf(plan, WindowsRegistration.CapabilitiesKey, "ApplicationIcon"));
+        Assert.Equal(icon, ValueOf(plan, WindowsRegistration.ProgIdKey + @"\Application", "ApplicationIcon"));
+        Assert.Equal(icon, ValueOf(plan, WindowsRegistration.ProgIdKey + @"\DefaultIcon", null));
+        Assert.Equal(icon, ValueOf(plan, WindowsRegistration.ClientKey + @"\DefaultIcon", null));
+        // Only the icon moves: links still run on the dotnet host.
+        Assert.StartsWith($"\"{host}\" ", plan.OpenCommand);
+    }
+
+    [Fact]
+    public void Without_a_launcher_the_icon_stays_on_the_dotnet_host()
+    {
+        string[] command = [@"C:\dotnet\dotnet.exe", @"C:\Apps\NudgeJudge.Desktop.dll"];
+        Assert.Equal(@"C:\dotnet\dotnet.exe", WindowsRegistration.IconFile(command, _ => false));
+    }
+
+    [Fact]
     public void Arguments_that_would_break_quoting_are_rejected()
     {
         Assert.Null(WindowsRegistration.Build([@"C:\a""b\nj.exe"]));
