@@ -1,0 +1,224 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NudgeJudge.ViewModels"
+             xmlns:c="using:NudgeJudge.Controls"
+             x:Class="NudgeJudge.Views.RulesView"
+             x:DataType="vm:RulesViewModel">
+
+  <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,0">
+
+    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*">
+
+      <!-- Header -->
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="h1" Text="Rules" />
+          <TextBlock Classes="muted" FontSize="13" TextWrapping="Wrap" Margin="0,0,16,0"
+                     Text="Checked from the top. The first rule that matches picks the browser." />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="accent" Command="{Binding NewRuleCommand}" VerticalAlignment="Center"
+                HotKey="Ctrl+N" ToolTip.Tip="New rule (Ctrl+N)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Data="{StaticResource Icon.Plus}" />
+            <TextBlock Text="New rule" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <!-- Tester + route diagram -->
+      <Border Grid.Row="1" Classes="surface" Padding="16,14,16,12">
+        <StackPanel Spacing="12">
+          <Border Classes="badge stop" Padding="10,6" CornerRadius="6" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding RoutingOffNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding RoutingOffNotice}" FontSize="12" TextWrapping="Wrap" />
+          </Border>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Classes="mono" Text="{Binding TestUrl}" PlaceholderText="Paste a link to test, e.g. https://jira.acme.io/browse/OPS-1"
+                     AutomationProperties.Name="Test link">
+              <TextBox.InnerLeftContent>
+                <c:Icon Data="{StaticResource Icon.Search}" Margin="10,0,2,0" Foreground="{DynamicResource InkFaintBrush}" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding SendTestToChooserCommand}"
+                    ToolTip.Tip="Open this link in the chooser, as if no rule matched">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Open}" />
+                <TextBlock Text="Try in chooser" />
+              </StackPanel>
+            </Button>
+          </Grid>
+
+          <c:RouteDiagram Stops="{Binding TestStops}" Destination="{Binding TestDestination}"
+                          IsIdle="{Binding TestIdle}" TerminalLabel="Ask me" />
+
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding TestHeadline}" FontWeight="SemiBold"
+                       Classes.error="{Binding TestInvalid}" />
+            <TextBlock Text="{Binding TestDetail}" Classes="mono faint small" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding TestDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Grid.Row="2" Classes="label muted" Text="Order" Margin="12,24,0,8"
+                 IsVisible="{Binding HasRules}" />
+
+      <!-- Rule list -->
+      <ScrollViewer Grid.Row="3" Padding="0,0,0,24">
+        <Panel>
+          <StackPanel IsVisible="{Binding !HasRules}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="460">
+            <TextBlock Classes="h2" Text="No rules yet" />
+            <TextBlock Classes="body muted"
+                       Text="Every link will open the chooser until you add a rule. You can also create rules straight from the chooser by picking ‘Always’." />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Rules}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:RuleItemViewModel">
+                <Border Classes="row" Classes.match="{Binding IsTestMatch}" Classes.editing="{Binding IsEditing}" Margin="0,0,0,2">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+
+                    <Border Classes="junction" Classes.lit="{Binding IsTestMatch}" Margin="0,0,14,0">
+                      <TextBlock Text="{Binding Number}" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center" Classes.dimmed="{Binding IsDimmed}">
+                      <Grid ColumnDefinitions="20,*">
+                        <c:MatchKindGlyph Kind="{Binding Kind}" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center"
+                                          HorizontalAlignment="Left" ToolTip.Tip="{Binding KindLabel}" />
+                        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Pattern}" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Pattern}" />
+                      </Grid>
+                      <TextBlock Classes="small faint" Margin="20,0,0,0" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding KindLabel}" /><Run Text="{Binding NameSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
+                      </TextBlock>
+                      <Border Classes="badge route" HorizontalAlignment="Left" Margin="20,3,0,0" IsVisible="{Binding IsTemporary}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <c:Icon Data="{StaticResource Icon.Clock}" Width="11" Height="11" Foreground="{DynamicResource RouteInkBrush}" />
+                          <TextBlock Text="{Binding ExpiryText}" />
+                        </StackPanel>
+                      </Border>
+                      <TextBlock Classes="error" Text="{Binding Problem}" Margin="20,2,0,0" IsVisible="{Binding HasProblem}" />
+                    </StackPanel>
+
+                    <!-- Destination: fixed width so destinations align down the list -->
+                    <Grid Grid.Column="2" ColumnDefinitions="Auto,*" Width="172" Margin="16,0,8,0" VerticalAlignment="Center"
+                          Classes.dimmed="{Binding IsDimmed}">
+                      <c:Icon Data="{StaticResource Icon.Arrow}" Width="14" Height="14" Margin="0,0,10,0"
+                              Foreground="{DynamicResource InkFaintBrush}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{Binding BrowserName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                 Classes.error="{Binding BrowserMissing}" VerticalAlignment="Center" ToolTip.Tip="{Binding BrowserName}" />
+                    </Grid>
+
+                    <ToggleSwitch Grid.Column="3" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" MinWidth="0"
+                                  VerticalAlignment="Center" Margin="0,0,4,0"
+                                  ToolTip.Tip="Enable or disable this rule" AutomationProperties.Name="Rule enabled" />
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                      <Button Classes="ghost icon" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}"
+                              ToolTip.Tip="Move up" AutomationProperties.Name="Move up">
+                        <c:Icon Data="{StaticResource Icon.Up}" />
+                      </Button>
+                      <Button Classes="ghost icon" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
+                              ToolTip.Tip="Move down" AutomationProperties.Name="Move down">
+                        <c:Icon Data="{StaticResource Icon.Down}" />
+                      </Button>
+                      <Button Classes="ghost icon" Command="{Binding EditCommand}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit rule">
+                        <c:Icon Data="{StaticResource Icon.Edit}" />
+                      </Button>
+                      <Button Classes="ghost icon danger" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete"
+                              AutomationProperties.Name="Delete rule">
+                        <c:Icon Data="{StaticResource Icon.Trash}" />
+                      </Button>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- Editor -->
+    <Panel Grid.Column="1" DataContext="{Binding Editor}">
+    <Border Classes="panel" Width="340" Margin="24,0,0,24" Padding="20" VerticalAlignment="Top"
+            IsVisible="{Binding IsOpen}" x:DataType="vm:RuleEditorViewModel">
+      <StackPanel Spacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h2" Text="{Binding Title}" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost icon" Command="{Binding CancelCommand}" ToolTip.Tip="Close"
+                  AutomationProperties.Name="Close editor" HotKey="Escape">
+            <c:Icon Data="{StaticResource Icon.Close}" />
+          </Button>
+        </Grid>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Match" />
+          <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:MatchKindOption">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:MatchKindGlyph Kind="{Binding Kind}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Classes="body faint small" Text="{Binding Kind.Hint}" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Pattern" />
+          <TextBox Classes="mono" Text="{Binding Pattern}" PlaceholderText="{Binding Kind.Example}" AutomationProperties.Name="Pattern" />
+          <TextBlock Classes="error" Text="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+          <StackPanel Orientation="Horizontal" Spacing="6"
+                      IsVisible="{Binding TestVerdict, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <Panel Width="8" Height="8" VerticalAlignment="Center">
+              <Ellipse Fill="{DynamicResource ProceedBrush}" IsVisible="{Binding TestVerdictMatches}" />
+              <Ellipse Fill="{DynamicResource LineStrongBrush}" IsVisible="{Binding !TestVerdictMatches}" />
+            </Panel>
+            <TextBlock Classes="small muted" Text="{Binding TestVerdict}" />
+          </StackPanel>
+          <CheckBox Content="Case-sensitive" IsChecked="{Binding CaseSensitive}" IsVisible="{Binding ShowCaseSensitive}" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Open in" />
+          <ComboBox ItemsSource="{Binding Browsers}" SelectedItem="{Binding Browser}" HorizontalAlignment="Stretch"
+                    PlaceholderText="Choose a browser">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:BrowserOption">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding Name}" />
+                  <TextBlock Classes="faint small" Text="{Binding Detail}" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Name" />
+          <TextBox Text="{Binding Name}" PlaceholderText="Optional, e.g. Work tracker" />
+        </StackPanel>
+
+        <Border Classes="badge route" Padding="10,8" CornerRadius="6" IsVisible="{Binding IsTemporary}">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding ExpiryText, StringFormat='Temporary rule · {0}'}" VerticalAlignment="Center" FontSize="12" />
+            <Button Grid.Column="1" Classes="ghost" Padding="8,2" Content="Make permanent" Command="{Binding MakePermanentCommand}" FontSize="12" />
+          </Grid>
+        </Border>
+
+        <Rectangle Classes="divider" />
+
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <CheckBox Content="Enabled" IsChecked="{Binding IsEnabled}" />
+          <Button Grid.Column="2" Content="Cancel" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+          <Button Grid.Column="3" Classes="accent" Content="Save rule" Command="{Binding SaveCommand}" IsDefault="True" />
+        </Grid>
+      </StackPanel>
+    </Border>
+    </Panel>
+  </Grid>
+</UserControl>

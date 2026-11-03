@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NudgeJudge.ViewModels"
+             xmlns:c="using:NudgeJudge.Controls"
+             x:Class="NudgeJudge.Views.BrowsersView"
+             x:DataType="vm:BrowsersViewModel">
+
+  <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,0">
+    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*">
+
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,20">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="h1" Text="Browsers" />
+          <TextBlock Classes="muted" FontSize="13" TextWrapping="Wrap" Margin="0,0,16,0"
+                     Text="Each entry is a browser, or one browser opened a particular way (a profile, a private window)." />
+        </StackPanel>
+        <Button Grid.Column="1" Command="{Binding ScanCommand}" Margin="0,0,8,0" VerticalAlignment="Center"
+                ToolTip.Tip="Look for installed browsers">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Data="{StaticResource Icon.Refresh}" />
+            <TextBlock Text="Scan" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Classes="accent" Command="{Binding AddCommand}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Data="{StaticResource Icon.Plus}" />
+            <TextBlock Text="Add browser" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
+        <Border Classes="badge route" Padding="12,10" CornerRadius="6" IsVisible="{Binding HasSampleBrowsers}">
+          <TextBlock TextWrapping="Wrap" FontSize="13" FontWeight="Normal"
+                     Text="Entries marked Sample came with NudgeJudge so you have something to try. Check their paths, or replace them with your own." />
+        </Border>
+        <TextBlock Text="{Binding StatusMessage}" Classes="small muted" TextWrapping="Wrap"
+                   Classes.error="{Binding StatusIsProblem}"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+
+      <ScrollViewer Grid.Row="2" Padding="0,0,0,24">
+        <Panel>
+          <StackPanel IsVisible="{Binding !HasBrowsers}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="460">
+            <TextBlock Classes="h2" Text="No browsers yet" />
+            <TextBlock Classes="body muted" Text="Add the browsers you use. Rules and the chooser can only send links to browsers listed here." />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Browsers}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:BrowserItemViewModel">
+                <Border Classes="row" Classes.editing="{Binding IsEditing}" Margin="0,0,0,2" Padding="12,12">
+                  <Grid ColumnDefinitions="*,Auto,Auto">
+                    <StackPanel Spacing="4">
+                      <WrapPanel ItemSpacing="8" LineSpacing="4">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                        <Border Classes="badge proceed" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Links open here when routing is off">
+                          <TextBlock Text="Primary" />
+                        </Border>
+                        <Border Classes="badge" IsVisible="{Binding IsPrivate}">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <c:Icon Data="{StaticResource Icon.Mask}" Width="12" Height="12" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Text="Private" />
+                          </StackPanel>
+                        </Border>
+                        <Border Classes="badge" IsVisible="{Binding HasProfile}">
+                          <TextBlock Text="{Binding ProfileLabel}" />
+                        </Border>
+                        <Border Classes="badge route" IsVisible="{Binding IsSample}">
+                          <TextBlock Text="Sample" />
+                        </Border>
+                        <Border Classes="badge" IsVisible="{Binding IsDiscovered}">
+                          <TextBlock Text="Found" />
+                        </Border>
+                      </WrapPanel>
+                      <TextBlock Classes="mono faint small" TextTrimming="CharacterEllipsis">
+                        <Run Text="{Binding ExecutablePath}" /><Run Text="{Binding ArgumentsSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
+                      </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Classes="small muted" Text="{Binding UsageText}" VerticalAlignment="Center" Margin="16,0" />
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button Classes="ghost icon" Command="{Binding TryCommand}" ToolTip.Tip="Open example.com in this browser"
+                              AutomationProperties.Name="Try browser">
+                        <c:Icon Data="{StaticResource Icon.Open}" />
+                      </Button>
+                      <Button Classes="ghost icon" Command="{Binding MakePrimaryCommand}" IsEnabled="{Binding IsNotPrimary}"
+                              ToolTip.Tip="Make primary: links open here when routing is off" AutomationProperties.Name="Make primary">
+                        <c:Icon Data="{StaticResource Icon.Star}" />
+                      </Button>
+                      <Button Classes="ghost icon" Command="{Binding EditCommand}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit browser">
+                        <c:Icon Data="{StaticResource Icon.Edit}" />
+                      </Button>
+                      <Button Classes="ghost icon danger" Command="{Binding DeleteCommand}" IsEnabled="{Binding CanDelete}"
+                              ToolTip.Tip="{Binding DeleteHint}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Remove browser">
+                        <c:Icon Data="{StaticResource Icon.Trash}" />
+                      </Button>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- Editor -->
+    <Panel Grid.Column="1" DataContext="{Binding Editor}">
+    <Border Classes="panel" Width="360" Margin="24,0,0,24" Padding="20" VerticalAlignment="Top"
+            IsVisible="{Binding IsOpen}" x:DataType="vm:BrowserEditorViewModel">
+      <StackPanel Spacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h2" Text="{Binding Title}" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost icon" Command="{Binding CancelCommand}" ToolTip.Tip="Close"
+                  AutomationProperties.Name="Close editor" HotKey="Escape">
+            <c:Icon Data="{StaticResource Icon.Close}" />
+          </Button>
+        </Grid>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Name" />
+          <TextBox Text="{Binding Name}" PlaceholderText="e.g. Chrome Work" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Program" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Classes="mono" Text="{Binding ExecutablePath}" PlaceholderText="firefox  or a full path" />
+            <Button Grid.Column="1" Classes="icon" Margin="6,0,0,0" Command="{Binding BrowseCommand}"
+                    ToolTip.Tip="Choose file…" AutomationProperties.Name="Choose program file">
+              <c:Icon Data="{StaticResource Icon.Folder}" />
+            </Button>
+          </Grid>
+          <TextBlock Classes="small faint" Text="{Binding PathNote}" TextWrapping="Wrap"
+                     IsVisible="{Binding PathNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <TextBlock Classes="label" Text="Arguments" />
+          <TextBox Classes="mono" Text="{Binding Arguments}" PlaceholderText="--profile-directory=&quot;Profile 1&quot; {url}" />
+          <TextBlock Classes="body faint small"
+                     Text="Put {url} where the link should go. Without it, the link is added at the end. No shell is involved." />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,16,Auto">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="Profile label" />
+            <TextBox Text="{Binding ProfileLabel}" PlaceholderText="Optional" />
+          </StackPanel>
+          <CheckBox Grid.Column="2" Content="Private window" IsChecked="{Binding IsPrivate}" VerticalAlignment="Bottom" />
+        </Grid>
+
+        <StackPanel Spacing="6" IsVisible="{Binding Preview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Classes="label" Text="Runs as" />
+          <Border Background="{DynamicResource SurfaceSunkenBrush}" CornerRadius="6" Padding="10,8">
+            <SelectableTextBlock Classes="mono" FontSize="12" Text="{Binding Preview}" TextWrapping="Wrap" />
+          </Border>
+        </StackPanel>
+
+        <Rectangle Classes="divider" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Cancel" Command="{Binding CancelCommand}" />
+          <Button Classes="accent" Content="Save browser" Command="{Binding SaveCommand}" IsDefault="True" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+    </Panel>
+  </Grid>
+</UserControl>

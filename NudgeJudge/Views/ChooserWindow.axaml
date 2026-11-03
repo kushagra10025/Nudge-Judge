@@ -1,0 +1,132 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NudgeJudge.ViewModels"
+        xmlns:c="using:NudgeJudge.Controls"
+        x:Class="NudgeJudge.Views.ChooserWindow"
+        x:DataType="vm:ChooserViewModel"
+        Icon="/Assets/nudgejudge.png"
+        Title="Open link with…"
+        Width="640" SizeToContent="Height" MinWidth="520" MaxHeight="760"
+        CanResize="False" WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="True">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Tab" Command="{Binding NextTabCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding PreviousTabCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto">
+
+    <!-- Queued links -->
+    <Border Grid.Row="0" Background="{DynamicResource SurfaceSunkenBrush}" Padding="12,10,12,0"
+            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" IsVisible="{Binding HasMultipleTabs}">
+      <ListBox Classes="tabs" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
+               AutomationProperties.Name="Waiting links">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate DataType="vm:ChooserTabViewModel">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Text="{Binding Host}" FontSize="13" FontWeight="Medium" MaxWidth="160"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <Button Classes="ghost icon" Width="22" Height="22" Command="{Binding CloseCommand}"
+                      ToolTip.Tip="Skip this link" AutomationProperties.Name="Skip link">
+                <c:Icon Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+              </Button>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <!-- The link -->
+    <Panel Grid.Row="1" IsVisible="{Binding HasSelection}"><Panel DataContext="{Binding SelectedTab}">
+    <StackPanel Margin="24,20,24,0" Spacing="6" x:DataType="vm:ChooserTabViewModel">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Classes="small faint" Text="No rule matched" />
+        <Border Classes="badge stop" IsVisible="{Binding IsInsecure}" ToolTip.Tip="This link isn't encrypted (http)">
+          <TextBlock Text="Not secure" />
+        </Border>
+      </StackPanel>
+      <TextBlock Text="{Binding Host}" FontSize="22" FontWeight="SemiBold" LetterSpacing="-0.3" TextTrimming="CharacterEllipsis" />
+      <SelectableTextBlock Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" MaxLines="2">
+        <Run Text="{Binding Scheme}" Foreground="{DynamicResource InkFaintBrush}" /><Run Text="{Binding Host}" Foreground="{DynamicResource InkBrush}" /><Run Text="{Binding Rest}" />
+      </SelectableTextBlock>
+      <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+    </StackPanel>
+    </Panel></Panel>
+
+    <!-- Platforms -->
+    <StackPanel Grid.Row="2" Margin="24,20,24,0" Spacing="10">
+      <TextBlock Classes="label muted" Text="Open with" />
+      <ItemsControl ItemsSource="{Binding Browsers}" IsVisible="{Binding HasBrowsers}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:BrowserChoiceViewModel">
+            <Button Classes="platform" Margin="0,0,8,8"
+                    Command="{Binding $parent[Window].((vm:ChooserViewModel)DataContext).ChooseCommand}"
+                    CommandParameter="{Binding}"
+                    AutomationProperties.Name="{Binding Name}">
+              <Grid ColumnDefinitions="Auto,*">
+                <Border Classes="key" Margin="0,0,12,0" IsVisible="{Binding HasKey}" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Key}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="small faint" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+                </StackPanel>
+              </Grid>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <StackPanel IsVisible="{Binding !HasBrowsers}" Spacing="8">
+        <TextBlock Classes="body muted" Text="No browsers are set up yet, so there's nowhere to send this link." />
+        <Button Content="Add a browser…" Command="{Binding OpenBrowserSettingsCommand}" />
+      </StackPanel>
+    </StackPanel>
+
+    <!-- Remember + footer -->
+    <Border Grid.Row="3" Margin="0,12,0,0" Background="{DynamicResource SurfaceSunkenBrush}"
+            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="24,14">
+      <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="Auto,Auto,*">
+          <TextBlock Classes="label" Text="Remember" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding RememberOptions}" SelectedItem="{Binding Remember}" MinWidth="190"
+                    AutomationProperties.Name="Remember this choice" />
+          <Panel Grid.Column="2" IsVisible="{Binding SavesRule}"><Panel DataContext="{Binding SelectedTab}">
+          <Grid ColumnDefinitions="Auto,*" Margin="10,0,0,0" x:DataType="vm:ChooserTabViewModel">
+            <ComboBox ItemsSource="{Binding $parent[Window].((vm:ChooserViewModel)DataContext).Kinds}" SelectedItem="{Binding Kind}"
+                      ToolTip.Tip="Match type" AutomationProperties.Name="Match type">
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="vm:MatchKindOption">
+                  <c:MatchKindGlyph Kind="{Binding Kind}" Margin="2,4" ToolTip.Tip="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBox Grid.Column="1" Classes="mono" Margin="6,0,0,0" Text="{Binding Pattern}"
+                     AutomationProperties.Name="Rule pattern" />
+          </Grid>
+          </Panel></Panel>
+        </Grid>
+        <Panel IsVisible="{Binding SavesRule}"><Panel DataContext="{Binding SelectedTab}">
+          <TextBlock Classes="error" x:DataType="vm:ChooserTabViewModel"
+                     Text="{Binding PatternError}" IsVisible="{Binding HasPatternError}" />
+        </Panel></Panel>
+
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Classes="small faint" VerticalAlignment="Center"
+                     Text="Press a number to choose · Esc to skip" />
+          <TextBlock Grid.Column="1" Classes="small muted" Text="{Binding WaitingText}" VerticalAlignment="Center" Margin="0,0,12,0"
+                     IsVisible="{Binding HasMultipleTabs}" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+            <Button Classes="ghost" Content="Skip all" Command="{Binding DismissAllCommand}" IsVisible="{Binding HasMultipleTabs}" />
+            <Button Content="Skip" Command="{Binding DismissCommand}" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

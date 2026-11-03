@@ -9,6 +9,7 @@
 
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\NudgeJudge\Assets\nudgejudge.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

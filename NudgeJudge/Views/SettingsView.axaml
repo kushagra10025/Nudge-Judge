@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NudgeJudge.ViewModels"
+             xmlns:c="using:NudgeJudge.Controls"
+             x:Class="NudgeJudge.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Grid.setting">
+      <Setter Property="Margin" Value="20,16" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
+      <Setter Property="Margin" Value="4,28,0,8" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer>
+    <StackPanel Margin="32,28,32,32" MaxWidth="760" HorizontalAlignment="Left">
+      <TextBlock Classes="h1" Text="Settings" />
+
+      <TextBlock Classes="section" Text="Routing" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Route links by rules" />
+              <TextBlock Classes="body muted" Text="When off, every link opens in the primary browser and rules are ignored." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding RoutingEnabled}" OnContent="On" OffContent="Off" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Primary browser" />
+              <TextBlock Classes="body muted" Text="Used when routing is off. With none set, links go to the chooser." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Browsers}" SelectedItem="{Binding PrimaryBrowser}"
+                      MinWidth="220" VerticalAlignment="Center" PlaceholderText="None" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="section" Text="Chooser" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Group links that arrive together" />
+              <TextBlock Classes="body muted" Text="Unmatched links within this many seconds of each other queue as tabs instead of jumping ahead." />
+            </StackPanel>
+            <NumericUpDown Grid.Column="1" Value="{Binding ChooserGroupingSeconds}" Minimum="0" Maximum="120" Increment="1"
+                           FormatString="0' s'" MinWidth="140" VerticalAlignment="Center" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Temporary rule length" />
+              <TextBlock Classes="body muted" Text="How long a rule saved with ‘For N hours’ lasts." />
+            </StackPanel>
+            <NumericUpDown Grid.Column="1" Value="{Binding TemporaryRuleHours}" Minimum="1" Maximum="168" Increment="1"
+                           FormatString="0' h'" MinWidth="140" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="section" Text="App" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Keep running in the tray" />
+              <TextBlock Classes="body muted" Text="Closing this window leaves NudgeJudge running so links keep routing. Quit from the tray menu." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding RunInBackground}" OnContent="On" OffContent="Off" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <TextBlock Classes="label" Text="Appearance" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="180" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="section" Text="System" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Default browser" />
+              <TextBlock Classes="body muted" Text="{Binding RegistrationMessage}" />
+            </StackPanel>
+            <Button Grid.Column="1" Command="{Binding RegisterCommand}" VerticalAlignment="Center" IsEnabled="{Binding !IsRegistered}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Shield}" />
+                <TextBlock Text="Make NudgeJudge the default" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" RowDefinitions="Auto,Auto">
+            <TextBlock Classes="label" Text="Configuration file" />
+            <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
+                                 Text="{Binding ConfigPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,12 +1,93 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:NudgeJudge.ViewModels"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:views="using:NudgeJudge.Views"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:c="using:NudgeJudge.Controls"
         x:Class="NudgeJudge.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="NudgeJudge">
-        <views:MainView />
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/nudgejudge.png"
+        Title="NudgeJudge"
+        Width="1200" Height="760" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid ColumnDefinitions="224,*">
+
+    <!-- Signalling panel -->
+    <Border Grid.Column="0" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelLineBrush}" BorderThickness="0,0,1,0">
+      <Grid RowDefinitions="Auto,*,Auto" Margin="12,20,12,12">
+
+        <StackPanel Orientation="Horizontal" Spacing="10" Margin="8,0,0,24">
+          <c:Icon Data="{StaticResource Icon.Rules}" Width="22" Height="22" StrokeThickness="2.2"
+                  Foreground="{StaticResource PanelLampBrush}" />
+          <TextBlock Text="NudgeJudge" FontSize="17" FontWeight="Bold" LetterSpacing="-0.2"
+                     Foreground="{StaticResource PanelInkBrush}" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <ListBox Grid.Row="1" Classes="nav" SelectedIndex="{Binding SelectedPageIndex}"
+                 AutomationProperties.Name="Sections">
+          <ListBoxItem>
+            <Grid ColumnDefinitions="10,Auto,*">
+              <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <c:Icon Data="{StaticResource Icon.Rules}" />
+                <TextBlock Text="Rules" />
+              </StackPanel>
+            </Grid>
+          </ListBoxItem>
+          <ListBoxItem>
+            <Grid ColumnDefinitions="10,Auto,*">
+              <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <c:Icon Data="{StaticResource Icon.Browsers}" />
+                <TextBlock Text="Browsers" />
+              </StackPanel>
+            </Grid>
+          </ListBoxItem>
+          <ListBoxItem>
+            <Grid ColumnDefinitions="10,Auto,*">
+              <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <c:Icon Data="{StaticResource Icon.Activity}" />
+                <TextBlock Text="Activity" />
+              </StackPanel>
+            </Grid>
+          </ListBoxItem>
+          <ListBoxItem>
+            <Grid ColumnDefinitions="10,Auto,*">
+              <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <c:Icon Data="{StaticResource Icon.Settings}" />
+                <TextBlock Text="Settings" />
+              </StackPanel>
+            </Grid>
+          </ListBoxItem>
+        </ListBox>
+
+        <!-- Routing signal -->
+        <Border Grid.Row="2" Background="{StaticResource PanelRaisedBrush}" CornerRadius="8" Padding="12">
+          <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+            <Panel Width="14" Height="14" Margin="0,2,10,0" VerticalAlignment="Top">
+              <Ellipse Fill="{StaticResource PanelProceedBrush}" IsVisible="{Binding Settings.RoutingEnabled}" />
+              <Ellipse Fill="{StaticResource PanelStopBrush}" IsVisible="{Binding !Settings.RoutingEnabled}" />
+            </Panel>
+            <TextBlock Grid.Column="1" Text="{Binding Settings.RoutingLabel}" FontWeight="SemiBold"
+                       Foreground="{StaticResource PanelInkBrush}" />
+            <ToggleSwitch Grid.Column="2" Grid.RowSpan="2" IsChecked="{Binding Settings.RoutingEnabled}"
+                          OnContent="" OffContent="" MinWidth="0" Margin="0,-6,-8,0" VerticalAlignment="Top"
+                          AutomationProperties.Name="Route links by rules" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.RoutingDetail}" FontSize="12"
+                       TextWrapping="Wrap" Foreground="{StaticResource PanelMutedBrush}" Margin="0,2,0,0" />
+          </Grid>
+        </Border>
+      </Grid>
+    </Border>
+
+    <!-- Work area -->
+    <Grid Grid.Column="1" RowDefinitions="Auto,*">
+      <Border Grid.Row="0" IsVisible="{Binding HasConfigProblem}" Background="{DynamicResource StopSoftBrush}" Padding="24,10">
+        <TextBlock Text="{Binding ConfigProblem}" Foreground="{DynamicResource StopBrush}" TextWrapping="Wrap" FontSize="13" />
+      </Border>
+      <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+    </Grid>
+  </Grid>
 </Window>

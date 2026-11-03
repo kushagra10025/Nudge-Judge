@@ -1,0 +1,102 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Signal Box. The sidebar is a signalling panel in every theme; the content ground is a
+    green-tinted neutral. Amber means "route set" and is the only live accent.
+  -->
+
+  <!-- Type -->
+  <FontFamily x:Key="UiFont">fonts:Inter#Inter, $Default</FontFamily>
+  <FontFamily x:Key="ContentControlThemeFontFamily">fonts:Inter#Inter, $Default</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono, JetBrains Mono, DejaVu Sans Mono, Consolas, Menlo, monospace</FontFamily>
+
+  <!-- Signalling panel (theme-independent) -->
+  <Color x:Key="PanelColor">#0F1F18</Color>
+  <SolidColorBrush x:Key="PanelBrush" Color="#0F1F18" />
+  <SolidColorBrush x:Key="PanelRaisedBrush" Color="#18302A" />
+  <SolidColorBrush x:Key="PanelHoverBrush" Color="#142821" />
+  <SolidColorBrush x:Key="PanelLineBrush" Color="#21382E" />
+  <SolidColorBrush x:Key="PanelInkBrush" Color="#DCE8E1" />
+  <SolidColorBrush x:Key="PanelMutedBrush" Color="#8DA89A" />
+  <SolidColorBrush x:Key="PanelLampBrush" Color="#F2B33D" />
+  <SolidColorBrush x:Key="PanelProceedBrush" Color="#45C486" />
+  <SolidColorBrush x:Key="PanelStopBrush" Color="#EA5A5F" />
+  <SolidColorBrush x:Key="OnLampBrush" Color="#1A1305" />
+
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="GroundBrush" Color="#EDF1EE" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#F4F7F5" />
+      <SolidColorBrush x:Key="SurfaceSunkenBrush" Color="#E6ECE8" />
+      <SolidColorBrush x:Key="LineBrush" Color="#D5DDD8" />
+      <SolidColorBrush x:Key="LineStrongBrush" Color="#B4C1B9" />
+      <SolidColorBrush x:Key="InkBrush" Color="#13201A" />
+      <SolidColorBrush x:Key="InkMutedBrush" Color="#4B5B52" />
+      <SolidColorBrush x:Key="InkFaintBrush" Color="#66766D" />
+      <SolidColorBrush x:Key="TrackBrush" Color="#B4C1B9" />
+      <SolidColorBrush x:Key="RouteBrush" Color="#C97C06" />
+      <SolidColorBrush x:Key="RouteSoftBrush" Color="#FBEBCB" />
+      <SolidColorBrush x:Key="RouteInkBrush" Color="#7A4A00" />
+      <SolidColorBrush x:Key="ProceedBrush" Color="#1B7F4D" />
+      <SolidColorBrush x:Key="ProceedSoftBrush" Color="#DDF2E6" />
+      <SolidColorBrush x:Key="StopBrush" Color="#BF2F35" />
+      <SolidColorBrush x:Key="StopSoftBrush" Color="#F9E0E1" />
+      <SolidColorBrush x:Key="SelectionBrush" Color="#F6D58F" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="GroundBrush" Color="#0D1411" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#141E19" />
+      <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#19251F" />
+      <SolidColorBrush x:Key="SurfaceSunkenBrush" Color="#0A100D" />
+      <SolidColorBrush x:Key="LineBrush" Color="#24322B" />
+      <SolidColorBrush x:Key="LineStrongBrush" Color="#34453C" />
+      <SolidColorBrush x:Key="InkBrush" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="InkMutedBrush" Color="#A2B3A9" />
+      <SolidColorBrush x:Key="InkFaintBrush" Color="#84978C" />
+      <SolidColorBrush x:Key="TrackBrush" Color="#3A4C42" />
+      <SolidColorBrush x:Key="RouteBrush" Color="#F2B33D" />
+      <SolidColorBrush x:Key="RouteSoftBrush" Color="#3A2C10" />
+      <SolidColorBrush x:Key="RouteInkBrush" Color="#F6C76A" />
+      <SolidColorBrush x:Key="ProceedBrush" Color="#45C486" />
+      <SolidColorBrush x:Key="ProceedSoftBrush" Color="#12301F" />
+      <SolidColorBrush x:Key="StopBrush" Color="#EA5A5F" />
+      <SolidColorBrush x:Key="StopSoftBrush" Color="#3A1618" />
+      <SolidColorBrush x:Key="SelectionBrush" Color="#6B4E12" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Fluent overrides: dark ink on the amber accent -->
+  <SolidColorBrush x:Key="AccentButtonForeground" Color="#1A1305" />
+  <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#1A1305" />
+  <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#1A1305" />
+  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#1A1305" />
+  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#1A1305" />
+  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#1A1305" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1A1305" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1A1305" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1A1305" />
+  <CornerRadius x:Key="ControlCornerRadius">5</CornerRadius>
+  <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+
+  <!-- Icons: authored strokes on a 24-unit box, drawn by controls:Icon -->
+  <StreamGeometry x:Key="Icon.Rules">M3 7H21 M8 7L14 17H21 M3 17H6</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Browsers">M3 5H21V19H3Z M3 9H21 M6 7H6.5 M9 7H9.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Activity">M4 6H6 M10 6H20 M4 12H6 M10 12H20 M4 18H6 M10 18H16</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Settings">M4 7H13 M17 7H20 M15 4.5V9.5 M4 17H7 M11 17H20 M9 14.5V19.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Arrow">M5 12H19 M13.5 6.5L19 12L13.5 17.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Plus">M12 5V19 M5 12H19</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Trash">M5 7H19 M10 7V4.5H14V7 M7 7L8 20H16L17 7 M10.5 11V16 M13.5 11V16</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Up">M12 19V5 M6.5 10.5L12 5L17.5 10.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Down">M12 5V19 M6.5 13.5L12 19L17.5 13.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Edit">M4.5 19.5L5.5 15L15.5 5L19 8.5L9 18.5Z M13.5 7L17 10.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Close">M6.5 6.5L17.5 17.5 M17.5 6.5L6.5 17.5</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Search">M10.5 4A6.5 6.5 0 1 0 10.5 17A6.5 6.5 0 1 0 10.5 4Z M15.5 15.5L20 20</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Open">M13 5H19V11 M19 5L11 13 M17 14V19H5V7H10</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Refresh">M19.5 12A7.5 7.5 0 1 1 17.3 6.7 M19 3.5V7.5H15</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Folder">M3.5 6.5V18.5H20.5V8.5H11.5L9.5 6.5Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Star">M12 4L14.4 9.1L20 9.7L15.8 13.4L17 19L12 16.2L7 19L8.2 13.4L4 9.7L9.6 9.1Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Clock">M12 4A8 8 0 1 0 12 20A8 8 0 1 0 12 4Z M12 8V12L15 14</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Shield">M12 3.5L19 6.5V11.5C19 15.5 16 18.8 12 20.5C8 18.8 5 15.5 5 11.5V6.5Z</StreamGeometry>
+  <StreamGeometry x:Key="Icon.Mask">M3.5 9C3.5 7.5 6 6.5 9 7L12 8L15 7C18 6.5 20.5 7.5 20.5 9C20.5 13 18 15 15.5 15C13.5 15 13 13.5 12 13.5C11 13.5 10.5 15 8.5 15C6 15 3.5 13 3.5 9Z</StreamGeometry>
+</ResourceDictionary>

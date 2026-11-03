@@ -1,37 +1,25 @@
-using System;
-using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using NudgeJudge.ViewModels;
+using NudgeJudge.Views;
 
 namespace NudgeJudge;
 
-/// <summary>
-/// Given a view model, returns the corresponding view if possible.
-/// </summary>
-[RequiresUnreferencedCode(
-    "Default implementation of ViewLocator involves reflection which may be trimmed away.",
-    Url = "https://docs.avaloniaui.net/docs/concepts/view-locator")]
-public class ViewLocator : IDataTemplate
+/// <summary>Maps page view models to their views. Explicit, so it survives trimming.</summary>
+public sealed class ViewLocator : IDataTemplate
 {
-    public Control? Build(object? param)
+    private static readonly Dictionary<Type, Func<Control>> Views = new()
     {
-        if (param is null)
-            return null;
+        [typeof(RulesViewModel)] = () => new RulesView(),
+        [typeof(BrowsersViewModel)] = () => new BrowsersView(),
+        [typeof(ActivityViewModel)] = () => new ActivityView(),
+        [typeof(SettingsViewModel)] = () => new SettingsView(),
+    };
 
-        var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
-        var type = Type.GetType(name);
+    public Control? Build(object? param) =>
+        param is not null && Views.TryGetValue(param.GetType(), out var factory)
+            ? factory()
+            : new TextBlock { Text = "No view for " + param?.GetType().Name };
 
-        if (type != null)
-        {
-            return (Control)Activator.CreateInstance(type)!;
-        }
-
-        return new TextBlock { Text = "Not Found: " + name };
-    }
-
-    public bool Match(object? data)
-    {
-        return data is ViewModelBase;
-    }
+    public bool Match(object? data) => data is ViewModelBase && Views.ContainsKey(data.GetType());
 }
