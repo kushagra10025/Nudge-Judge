@@ -21,6 +21,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             Navigate(AppPage.Browsers);
             if (browsers.ScanCommand.CanExecute(null)) browsers.ScanCommand.Execute(null);
         };
+        activity.CreateRuleRequested += (_, source) =>
+        {
+            Navigate(AppPage.Rules);
+            rules.NewRuleFrom(source);
+        };
     }
 
     public RulesViewModel Rules { get; }
@@ -50,5 +55,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public void OnActivated()
     {
         if (Settings.RefreshRegistrationCommand.CanExecute(null)) Settings.RefreshRegistrationCommand.Execute(null);
+        // Each link launch is its own process for now, so links handled while this window was away are on disk.
+        Activity.Reload();
     }
 }

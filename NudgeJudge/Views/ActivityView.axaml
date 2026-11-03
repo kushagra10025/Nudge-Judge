@@ -6,8 +6,8 @@
              x:Class="NudgeJudge.Views.ActivityView"
              x:DataType="vm:ActivityViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,*" Margin="32,28,32,0">
-    <v:UndoToast Grid.RowSpan="3" ZIndex="1" DataContext="{Binding Undo}" />
+  <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="32,28,32,0">
+    <v:UndoToast Grid.RowSpan="4" ZIndex="1" DataContext="{Binding Undo}" />
     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
       <StackPanel Spacing="4">
         <TextBlock Classes="h1" Text="Activity" />
@@ -21,7 +21,17 @@
       </Button>
     </Grid>
 
-    <TextBox Grid.Row="1" Text="{Binding Filter}" PlaceholderText="Filter by link, rule or browser" MaxWidth="420"
+    <!-- Logging off with history still showing: say why nothing new appears -->
+    <Border Grid.Row="1" Classes="notice" IsVisible="{Binding ShowLoggingOffNotice}" Margin="0,0,0,12"
+            HorizontalAlignment="Left" MaxWidth="640">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Ellipse Classes="lamp" />
+        <TextBlock Grid.Column="1" Classes="text" Text="Activity logging is off, so new links aren't recorded." />
+        <Button Grid.Column="2" Classes="ghost" Content="Turn on" Command="{Binding TurnOnLoggingCommand}" Margin="12,0,0,0" />
+      </Grid>
+    </Border>
+
+    <TextBox Grid.Row="2" Text="{Binding Filter}" PlaceholderText="Filter by link, rule or browser" MaxWidth="420"
              HorizontalAlignment="Left" Margin="0,0,0,12" IsVisible="{Binding !IsEmpty}"
              AutomationProperties.Name="Filter activity">
       <TextBox.InnerLeftContent>
@@ -29,9 +39,9 @@
       </TextBox.InnerLeftContent>
     </TextBox>
 
-    <ScrollViewer Grid.Row="2" Padding="0,0,0,24">
+    <ScrollViewer Grid.Row="3" Padding="0,0,0,24">
       <Panel>
-        <StackPanel IsVisible="{Binding IsEmpty}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="480">
+        <StackPanel IsVisible="{Binding ShowEmptyHint}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="480">
           <TextBlock Classes="h2" Text="Nothing routed yet" />
           <TextBlock Classes="body muted"
                      Text="When another app opens a link, it shows up here along with the rule that handled it, or the browser you picked." />
@@ -40,6 +50,12 @@
                        Text="Links only arrive once NudgeJudge is your default browser." />
             <Button Content="Open setup" Command="{Binding OpenSetupCommand}" HorizontalAlignment="Left" />
           </StackPanel>
+        </StackPanel>
+        <StackPanel IsVisible="{Binding ShowLoggingOffEmpty}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="480">
+          <TextBlock Classes="h2" Text="Activity logging is off" />
+          <TextBlock Classes="body muted"
+                     Text="Links still route as usual, but NudgeJudge doesn't keep a record of them." />
+          <Button Content="Turn on" Command="{Binding TurnOnLoggingCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
         </StackPanel>
         <StackPanel IsVisible="{Binding NoFilterResults}" Spacing="8" Margin="12,24" HorizontalAlignment="Left">
           <TextBlock Classes="muted" Text="{Binding Filter, StringFormat='Nothing matches “{0}”.'}" />
@@ -50,7 +66,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="vm:ActivityItemViewModel">
               <Border Classes="row" Margin="0,0,0,2">
-                <Grid ColumnDefinitions="72,96,*">
+                <Grid ColumnDefinitions="72,96,*,Auto">
                   <TextBlock Classes="mono faint small" Text="{Binding Time}" VerticalAlignment="Top" Margin="0,2,0,0"
                              ToolTip.Tip="{Binding FullTime}" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="0,4,0,0">
@@ -70,6 +86,15 @@
                       <Run Text="{Binding RoutePrefix}" /><Run Text="{Binding RoutePattern}" FontFamily="{StaticResource MonoFont}" /><Run Text="{Binding RouteSuffix}" />
                     </TextBlock>
                   </StackPanel>
+                  <!-- Shown on hover and keyboard focus (Styles.axaml) -->
+                  <Button Grid.Column="3" Classes="ghost actions" Command="{Binding CreateRuleCommand}" IsVisible="{Binding CanCreateRule}"
+                          VerticalAlignment="Top" Margin="12,0,0,0" ToolTip.Tip="Start a rule for links like this one"
+                          AutomationProperties.Name="Create rule from this link">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:Icon Data="{StaticResource Icon.Plus}" />
+                      <TextBlock Text="Create rule" />
+                    </StackPanel>
+                  </Button>
                 </Grid>
               </Border>
             </DataTemplate>

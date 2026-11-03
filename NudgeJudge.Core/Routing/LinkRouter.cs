@@ -93,19 +93,20 @@ public sealed class LinkRouter(
         try
         {
             launcher.Launch(browser, url);
-            Log(url.AbsoluteUri, outcome, browser.Name, ruleNumber, pattern);
+            Log(url.AbsoluteUri, outcome, browser.Name, ruleNumber, pattern, browserId: browser.Id);
             return new RouteDecision(RouteKind.Launched, url);
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or FileNotFoundException)
         {
             var message = $"Couldn't start {browser.Name}: {ex.Message}";
-            Log(url.AbsoluteUri, ActivityOutcome.Failed, browser.Name, ruleNumber, pattern, message);
+            Log(url.AbsoluteUri, ActivityOutcome.Failed, browser.Name, ruleNumber, pattern, message, browser.Id);
             return new RouteDecision(RouteKind.Failed, url, message);
         }
     }
 
-    private void Log(string url, ActivityOutcome outcome, string? browser = null, int? ruleNumber = null, string? pattern = null, string? detail = null) =>
-        activity.Add(new ActivityEntry(_time.GetUtcNow(), url, outcome, browser, ruleNumber, pattern, detail));
+    private void Log(string url, ActivityOutcome outcome, string? browser = null, int? ruleNumber = null, string? pattern = null, string? detail = null,
+        Guid? browserId = null) =>
+        activity.Add(new ActivityEntry(_time.GetUtcNow(), url, outcome, browser, ruleNumber, pattern, detail, browserId));
 
     private static string Truncate(string? s) =>
         s is null ? "(empty)" : s.Length <= 200 ? s : s[..200] + "…";

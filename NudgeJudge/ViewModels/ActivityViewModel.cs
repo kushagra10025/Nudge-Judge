@@ -1,10 +1,15 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NudgeJudge.Core.Routing;
+using NudgeJudge.Core.Security;
 using NudgeJudge.Services;
 
 namespace NudgeJudge.ViewModels;
+
+/// <summary>What "Create rule" on an Activity entry hands to the Rules page.</summary>
+public sealed record RuleFromActivity(Uri Url, Guid? BrowserId, string? BrowserName);
 
 public sealed partial class ActivityViewModel : ViewModelBase
 {
@@ -19,26 +24,36 @@ public sealed partial class ActivityViewModel : ViewModelBase
         _windows = windows;
         Settings = settings;
         Undo = new UndoBar(dispatcher);
-        foreach (var e in log.Snapshot()) _all.Insert(0, new ActivityItemViewModel(e));
         log.Added += (_, e) => dispatcher.Post(() => Add(e));
-        log.Cleared += (_, _) => dispatcher.Post(() => { _all.Clear(); Refilter(); });
-        Refilter();
+        log.Reset += (_, _) => dispatcher.Post(Rebuild);
+        settings.PropertyChanged += OnSettingsChanged;
+        Rebuild();
     }
 
     public ObservableCollection<ActivityItemViewModel> Entries { get; } = [];
     public UndoBar Undo { get; }
 
-    /// <summary>Empty-state hint: nothing arrives until NudgeJudge is the default browser.</summary>
+    /// <summary>Empty-state hint (nothing arrives until NudgeJudge is the default browser) and the logging switch.</summary>
     public SettingsViewModel Settings { get; }
 
     /// <summary>Most recent few, for the tray and the sidebar.</summary>
     public IEnumerable<ActivityItemViewModel> Recent => _all.Take(5);
 
+    /// <summary>Raised when the user asks for a rule built from an entry. The main window takes it to the Rules page.</summary>
+    public event EventHandler<RuleFromActivity>? CreateRuleRequested;
+
     [ObservableProperty] public partial string Filter { get; set; } = "";
 
     public bool IsEmpty => _all.Count == 0;
     public bool NoFilterResults => _all.Count > 0 && Entries.Count == 0;
-    public string CountText => _all.Count == 1 ? "1 link this session" : $"{_all.Count} links this session";
+    public bool IsLoggingOff => !Settings.ActivityLogEnabled;
+    public bool ShowEmptyHint => IsEmpty && !IsLoggingOff;
+    public bool ShowLoggingOffEmpty => IsEmpty && IsLoggingOff;
+    public bool ShowLoggingOffNotice => !IsEmpty && IsLoggingOff;
+
+    public string CountText => IsLoggingOff
+        ? (_all.Count == 1 ? "1 link · logging is off" : $"{_all.Count} links · logging is off")
+        : (_all.Count == 1 ? "1 link" : $"{_all.Count} links") + $" · keeps the latest {_log.Capacity}";
 
     partial void OnFilterChanged(string value) => Refilter();
 
@@ -49,23 +64,44 @@ public sealed partial class ActivityViewModel : ViewModelBase
         if (cleared.Count == 0) return;
         _log.Clear();
         Undo.Show(cleared.Count == 1 ? "Cleared 1 link" : $"Cleared {cleared.Count} links", () =>
-        {
-            // Snapshot is oldest first, so re-adding keeps the order. Links handled since the clear stay newest.
-            var since = _log.Snapshot();
-            _log.Clear();
-            foreach (var e in cleared.Concat(since)) _log.Add(e);
-        });
+            // Snapshot is oldest first, so links handled since the clear stay newest.
+            _log.Replace(cleared.Concat(_log.Snapshot())));
     }
 
     [RelayCommand] private void OpenSetup() => _windows.ShowMainWindow(AppPage.Settings);
     [RelayCommand] private void ClearFilter() => Filter = "";
+    [RelayCommand] private void TurnOnLogging() => Settings.ActivityLogEnabled = true;
+
+    /// <summary>Picks up links that other NudgeJudge processes logged while this one wasn't looking.</summary>
+    public void Reload() => _log.Reload();
+
+    internal void CreateRule(ActivityItemViewModel item)
+    {
+        if (item.RuleUrl is { } url)
+            CreateRuleRequested?.Invoke(this, new RuleFromActivity(url, item.BrowserId, item.BrowserName));
+    }
 
     private void Add(ActivityEntry entry)
     {
-        var item = new ActivityItemViewModel(entry);
+        var item = new ActivityItemViewModel(entry, this);
         _all.Insert(0, item);
         if (item.Matches(Filter)) Entries.Insert(0, item);
+
+        // The log dropped its oldest entry when full; drop it here too.
+        while (_all.Count > _log.Capacity)
+        {
+            var oldest = _all[^1];
+            _all.RemoveAt(_all.Count - 1);
+            Entries.Remove(oldest);
+        }
         NotifyCounts();
+    }
+
+    private void Rebuild()
+    {
+        _all.Clear();
+        foreach (var e in _log.Snapshot()) _all.Insert(0, new ActivityItemViewModel(e, this));
+        Refilter();
     }
 
     private void Refilter()
@@ -75,17 +111,28 @@ public sealed partial class ActivityViewModel : ViewModelBase
         NotifyCounts();
     }
 
+    private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SettingsViewModel.ActivityLogEnabled) or nameof(SettingsViewModel.ActivityLogLimit))
+            NotifyCounts();
+    }
+
     private void NotifyCounts()
     {
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(NoFilterResults));
+        OnPropertyChanged(nameof(IsLoggingOff));
+        OnPropertyChanged(nameof(ShowEmptyHint));
+        OnPropertyChanged(nameof(ShowLoggingOffEmpty));
+        OnPropertyChanged(nameof(ShowLoggingOffNotice));
         OnPropertyChanged(nameof(CountText));
         OnPropertyChanged(nameof(Recent));
     }
 }
 
-public sealed class ActivityItemViewModel(ActivityEntry entry) : ViewModelBase
+public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityViewModel? owner = null) : ViewModelBase
 {
+    public ActivityEntry Entry { get; } = entry;
     public string Url { get; } = entry.Url;
     public string Host { get; } = Uri.TryCreate(entry.Url, UriKind.Absolute, out var u) && u.Host.Length > 0 ? u.Host : "Not a web link";
     public string Time { get; } = entry.Timestamp.ToLocalTime().ToString("HH:mm:ss");
@@ -131,6 +178,16 @@ public sealed class ActivityItemViewModel(ActivityEntry entry) : ViewModelBase
     public bool IsProblem => Outcome is ActivityOutcome.Rejected or ActivityOutcome.Failed;
 
     public string Summary => $"{Time}  {OutcomeLabel}  {Host}";
+
+    public Guid? BrowserId { get; } = entry.BrowserId;
+    public string? BrowserName { get; } = entry.BrowserName;
+
+    /// <summary>The link a rule can be made for. Null for rejected links, which aren't web links.</summary>
+    public Uri? RuleUrl { get; } = UrlValidator.Validate(entry.Url).Url;
+    public bool CanCreateRule => owner is not null && RuleUrl is not null;
+
+    [RelayCommand(CanExecute = nameof(CanCreateRule))]
+    private void CreateRule() => owner?.CreateRule(this);
 
     internal bool Matches(string filter) =>
         string.IsNullOrWhiteSpace(filter) ||

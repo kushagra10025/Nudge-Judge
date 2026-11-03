@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Headless;
+using NudgeJudge.Core.Browsers;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Models;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Services;
+using NudgeJudge.ViewModels;
 
 [assembly: AvaloniaTestApplication(typeof(NudgeJudge.UI.Tests.TestApp))]
 
@@ -68,4 +70,36 @@ internal sealed class NoTheme : IThemeService
 internal sealed class InlineDispatcher : IUiDispatcher
 {
     public void Post(Action action) => action();
+}
+
+internal sealed class FakeBoot : ISystemBoot
+{
+    public string CurrentBootId => "test-boot";
+    public bool IsCurrentBoot(string bootId) => bootId == CurrentBootId;
+}
+
+internal sealed class FakeLauncher : IBrowserLauncher
+{
+    public List<(BrowserProfile Browser, Uri Url)> Launched { get; } = [];
+    public void Launch(BrowserProfile browser, Uri url) => Launched.Add((browser, url));
+}
+
+internal sealed class NoDiscovery : IBrowserDiscovery
+{
+    public bool IsSupported => false;
+    public Task<IReadOnlyList<BrowserProfile>> DiscoverAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<BrowserProfile>>([]);
+}
+
+internal sealed class FakeWindows : IWindowService, IDialogService
+{
+    public MainWindowViewModel? Main { get; set; }
+    public void ShowMainWindow(AppPage? page = null)
+    {
+        if (page is { } p) Main?.Navigate(p);
+    }
+    public void ShowChooser() { }
+    public void HideChooser() { }
+    public void Quit() { }
+    public Task<string?> PickExecutableAsync() => Task.FromResult<string?>(null);
 }

@@ -16,7 +16,7 @@ Built with [Avalonia UI](https://avaloniaui.net/) and .NET 10 (C#), using a stri
 - **Live rule tester.** Open "Test a link" on the Rules page (Ctrl+T), paste a link, and a route diagram shows it running past each rule, which rule caught it, and how long matching took.
 - **Chooser for unmatched links.** Links that arrive in a burst queue up as tabs. Press 1–9 to pick a browser and Esc to skip. You can open a link once, or save the choice as a rule for N hours, until restart, or permanently.
 - **Browser profiles.** Each entry is a program plus arguments, so one browser can appear several times: a specific profile, a private window, extra flags.
-- **Activity log.** Shows every link handled in the current session, with the rule or choice that sent it where it went.
+- **Activity log.** Shows every link handled, with the rule or choice that sent it where it went. It's kept between runs in `activity.log` next to the config (one JSON object per line, owner-only). Settings → Activity sets how many entries to keep (100 by default; the oldest are deleted past that) or turns logging off. "Create rule" on an entry opens the rule editor with a pattern suggested from the link and the browser it went to.
 - **Tray menu.** Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit.
 - **Light and dark themes**, following the system by default.
 - **Default-browser setup** from Settings → "Make default":
@@ -74,7 +74,7 @@ NudgeJudge.Core/          Plain .NET library with no UI dependencies
   Browsers/               BrowserLauncher (argv-only launch); Discovery/ finds installed browsers, private modes and profiles
   Platform/               SystemBoot (detects reboots for "until restart" rules); default-browser registrars (Linux xdg-mime,
                           Windows registry + Default Apps, macOS stub), AppLaunchCommand, ICommandRunner
-  Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog
+  Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog + its rolling file
 
 NudgeJudge/               Avalonia UI library
   ViewModels/             CommunityToolkit.Mvvm view models; they reach windows only through interfaces in Services/
@@ -105,7 +105,8 @@ Every incoming link goes through `LinkRouter.Route(string)`. Today that's the co
 - [x] Light, dark and follow-system themes
 - [x] Browser scanning: Linux `.desktop` entries (including Snap and Flatpak) and Windows `StartMenuInternet`, with a private-window entry per browser and Firefox profiles (both `profiles.ini` and the new profile manager) and Chrome/Chromium-family profiles when there's more than one. A scan that adds browsers removes the sample browsers and rules
 - [x] Default-browser registration: Linux (`.desktop` entry + `xdg-mime`) and Windows (Capabilities registration + Default Apps hand-off). Status is checked whenever the main window comes forward and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering)
-- [x] 126 core unit tests and 7 headless UI tests
+- [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
+- [x] 126 core unit tests and 21 headless UI tests
 
 **Limitations right now**
 
@@ -113,7 +114,7 @@ Every incoming link goes through `LinkRouter.Route(string)`. Today that's the co
 - Default-browser registration isn't available on macOS yet.
 - There's **no single-instance mode**: each launch with a URL handles that link in its own process and exits.
 - Browser scanning isn't available on macOS yet.
-- The activity log is in memory only and clears when the app quits.
+- Without single-instance mode, a running window picks up links that other launches logged when it next comes forward, not instantly.
 - macOS isn't tested.
 
 ## Upcoming work
@@ -124,10 +125,9 @@ Roughly in order:
 2. **Start on login.**
    - Linux: XDG autostart entry.
    - Windows: `Run` registry key.
-3. **Persistent activity log**, with a size limit and an option to turn it off; "create rule from this entry".
-4. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-5. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
-6. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
+3. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
+4. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
+5. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
 
 ## Contributing
 

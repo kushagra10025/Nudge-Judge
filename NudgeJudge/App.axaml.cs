@@ -50,7 +50,7 @@ public partial class App : Application
         var boot = new SystemBoot();
         var config = new JsonConfigStore(AppPaths.ConfigFile, SampleData.FirstRun);
         var engine = new RuleEngine(boot);
-        var activity = new ActivityLog();
+        var activity = ActivityLog.FollowingSettings(config, new ActivityLogFile(AppPaths.ActivityLogFile));
         var router = new LinkRouter(config, engine, new BrowserLauncher(), activity);
         var windows = new DesktopWindowService(desktop);
 

@@ -96,6 +96,12 @@ public sealed class AppSettings
     public bool RunInBackground { get; set; } = true;
     public ThemePreference Theme { get; set; } = ThemePreference.System;
 
+    /// <summary>When false, handled links aren't recorded in Activity (or on disk).</summary>
+    public bool ActivityLogEnabled { get; set; } = true;
+
+    /// <summary>How many Activity entries to keep. The oldest are deleted once there are more.</summary>
+    public int ActivityLogLimit { get; set; } = 100;
+
     /// <summary>
     /// True on a fresh install until the user either loads the example setup or chooses to start empty.
     /// Absent from configs written before first-run onboarding existed, so those users are never asked.

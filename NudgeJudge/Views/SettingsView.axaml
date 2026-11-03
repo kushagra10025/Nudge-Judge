@@ -101,6 +101,31 @@
         </StackPanel>
       </Border>
 
+      <TextBlock Classes="section" Text="Activity" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Keep an activity log" />
+              <TextBlock Classes="body muted" Text="Records each link and where it went, and keeps the log between runs. When off, nothing new is recorded." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ActivityLogEnabled}" OnContent="On" OffContent="Off"
+                          AutomationProperties.Name="Keep an activity log" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Entries to keep" />
+              <TextBlock Classes="body muted" Text="Once the log is longer than this, the oldest entries are deleted." />
+            </StackPanel>
+            <NumericUpDown Grid.Column="1" Value="{Binding ActivityLogLimit}" Minimum="{Binding MinActivityLogLimit}"
+                           Maximum="{Binding MaxActivityLogLimit}" Increment="10" FormatString="0" MinWidth="140"
+                           VerticalAlignment="Center" IsEnabled="{Binding ActivityLogEnabled}"
+                           AutomationProperties.Name="Activity entries to keep" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <TextBlock Classes="section" Text="App" />
       <Border Classes="surface">
         <StackPanel>
@@ -121,11 +146,19 @@
 
       <TextBlock Classes="section" Text="Files" />
       <Border Classes="surface">
-        <Grid Classes="setting" RowDefinitions="Auto,Auto">
-          <TextBlock Classes="label" Text="Configuration file" />
-          <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
-                               Text="{Binding ConfigPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
-        </Grid>
+        <StackPanel>
+          <Grid Classes="setting" RowDefinitions="Auto,Auto">
+            <TextBlock Classes="label" Text="Configuration file" />
+            <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
+                                 Text="{Binding ConfigPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" RowDefinitions="Auto,Auto">
+            <TextBlock Classes="label" Text="Activity log" />
+            <SelectableTextBlock Grid.Row="1" Classes="mono" FontSize="12" Foreground="{DynamicResource InkMutedBrush}"
+                                 Text="{Binding ActivityLogPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
+          </Grid>
+        </StackPanel>
       </Border>
     </StackPanel>
   </ScrollViewer>

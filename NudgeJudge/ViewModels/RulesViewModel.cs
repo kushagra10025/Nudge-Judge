@@ -111,6 +111,21 @@ public sealed partial class RulesViewModel : ViewModelBase
         SyncEditingFlags();
     }
 
+    /// <summary>
+    /// "Create rule" from an Activity entry: the editor opens with a pattern suggested from the link and the
+    /// browser it went to, and the tester shows that link so the editor can say whether the pattern catches it.
+    /// </summary>
+    public void NewRuleFrom(RuleFromActivity source)
+    {
+        if (_config.Current.Settings.OfferSamples) StartEmpty();
+        TestUrl = source.Url.AbsoluteUri;
+        IsTesterOpen = true;
+        var browser = Browsers.FirstOrDefault(b => b.Id == source.BrowserId)
+                      ?? Browsers.FirstOrDefault(b => b.Name == source.BrowserName);
+        Editor.OpenNew(PatternCompiler.SuggestWildcard(source.Url), browser?.Id);
+        SyncEditingFlags();
+    }
+
     [RelayCommand]
     private void LoadSamples() => _config.Update(c =>
     {

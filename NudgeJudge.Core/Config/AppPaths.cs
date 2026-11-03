@@ -5,6 +5,7 @@ public static class AppPaths
 {
     public static string ConfigDirectory { get; } = ResolveConfigDirectory();
     public static string ConfigFile => Path.Combine(ConfigDirectory, "config.json");
+    public static string ActivityLogFile => Path.Combine(ConfigDirectory, "activity.log");
 
     private static string ResolveConfigDirectory()
     {

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Platform;
+using NudgeJudge.Core.Routing;
 using NudgeJudge.Services;
 
 namespace NudgeJudge.ViewModels;
@@ -22,6 +23,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _registrar = registrar;
         _theme = theme;
         ConfigPath = AppPaths.ConfigFile;
+        ActivityLogPath = AppPaths.ActivityLogFile;
         Theme = ThemeOption.All[0];
         config.Changed += (_, _) => dispatcher.Post(Load);
         Load();
@@ -30,6 +32,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public ObservableCollection<BrowserOption> Browsers { get; } = [];
     public IReadOnlyList<ThemeOption> Themes => ThemeOption.All;
     public string ConfigPath { get; }
+    public string ActivityLogPath { get; }
+    public int MinActivityLogLimit => ActivityLog.MinCapacity;
+    public int MaxActivityLogLimit => ActivityLog.MaxCapacity;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RoutingLabel), nameof(RoutingDetail), nameof(SignalLabel), nameof(SignalDetail),
@@ -43,6 +48,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] public partial decimal? ChooserGroupingSeconds { get; set; }
     [ObservableProperty] public partial decimal? TemporaryRuleHours { get; set; }
     [ObservableProperty] public partial bool RunInBackground { get; set; }
+    [ObservableProperty] public partial bool ActivityLogEnabled { get; set; }
+    [ObservableProperty] public partial decimal? ActivityLogLimit { get; set; }
     [ObservableProperty] public partial ThemeOption Theme { get; set; }
 
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
@@ -127,6 +134,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
     partial void OnChooserGroupingSecondsChanged(decimal? value) => Save(c => c.Settings.ChooserGroupingSeconds = (int)Math.Clamp(value ?? 5, 0, 120));
     partial void OnTemporaryRuleHoursChanged(decimal? value) => Save(c => c.Settings.TemporaryRuleHours = (int)Math.Clamp(value ?? 8, 1, 168));
     partial void OnRunInBackgroundChanged(bool value) => Save(c => c.Settings.RunInBackground = value);
+    partial void OnActivityLogEnabledChanged(bool value) => Save(c => c.Settings.ActivityLogEnabled = value);
+
+    partial void OnActivityLogLimitChanged(decimal? value) =>
+        Save(c => c.Settings.ActivityLogLimit =
+            (int)Math.Clamp(value ?? ActivityLog.DefaultCapacity, ActivityLog.MinCapacity, ActivityLog.MaxCapacity));
 
     partial void OnThemeChanged(ThemeOption value)
     {
@@ -153,6 +165,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ChooserGroupingSeconds = s.ChooserGroupingSeconds;
             TemporaryRuleHours = s.TemporaryRuleHours;
             RunInBackground = s.RunInBackground;
+            ActivityLogEnabled = s.ActivityLogEnabled;
+            ActivityLogLimit = ActivityLog.ClampCapacity(s.ActivityLogLimit);
             Theme = ThemeOption.All.First(t => t.Value == s.Theme);
             _theme.Apply(s.Theme);
         }
