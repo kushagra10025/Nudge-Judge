@@ -67,7 +67,9 @@ public partial class App : Application
         var chooser = new ChooserViewModel(config, router, boot, dispatcher);
         chooser.Attach(windows);
         var registrar = DefaultBrowserRegistration.ForCurrentPlatform(ReadAppIcon);
-        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher);
+        var startup = LaunchAtStartup.ForCurrentPlatform();
+        RefreshStartupEntry(startup);
+        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
@@ -135,6 +137,19 @@ public partial class App : Application
                 break;
         }
         return InstanceReply.Success;
+    }
+
+    /// <summary>Keeps an existing startup entry pointing at this install, in case the app moved since it was added.</summary>
+    private static void RefreshStartupEntry(ILaunchAtStartup startup)
+    {
+        try
+        {
+            startup.Refresh();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            System.Diagnostics.Trace.TraceWarning($"NudgeJudge: couldn't update the startup entry: {e.Message}");
+        }
     }
 
     /// <summary>The app icon as PNG bytes, for the Linux launcher entry written when registering.</summary>

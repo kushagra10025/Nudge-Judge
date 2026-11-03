@@ -325,7 +325,7 @@ public sealed class CompoundRuleUiTests : IDisposable
             Chooser = new ChooserViewModel(Config, Router, boot, dispatcher);
             Chooser.Attach(windows);
             Router.ChoiceRequested += (_, link) => Chooser.Enqueue(link.Url, link.Source);
-            var settings = new SettingsViewModel(Config, new FakeRegistrar(), new NoTheme(), dispatcher);
+            var settings = new SettingsViewModel(Config, new FakeRegistrar(), new NoTheme(), dispatcher, new FakeStartup());
             Main = new MainWindowViewModel(
                 new RulesViewModel(Config, engine, boot, Chooser, windows, dispatcher, settings),
                 new BrowsersViewModel(Config, new NoDiscovery(), Router, windows, dispatcher),

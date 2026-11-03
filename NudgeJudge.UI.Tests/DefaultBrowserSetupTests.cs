@@ -19,7 +19,7 @@ public sealed class DefaultBrowserSetupTests
     private const string CheckingLabel = "Checking the default browser…";
 
     private static SettingsViewModel ViewModel(FakeRegistrar registrar) =>
-        new(new MemoryConfigStore(), registrar, new NoTheme(), new InlineDispatcher());
+        new(new MemoryConfigStore(), registrar, new NoTheme(), new InlineDispatcher(), new FakeStartup());
 
     private static Window Show(SettingsViewModel vm)
     {

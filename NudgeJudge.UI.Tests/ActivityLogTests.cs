@@ -64,7 +64,7 @@ public sealed class ActivityLogTests : IDisposable
     public void Settings_are_saved_to_the_config_file()
     {
         var path = Path.Combine(_dir, "config.json");
-        var settings = new SettingsViewModel(new JsonConfigStore(path), new FakeRegistrar(), new NoTheme(), new InlineDispatcher())
+        var settings = new SettingsViewModel(new JsonConfigStore(path), new FakeRegistrar(), new NoTheme(), new InlineDispatcher(), new FakeStartup())
         {
             ActivityLogEnabled = false,
             ActivityLogLimit = 250,
@@ -332,7 +332,7 @@ public sealed class ActivityLogTests : IDisposable
             Router = new LinkRouter(Config, engine, Launcher, Log);
             var windows = new FakeWindows();
             var chooser = new ChooserViewModel(Config, Router, boot, dispatcher);
-            Settings = new SettingsViewModel(Config, new FakeRegistrar(), new NoTheme(), dispatcher);
+            Settings = new SettingsViewModel(Config, new FakeRegistrar(), new NoTheme(), dispatcher, new FakeStartup());
             Main = new MainWindowViewModel(
                 new RulesViewModel(Config, engine, boot, chooser, windows, dispatcher, Settings),
                 new BrowsersViewModel(Config, new NoDiscovery(), Router, windows, dispatcher),

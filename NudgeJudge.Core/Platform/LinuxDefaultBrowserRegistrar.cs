@@ -176,8 +176,11 @@ internal static class DesktopExec
     // Characters that force an argument to be quoted (Desktop Entry spec, "The Exec key").
     private const string Reserved = " \t\n\"'\\><~|&;$*?#()`";
 
-    /// <summary>Exec value that runs <paramref name="command"/> followed by the link (<c>%u</c>). Null if an argument can't be expressed.</summary>
-    public static string? Build(IReadOnlyList<string> command)
+    /// <summary>
+    /// Exec value that runs <paramref name="command"/>, followed by the link (<c>%u</c>) unless <paramref name="withUrl"/>
+    /// is false. Null if an argument can't be expressed.
+    /// </summary>
+    public static string? Build(IReadOnlyList<string> command, bool withUrl = true)
     {
         var parts = new List<string>(command.Count + 1);
         foreach (var arg in command)
@@ -185,7 +188,7 @@ internal static class DesktopExec
             if (arg.Length == 0 || arg.Any(char.IsControl)) return null;
             parts.Add(Quote(arg));
         }
-        parts.Add("%u");
+        if (withUrl) parts.Add("%u");
         // The string-value escape for backslash applies on top of the Exec quoting rules.
         return string.Join(' ', parts).Replace("\\", @"\\");
     }

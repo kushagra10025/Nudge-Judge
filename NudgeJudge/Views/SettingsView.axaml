@@ -138,6 +138,20 @@
           </Grid>
           <Rectangle Classes="divider" />
           <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Launch at startup" />
+              <TextBlock Classes="body muted" Text="Starts NudgeJudge in the tray when you sign in, so links route from the first click."
+                         IsVisible="{Binding CanLaunchAtStartup}" />
+              <TextBlock Classes="body muted" Text="Launching at startup isn't available on this system yet."
+                         IsVisible="{Binding !CanLaunchAtStartup}" />
+              <TextBlock Classes="body" Foreground="{DynamicResource StopBrush}" Text="{Binding StartupMessage}"
+                         TextWrapping="Wrap" IsVisible="{Binding HasStartupMessage}" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchAtStartup}" OnContent="On" OffContent="Off"
+                          IsEnabled="{Binding CanLaunchAtStartup}" AutomationProperties.Name="Launch at startup" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
             <TextBlock Classes="label" Text="Appearance" VerticalAlignment="Center" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="180" />
           </Grid>

@@ -14,12 +14,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IConfigStore _config;
     private readonly IDefaultBrowserRegistrar _registrar;
     private readonly IThemeService _theme;
+    private readonly ILaunchAtStartup _startup;
     private bool _loading;
     private bool _refreshing;
 
-    public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher)
+    public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
+        ILaunchAtStartup startup)
     {
         _config = config;
+        _startup = startup;
         _registrar = registrar;
         _theme = theme;
         ConfigPath = AppPaths.ConfigFile;
@@ -51,6 +54,17 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] public partial bool ActivityLogEnabled { get; set; }
     [ObservableProperty] public partial decimal? ActivityLogLimit { get; set; }
     [ObservableProperty] public partial ThemeOption Theme { get; set; }
+
+    /// <summary>Mirrors the OS startup entry; changing it adds or removes that entry.</summary>
+    [ObservableProperty] public partial bool LaunchAtStartup { get; set; }
+
+    /// <summary>Why the last change to <see cref="LaunchAtStartup"/> didn't take, or empty.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStartupMessage))]
+    public partial string StartupMessage { get; set; } = "";
+
+    public bool HasStartupMessage => StartupMessage.Length > 0;
+    public bool CanLaunchAtStartup => _startup.IsSupported;
 
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
 
@@ -136,6 +150,40 @@ public sealed partial class SettingsViewModel : ViewModelBase
     partial void OnRunInBackgroundChanged(bool value) => Save(c => c.Settings.RunInBackground = value);
     partial void OnActivityLogEnabledChanged(bool value) => Save(c => c.Settings.ActivityLogEnabled = value);
 
+    partial void OnLaunchAtStartupChanged(bool value)
+    {
+        if (_loading) return;
+        try
+        {
+            _startup.SetEnabled(value);
+            StartupMessage = "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            StartupMessage = (value ? "Couldn't add NudgeJudge to startup: " : "Couldn't remove NudgeJudge from startup: ") + e.Message;
+        }
+        // Show what the OS actually has, whether or not the change took.
+        LoadStartup();
+    }
+
+    private void LoadStartup()
+    {
+        var was = _loading;
+        _loading = true;
+        try
+        {
+            LaunchAtStartup = _startup.IsSupported && _startup.IsEnabled();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            LaunchAtStartup = false;
+        }
+        finally
+        {
+            _loading = was;
+        }
+    }
+
     partial void OnActivityLogLimitChanged(decimal? value) =>
         Save(c => c.Settings.ActivityLogLimit =
             (int)Math.Clamp(value ?? ActivityLog.DefaultCapacity, ActivityLog.MinCapacity, ActivityLog.MaxCapacity));
@@ -169,6 +217,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ActivityLogLimit = ActivityLog.ClampCapacity(s.ActivityLogLimit);
             Theme = ThemeOption.All.First(t => t.Value == s.Theme);
             _theme.Apply(s.Theme);
+            LoadStartup();
         }
         finally
         {

@@ -103,3 +103,22 @@ internal sealed class FakeWindows : IWindowService, IDialogService
     public void Quit() { }
     public Task<string?> PickExecutableAsync() => Task.FromResult<string?>(null);
 }
+
+internal sealed class FakeStartup : ILaunchAtStartup
+{
+    public bool IsSupported { get; init; } = true;
+    public bool Enabled { get; set; }
+
+    /// <summary>When set, SetEnabled throws it instead of changing anything.</summary>
+    public Exception? Fail { get; set; }
+
+    public bool IsEnabled() => Enabled;
+
+    public void SetEnabled(bool enabled)
+    {
+        if (Fail is not null) throw Fail;
+        Enabled = enabled;
+    }
+
+    public void Refresh() { }
+}
