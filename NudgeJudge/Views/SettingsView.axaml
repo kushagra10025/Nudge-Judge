@@ -43,10 +43,11 @@
           <StackPanel Grid.Column="1" Spacing="2">
             <TextBlock Classes="label" Text="NudgeJudge is your default browser" IsVisible="{Binding IsRegistered}" />
             <TextBlock Classes="label" Text="NudgeJudge isn't your default browser yet" IsVisible="{Binding NeedsSetup}" />
+            <TextBlock Classes="label" Text="Checking the default browser…" IsVisible="{Binding !RegistrationChecked}" />
             <TextBlock Classes="body muted" Text="{Binding RegistrationMessage}" />
           </StackPanel>
           <Button Grid.Column="2" Classes="accent" Command="{Binding RegisterCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
-                  IsVisible="{Binding NeedsSetup}">
+                  IsVisible="{Binding CanRegister}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Data="{StaticResource Icon.Shield}" />
               <TextBlock Text="Make default" />

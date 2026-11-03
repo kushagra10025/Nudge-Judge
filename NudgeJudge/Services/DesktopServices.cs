@@ -36,6 +36,7 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
         {
             _main = new MainWindow { DataContext = Main };
             _main.Closing += OnMainClosing;
+            _main.Activated += (_, _) => Main?.OnActivated();
             _main.Closed += (_, _) => _main = null;
             lifetime.MainWindow = _main;
         }

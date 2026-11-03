@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using NudgeJudge.Core.Browsers;
 using NudgeJudge.Core.Browsers.Discovery;
@@ -20,9 +21,18 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
 #if DEBUG
-        this.AttachDeveloperTools();
+        // Once per process: headless UI tests create a fresh App for every test.
+        if (!_devToolsAttached)
+        {
+            this.AttachDeveloperTools();
+            _devToolsAttached = true;
+        }
 #endif
     }
+
+#if DEBUG
+    private static bool _devToolsAttached;
+#endif
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -46,7 +56,8 @@ public partial class App : Application
 
         var chooser = new ChooserViewModel(config, router, boot, dispatcher);
         chooser.Attach(windows);
-        var settings = new SettingsViewModel(config, new StubDefaultBrowserRegistrar(), new AvaloniaThemeService(), dispatcher);
+        var registrar = DefaultBrowserRegistration.ForCurrentPlatform(ReadAppIcon);
+        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
@@ -89,5 +100,21 @@ public partial class App : Application
         {
             if (!windows.MainWindowShown) desktop.Shutdown();
         };
+    }
+
+    /// <summary>The app icon as PNG bytes, for the Linux launcher entry written when registering.</summary>
+    private static byte[]? ReadAppIcon()
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(new Uri("avares://NudgeJudge/Assets/nudgejudge.png"));
+            using var copy = new MemoryStream();
+            stream.CopyTo(copy);
+            return copy.ToArray();
+        }
+        catch (Exception e) when (e is IOException or FileNotFoundException)
+        {
+            return null;
+        }
     }
 }

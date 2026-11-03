@@ -3,4 +3,5 @@
   <Project Path="NudgeJudge.Core.Tests/NudgeJudge.Core.Tests.csproj" />
   <Project Path="NudgeJudge.Desktop/NudgeJudge.Desktop.csproj" />
   <Project Path="NudgeJudge/NudgeJudge.csproj" />
+  <Project Path="NudgeJudge.UI.Tests/NudgeJudge.UI.Tests.csproj" />
 </Solution>

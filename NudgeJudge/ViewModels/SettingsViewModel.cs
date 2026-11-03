@@ -14,6 +14,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IDefaultBrowserRegistrar _registrar;
     private readonly IThemeService _theme;
     private bool _loading;
+    private bool _refreshing;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher)
     {
@@ -24,7 +25,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Theme = ThemeOption.All[0];
         config.Changed += (_, _) => dispatcher.Post(Load);
         Load();
-        RefreshRegistration();
     }
 
     public ObservableCollection<BrowserOption> Browsers { get; } = [];
@@ -48,17 +48,27 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn), nameof(SignalOff))]
+    [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(CanRegister), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn),
+        nameof(SignalOff))]
     public partial bool IsRegistered { get; set; }
 
+    /// <summary>False until the OS has been asked once, so nothing claims "not default" before we know.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(CanRegister), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn),
+        nameof(SignalOff))]
+    public partial bool RegistrationChecked { get; set; }
+
     /// <summary>NudgeJudge isn't the system's default browser, so no links reach it whatever routing says.</summary>
-    public bool NeedsSetup => !IsRegistered;
+    public bool NeedsSetup => RegistrationChecked && !IsRegistered;
+
+    /// <summary>Shows the "Make default" button: there's something to do and this platform can do it.</summary>
+    public bool CanRegister => NeedsSetup && _registrar.IsSupported;
 
     // The sidebar signal shows the one state that matters most: not receiving links at all, then on/off.
-    public bool SignalOn => IsRegistered && RoutingEnabled;
-    public bool SignalOff => IsRegistered && !RoutingEnabled;
-    public string SignalLabel => IsRegistered ? RoutingLabel : "Not default yet";
-    public string SignalDetail => IsRegistered ? RoutingDetail : "Links can't reach it";
+    public bool SignalOn => !NeedsSetup && RoutingEnabled;
+    public bool SignalOff => !NeedsSetup && !RoutingEnabled;
+    public string SignalLabel => NeedsSetup ? "Not default yet" : RoutingLabel;
+    public string SignalDetail => NeedsSetup ? "Links can't reach it" : RoutingDetail;
 
     public string RoutingLabel => RoutingEnabled ? "Routing on" : "Routing off";
 
@@ -71,9 +81,45 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task RegisterAsync()
     {
-        var status = await _registrar.RegisterAsync();
+        RegistrationMessage = "Registering…";
+        try
+        {
+            Apply(await _registrar.RegisterAsync());
+        }
+        catch (Exception e)
+        {
+            Apply(new RegistrationStatus(RegistrationState.Unknown, "Registration failed: " + e.Message));
+        }
+    }
+
+    /// <summary>
+    /// Asks the OS again. Run whenever the main window comes forward, since the default can change outside
+    /// the app (and on Windows, registering finishes in the system's Default Apps page).
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshRegistrationAsync()
+    {
+        if (_refreshing || RegisterCommand.IsRunning) return;
+        _refreshing = true;
+        try
+        {
+            Apply(await _registrar.GetStatusAsync());
+        }
+        catch (Exception e)
+        {
+            Apply(new RegistrationStatus(RegistrationState.Unknown, "Couldn't check the default browser: " + e.Message));
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    private void Apply(RegistrationStatus status)
+    {
         RegistrationMessage = status.Message;
         IsRegistered = status.State == RegistrationState.Registered;
+        RegistrationChecked = true;
     }
 
     partial void OnRoutingEnabledChanged(bool value) => Save(c => c.Settings.RoutingEnabled = value);
@@ -114,12 +160,5 @@ public sealed partial class SettingsViewModel : ViewModelBase
         {
             _loading = false;
         }
-    }
-
-    private void RefreshRegistration()
-    {
-        var status = _registrar.GetStatus();
-        RegistrationMessage = status.Message;
-        IsRegistered = status.State == RegistrationState.Registered;
     }
 }

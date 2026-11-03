@@ -45,4 +45,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public void Navigate(AppPage page) => SelectedPageIndex = (int)page;
 
     [RelayCommand] private void OpenSetup() => Navigate(AppPage.Settings);
+
+    /// <summary>The main window came forward: re-check anything that can change while the app is in the background.</summary>
+    public void OnActivated()
+    {
+        if (Settings.RefreshRegistrationCommand.CanExecute(null)) Settings.RefreshRegistrationCommand.Execute(null);
+    }
 }
