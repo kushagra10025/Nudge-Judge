@@ -38,7 +38,7 @@ public partial class App : Application
 
         var dispatcher = new AvaloniaUiDispatcher();
         var boot = new SystemBoot();
-        var config = new JsonConfigStore(AppPaths.ConfigFile, SampleData.Create);
+        var config = new JsonConfigStore(AppPaths.ConfigFile, SampleData.FirstRun);
         var engine = new RuleEngine(boot);
         var activity = new ActivityLog();
         var router = new LinkRouter(config, engine, new BrowserLauncher(), activity);

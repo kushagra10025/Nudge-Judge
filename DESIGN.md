@@ -27,7 +27,7 @@ Text on amber is always the dark `OnLampBrush` (`#1A1305`). Soft variants (`*Sof
 
 [Controls/RouteDiagram.cs](NudgeJudge/Controls/RouteDiagram.cs). The main line has one junction per rule, numbered. Passed junctions are amber rings, the matching junction is an amber diamond, and from there the route diverts to the browser's platform. With no match, the line runs to the "Ask me" terminal. Disabled rules are dashed and errors are red. The route draws on over 320 ms with an ease-out; this is the only authored motion in the app.
 
-Rule rows echo the diagram: the number sits in a junction circle that lights amber when the tester matches that rule.
+Rule rows echo the diagram: the number sits in a junction circle that lights amber when the tester matches that rule. The tester is secondary: it stays closed until "Test a link" (Ctrl+T) opens it as a panel docked under the rule list, so the page leads with creating rules.
 
 ## Match-kind glyphs
 

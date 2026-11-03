@@ -25,7 +25,8 @@ public sealed partial class RulesViewModel : ViewModelBase
         _boot = boot;
         _chooser = chooser;
         _windows = windows;
-        Editor = new RuleEditorViewModel(config, engine, Browsers, () => TestUrl);
+        // The editor only compares against the test link while the tester is showing it.
+        Editor = new RuleEditorViewModel(config, engine, Browsers, () => IsTesterOpen ? TestUrl : "");
         config.Changed += (_, _) => dispatcher.Post(Reload);
         Reload();
     }
@@ -37,7 +38,28 @@ public sealed partial class RulesViewModel : ViewModelBase
     public bool HasRules => Rules.Count > 0;
     public bool HasBrowsers => Browsers.Count > 0;
 
-    [ObservableProperty] public partial string TestUrl { get; set; } = "https://github.com/acme/web/pull/42";
+    /// <summary>First run: nothing configured yet and the user hasn't picked samples or an empty start.</summary>
+    public bool ShowWelcome => _config.Current.Settings.OfferSamples && !HasRules && !HasBrowsers;
+
+    /// <summary>No rules and nowhere to send links yet, so finding browsers comes first.</summary>
+    public bool ShowNoBrowsers => !HasRules && !HasBrowsers && !ShowWelcome;
+
+    /// <summary>Browsers are set up but there are no rules: invite the first one.</summary>
+    public bool ShowNoRules => !HasRules && HasBrowsers;
+
+    public bool HasSampleRules => _config.Current.Rules.Any(r => r.IsSample == true);
+
+    /// <summary>The tester is secondary: hidden until asked for, and only useful once there are rules.</summary>
+    public bool ShowTester => IsTesterOpen && HasRules;
+
+    /// <summary>Raised when the user asks to look for installed browsers from the Rules page.</summary>
+    public event EventHandler? FindBrowsersRequested;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTester))]
+    public partial bool IsTesterOpen { get; set; }
+
+    [ObservableProperty] public partial string TestUrl { get; set; } = "";
     [ObservableProperty] public partial IReadOnlyList<RouteStop> TestStops { get; set; } = [];
     [ObservableProperty] public partial string? TestDestination { get; set; }
     [ObservableProperty] public partial bool TestIdle { get; set; }
@@ -56,13 +78,47 @@ public sealed partial class RulesViewModel : ViewModelBase
         Editor.RefreshTestVerdict();
     }
 
+    partial void OnIsTesterOpenChanged(bool value)
+    {
+        RunTest();
+        Editor.RefreshTestVerdict();
+    }
+
+    [RelayCommand]
+    private void ToggleTester() => IsTesterOpen = !IsTesterOpen;
+
     [RelayCommand]
     private void NewRule()
     {
-        var url = UrlValidator.Validate(TestUrl).Url;
+        if (_config.Current.Settings.OfferSamples) StartEmpty();
+        var url = IsTesterOpen ? UrlValidator.Validate(TestUrl).Url : null;
         var suggestion = url is not null && !TestMatched ? PatternCompiler.SuggestWildcard(url) : "";
         Editor.OpenNew(suggestion, Browsers.FirstOrDefault()?.Id);
         SyncEditingFlags();
+    }
+
+    [RelayCommand]
+    private void LoadSamples() => _config.Update(c =>
+    {
+        c.Settings.OfferSamples = false;
+        SampleData.AddTo(c);
+    });
+
+    [RelayCommand]
+    private void StartEmpty() => _config.Update(c => c.Settings.OfferSamples = false);
+
+    [RelayCommand]
+    private void RemoveSamples()
+    {
+        if (Editor.EditingId is { } id && _config.Current.Rules.Find(r => r.Id == id)?.IsSample == true) Editor.Close();
+        _config.Update(c => SampleData.RemoveSamples(c));
+    }
+
+    [RelayCommand]
+    private void FindBrowsers()
+    {
+        if (_config.Current.Settings.OfferSamples) StartEmpty();
+        FindBrowsersRequested?.Invoke(this, EventArgs.Empty);
     }
 
     [RelayCommand(CanExecute = nameof(CanSendTestToChooser))]
@@ -128,6 +184,11 @@ public sealed partial class RulesViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HasRules));
         OnPropertyChanged(nameof(HasBrowsers));
+        OnPropertyChanged(nameof(ShowWelcome));
+        OnPropertyChanged(nameof(ShowNoBrowsers));
+        OnPropertyChanged(nameof(ShowNoRules));
+        OnPropertyChanged(nameof(HasSampleRules));
+        OnPropertyChanged(nameof(ShowTester));
         Editor.SyncBrowsers();
         SyncEditingFlags();
         RunTest();
@@ -143,6 +204,8 @@ public sealed partial class RulesViewModel : ViewModelBase
         var rules = _config.Current.Rules;
         var validation = UrlValidator.Validate(TestUrl);
         foreach (var r in Rules) r.IsTestMatch = false;
+        // A closed tester shouldn't leave a rule lit up with no explanation.
+        if (!IsTesterOpen) return;
 
         if (!validation.IsValid)
         {
@@ -217,6 +280,7 @@ public sealed partial class RuleItemViewModel : ViewModelBase
         PatternError = patternError;
         ExpiryText = expiryText;
         IsExpired = isExpired;
+        IsSample = rule.IsSample == true;
         CanMoveUp = number > 1;
         CanMoveDown = number < count;
         IsEnabled = rule.Enabled;
@@ -238,6 +302,7 @@ public sealed partial class RuleItemViewModel : ViewModelBase
     public string? Problem => PatternError ?? (BrowserMissing ? "The browser for this rule was removed." : null);
     public string? ExpiryText { get; }
     public bool IsTemporary => ExpiryText is not null;
+    public bool IsSample { get; }
     public bool IsExpired { get; }
     public bool CanMoveUp { get; }
     public bool CanMoveDown { get; }

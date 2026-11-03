@@ -13,7 +13,7 @@ Built with [Avalonia UI](https://avaloniaui.net/) and .NET 10 (C#), using a stri
   - **Exact domain:** `www.youtube.com`
   - **Path prefix:** `github.com/acme` matches `/acme` and `/acme/…` but not `/acmecorp`
   - **Regular expression:** matched against the full URL
-- **Live rule tester.** Paste a link and a route diagram shows it running past each rule, which rule caught it, and how long matching took.
+- **Live rule tester.** Open "Test a link" on the Rules page (Ctrl+T), paste a link, and a route diagram shows it running past each rule, which rule caught it, and how long matching took.
 - **Chooser for unmatched links.** Links that arrive in a burst queue up as tabs. Press 1–9 to pick a browser and Esc to skip. You can open a link once, or save the choice as a rule for N hours, until restart, or permanently.
 - **Browser profiles.** Each entry is a program plus arguments, so one browser can appear several times: a specific profile, a private window, extra flags.
 - **Activity log.** Shows every link handled in the current session, with the rule or choice that sent it where it went.
@@ -47,7 +47,7 @@ dotnet run --project NudgeJudge.Desktop -- --background
 dotnet test
 ```
 
-On first run, NudgeJudge creates a config with **sample** browsers and rules (marked "Sample" in the UI) so the screens aren't empty. Check their paths, or replace them with your own on the Browsers page.
+On first run, the Rules page asks how you want to start: empty, or with a **sample** setup of browsers and rules (marked "Sample" in the UI). Nothing is created unless you pick the samples. They can be removed from the Rules page at any time, and a browser scan replaces them with the browsers you have installed.
 
 The config file is stored at:
 

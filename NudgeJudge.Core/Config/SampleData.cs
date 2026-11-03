@@ -4,7 +4,8 @@ using NudgeJudge.Core.Models;
 namespace NudgeJudge.Core.Config;
 
 /// <summary>
-/// First-run sample configuration, so the UI has something to show before the first browser scan.
+/// Optional example setup, offered on first run so a new user can see rules and browsers working
+/// together. Nothing is created unless the user asks for it (<see cref="AddTo"/>).
 /// Browsers are marked <see cref="BrowserSource.Sample"/> and rules <see cref="Rule.IsSample"/>;
 /// <see cref="RemoveSamples"/> clears them once real browsers are found.
 /// </summary>
@@ -18,7 +19,22 @@ public static class SampleData
         ("Video", MatchKind.Domain, "www.youtube.com"),
     ];
 
+    /// <summary>The config a fresh install starts with: empty, with the example setup still on offer.</summary>
+    public static AppConfig FirstRun() => new() { Settings = new AppSettings { OfferSamples = true } };
+
+    /// <summary>A config holding only the example setup.</summary>
     public static AppConfig Create()
+    {
+        var config = new AppConfig();
+        AddTo(config);
+        return config;
+    }
+
+    /// <summary>
+    /// Adds the sample browsers and rules to <paramref name="config"/>. The sample rules go after any
+    /// existing ones, and the primary browser is only set when there isn't one.
+    /// </summary>
+    public static void AddTo(AppConfig config)
     {
         var win = OperatingSystem.IsWindows();
         var firefox = new BrowserProfile
@@ -51,19 +67,17 @@ public static class SampleData
         };
 
         Guid[] targets = [chromeWork.Id, chromeWork.Id, firefoxPrivate.Id, firefox.Id];
-        return new AppConfig
+        config.Browsers.AddRange([firefox, chrome, chromeWork, firefoxPrivate]);
+        config.Rules.AddRange(RuleTemplates.Select((t, i) => new Rule
         {
-            Settings = new AppSettings { PrimaryBrowserId = firefox.Id },
-            Browsers = [firefox, chrome, chromeWork, firefoxPrivate],
-            Rules = RuleTemplates.Select((t, i) => new Rule
-            {
-                Name = t.Name,
-                MatchKind = t.Kind,
-                Pattern = t.Pattern,
-                BrowserId = targets[i],
-                IsSample = true,
-            }).ToList(),
-        };
+            Name = t.Name,
+            MatchKind = t.Kind,
+            Pattern = t.Pattern,
+            BrowserId = targets[i],
+            IsSample = true,
+        }));
+        if (config.FindBrowser(config.Settings.PrimaryBrowserId) is null)
+            config.Settings.PrimaryBrowserId = firefox.Id;
     }
 
     /// <summary>

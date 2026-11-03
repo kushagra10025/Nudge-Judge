@@ -7,17 +7,24 @@
 
   <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,0">
 
-    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*">
+    <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*,Auto">
 
-      <!-- Header -->
-      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+      <!-- Header: creating rules is the page's job; testing is the secondary action -->
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,20">
         <StackPanel Spacing="4">
           <TextBlock Classes="h1" Text="Rules" />
           <TextBlock Classes="muted" FontSize="13" TextWrapping="Wrap" Margin="0,0,16,0"
                      Text="Checked from the top. The first rule that matches picks the browser." />
         </StackPanel>
-        <Button Grid.Column="1" Classes="accent" Command="{Binding NewRuleCommand}" VerticalAlignment="Center"
-                HotKey="Ctrl+N" ToolTip.Tip="New rule (Ctrl+N)">
+        <Button Grid.Column="1" Command="{Binding ToggleTesterCommand}" VerticalAlignment="Center" Margin="0,0,8,0"
+                IsVisible="{Binding HasRules}" HotKey="Ctrl+T" ToolTip.Tip="Check which rule a link would hit (Ctrl+T)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Data="{StaticResource Icon.Search}" />
+            <TextBlock Text="Test a link" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Classes="accent" Command="{Binding NewRuleCommand}" VerticalAlignment="Center"
+                IsVisible="{Binding HasRules}" HotKey="Ctrl+N" ToolTip.Tip="New rule (Ctrl+N)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Data="{StaticResource Icon.Plus}" />
             <TextBlock Text="New rule" />
@@ -25,51 +32,66 @@
         </Button>
       </Grid>
 
-      <!-- Tester + route diagram -->
-      <Border Grid.Row="1" Classes="surface" Padding="16,14,16,12">
-        <StackPanel Spacing="12">
-          <Border Classes="badge stop" Padding="10,6" CornerRadius="6" HorizontalAlignment="Stretch"
-                  IsVisible="{Binding RoutingOffNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Text="{Binding RoutingOffNotice}" FontSize="12" TextWrapping="Wrap" />
-          </Border>
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBox Classes="mono" Text="{Binding TestUrl}" PlaceholderText="Paste a link to test, e.g. https://jira.acme.io/browse/OPS-1"
-                     AutomationProperties.Name="Test link">
-              <TextBox.InnerLeftContent>
-                <c:Icon Data="{StaticResource Icon.Search}" Margin="10,0,2,0" Foreground="{DynamicResource InkFaintBrush}" />
-              </TextBox.InnerLeftContent>
-            </TextBox>
-            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding SendTestToChooserCommand}"
-                    ToolTip.Tip="Open this link in the chooser, as if no rule matched">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource Icon.Open}" />
-                <TextBlock Text="Try in chooser" />
-              </StackPanel>
-            </Button>
-          </Grid>
-
-          <c:RouteDiagram Stops="{Binding TestStops}" Destination="{Binding TestDestination}"
-                          IsIdle="{Binding TestIdle}" TerminalLabel="Ask me" />
-
-          <StackPanel Spacing="2">
-            <TextBlock Text="{Binding TestHeadline}" FontWeight="SemiBold"
-                       Classes.error="{Binding TestInvalid}" />
-            <TextBlock Text="{Binding TestDetail}" Classes="mono faint small" TextTrimming="CharacterEllipsis"
-                       IsVisible="{Binding TestDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          </StackPanel>
-        </StackPanel>
+      <!-- Sample setup notice -->
+      <Border Grid.Row="1" Classes="badge route" Padding="12,8,8,8" CornerRadius="6" Margin="0,0,0,8"
+              HorizontalAlignment="Stretch" IsVisible="{Binding HasSampleRules}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock TextWrapping="Wrap" FontSize="13" FontWeight="Normal" VerticalAlignment="Center"
+                     Text="Rules marked Sample are examples. Save one in the editor to keep it, or remove them all when you're ready for your own." />
+          <Button Grid.Column="1" Classes="ghost" Content="Remove samples" Command="{Binding RemoveSamplesCommand}"
+                  Margin="12,0,0,0" VerticalAlignment="Center" />
+        </Grid>
       </Border>
 
-      <TextBlock Grid.Row="2" Classes="label muted" Text="Order" Margin="12,24,0,8"
+      <TextBlock Grid.Row="2" Classes="label muted" Text="Order" Margin="12,4,0,8"
                  IsVisible="{Binding HasRules}" />
 
       <!-- Rule list -->
       <ScrollViewer Grid.Row="3" Padding="0,0,0,24">
         <Panel>
-          <StackPanel IsVisible="{Binding !HasRules}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="460">
+
+          <!-- First run: the user decides whether to start from samples -->
+          <Border Classes="surface" Padding="24,22" Margin="0,8,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" MaxWidth="520"
+                  IsVisible="{Binding ShowWelcome}">
+            <StackPanel Spacing="16">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="h2" Text="How would you like to start?" />
+                <TextBlock Classes="body muted"
+                           Text="Rules decide which browser opens each link. Start with an empty list and build your own, or load a sample setup to see how rules and browsers work together first." />
+                <TextBlock Classes="body muted"
+                           Text="Samples are marked as such and can be removed at any time. Scanning for your installed browsers replaces them." />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Command="{Binding StartEmptyCommand}" Content="Start empty" />
+                <Button Command="{Binding LoadSamplesCommand}" Content="Load sample setup" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Empty, nowhere to send links yet -->
+          <StackPanel IsVisible="{Binding ShowNoBrowsers}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="460">
             <TextBlock Classes="h2" Text="No rules yet" />
             <TextBlock Classes="body muted"
-                       Text="Every link will open the chooser until you add a rule. You can also create rules straight from the chooser by picking ‘Always’." />
+                       Text="A rule sends matching links to one of your browsers, so start by finding the browsers installed on this computer." />
+            <Button Classes="accent" Command="{Binding FindBrowsersCommand}" Margin="0,10,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Browsers}" />
+                <TextBlock Text="Find browsers" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+          <!-- Empty, browsers ready -->
+          <StackPanel IsVisible="{Binding ShowNoRules}" Spacing="6" Margin="12,32" HorizontalAlignment="Left" MaxWidth="460">
+            <TextBlock Classes="h2" Text="No rules yet" />
+            <TextBlock Classes="body muted"
+                       Text="Until you add one, every link opens the chooser. You can also create rules straight from the chooser by picking ‘Always’." />
+            <Button Classes="accent" Command="{Binding NewRuleCommand}" Margin="0,10,0,0" HotKey="Ctrl+N">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Plus}" />
+                <TextBlock Text="Add your first rule" />
+              </StackPanel>
+            </Button>
           </StackPanel>
 
           <ItemsControl ItemsSource="{Binding Rules}">
@@ -92,6 +114,9 @@
                       <TextBlock Classes="small faint" Margin="20,0,0,0" TextTrimming="CharacterEllipsis">
                         <Run Text="{Binding KindLabel}" /><Run Text="{Binding NameSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
                       </TextBlock>
+                      <Border Classes="badge route" HorizontalAlignment="Left" Margin="20,3,0,0" IsVisible="{Binding IsSample}">
+                        <TextBlock Text="Sample" />
+                      </Border>
                       <Border Classes="badge route" HorizontalAlignment="Left" Margin="20,3,0,0" IsVisible="{Binding IsTemporary}">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                           <c:Icon Data="{StaticResource Icon.Clock}" Width="11" Height="11" Foreground="{DynamicResource RouteInkBrush}" />
@@ -138,6 +163,54 @@
           </ItemsControl>
         </Panel>
       </ScrollViewer>
+
+      <!-- Tester: opened on demand, docked under the list -->
+      <Border Grid.Row="4" x:Name="TesterDock" Classes="surface" Padding="16,12,12,12" Margin="0,0,0,24"
+              IsVisible="{Binding ShowTester}">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock Classes="label" Text="Test a link" />
+              <TextBlock Classes="small faint" Text="See which rule would catch it" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="ghost icon" Command="{Binding ToggleTesterCommand}" ToolTip.Tip="Close tester"
+                    AutomationProperties.Name="Close tester">
+              <c:Icon Data="{StaticResource Icon.Close}" />
+            </Button>
+          </Grid>
+
+          <Border Classes="badge stop" Padding="10,6" CornerRadius="6" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding RoutingOffNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding RoutingOffNotice}" FontSize="12" TextWrapping="Wrap" />
+          </Border>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,4,0">
+            <TextBox x:Name="TestUrlBox" Classes="mono" Text="{Binding TestUrl}"
+                     PlaceholderText="Paste a link, e.g. https://jira.acme.io/browse/OPS-1"
+                     AutomationProperties.Name="Test link">
+              <TextBox.InnerLeftContent>
+                <c:Icon Data="{StaticResource Icon.Search}" Margin="10,0,2,0" Foreground="{DynamicResource InkFaintBrush}" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding SendTestToChooserCommand}"
+                    ToolTip.Tip="Open this link in the chooser, as if no rule matched">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Open}" />
+                <TextBlock Text="Try in chooser" />
+              </StackPanel>
+            </Button>
+          </Grid>
+
+          <c:RouteDiagram Stops="{Binding TestStops}" Destination="{Binding TestDestination}"
+                          IsIdle="{Binding TestIdle}" TerminalLabel="Ask me" Margin="0,0,4,0" />
+
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding TestHeadline}" FontWeight="SemiBold"
+                       Classes.error="{Binding TestInvalid}" />
+            <TextBlock Text="{Binding TestDetail}" Classes="mono faint small" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding TestDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
     </Grid>
 
     <!-- Editor -->
@@ -196,6 +269,8 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
+          <TextBlock Classes="body faint small" IsVisible="{Binding HasNoBrowsers}"
+                     Text="No browsers yet. Add or scan for them on the Browsers page." />
         </StackPanel>
 
         <StackPanel Spacing="6">

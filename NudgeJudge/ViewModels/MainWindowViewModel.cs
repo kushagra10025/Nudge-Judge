@@ -14,6 +14,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         Activity = activity;
         Settings = settings;
         ConfigProblem = config.LoadError;
+
+        rules.FindBrowsersRequested += (_, _) =>
+        {
+            Navigate(AppPage.Browsers);
+            if (browsers.ScanCommand.CanExecute(null)) browsers.ScanCommand.Execute(null);
+        };
     }
 
     public RulesViewModel Rules { get; }

@@ -19,6 +19,42 @@ public class SampleDataTests
     }
 
     [Fact]
+    public void First_run_config_is_empty_and_offers_samples()
+    {
+        var c = SampleData.FirstRun();
+        Assert.Empty(c.Browsers);
+        Assert.Empty(c.Rules);
+        Assert.True(c.Settings.OfferSamples);
+    }
+
+    [Fact]
+    public void Older_configs_without_the_flag_are_not_offered_samples() =>
+        Assert.False(new AppSettings().OfferSamples);
+
+    [Fact]
+    public void Adding_samples_keeps_existing_rules_first_and_existing_primary()
+    {
+        var mine = Real("Firefox", "/usr/bin/firefox");
+        var own = new Rule { Name = "Mine", Pattern = "example.org", BrowserId = mine.Id };
+        var c = new AppConfig { Browsers = [mine], Rules = [own], Settings = { PrimaryBrowserId = mine.Id } };
+
+        SampleData.AddTo(c);
+
+        Assert.Same(own, c.Rules[0]);
+        Assert.Equal(5, c.Rules.Count);
+        Assert.Equal(mine.Id, c.Settings.PrimaryBrowserId);
+        Assert.All(c.Rules.Skip(1), r => Assert.NotNull(c.FindBrowser(r.BrowserId)));
+    }
+
+    [Fact]
+    public void Adding_samples_to_an_empty_config_sets_a_primary()
+    {
+        var c = SampleData.FirstRun();
+        SampleData.AddTo(c);
+        Assert.Equal("Firefox", c.FindBrowser(c.Settings.PrimaryBrowserId)?.Name);
+    }
+
+    [Fact]
     public void Removes_sample_browsers_and_rules_and_moves_primary()
     {
         var c = SampleData.Create();

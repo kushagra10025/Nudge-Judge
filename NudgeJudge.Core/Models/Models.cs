@@ -95,6 +95,12 @@ public sealed class AppSettings
     /// <summary>Closing the main window keeps NudgeJudge running in the tray.</summary>
     public bool RunInBackground { get; set; } = true;
     public ThemePreference Theme { get; set; } = ThemePreference.System;
+
+    /// <summary>
+    /// True on a fresh install until the user either loads the example setup or chooses to start empty.
+    /// Absent from configs written before first-run onboarding existed, so those users are never asked.
+    /// </summary>
+    public bool OfferSamples { get; set; }
 }
 
 public sealed class AppConfig

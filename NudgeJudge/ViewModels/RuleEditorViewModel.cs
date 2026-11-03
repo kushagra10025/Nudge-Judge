@@ -67,6 +67,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     public bool HasPatternError => PatternError is not null;
     public bool ShowCaseSensitive => Kind.Kind is MatchKind.Regex or MatchKind.PathPrefix;
     public bool IsTemporary => ExpiryText is not null;
+    public bool HasNoBrowsers => Browsers.Count == 0;
 
     partial void OnKindChanged(MatchKindOption value) => Validate();
     partial void OnPatternChanged(string value) => Validate();
@@ -116,6 +117,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     public void SyncBrowsers()
     {
         if (Browser is { } b) Browser = Browsers.FirstOrDefault(o => o.Id == b.Id);
+        OnPropertyChanged(nameof(HasNoBrowsers));
     }
 
     public void RefreshTestVerdict() => Validate();

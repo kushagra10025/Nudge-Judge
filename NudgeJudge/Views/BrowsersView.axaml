@@ -32,7 +32,7 @@
       <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
         <Border Classes="badge route" Padding="12,10" CornerRadius="6" IsVisible="{Binding HasSampleBrowsers}">
           <TextBlock TextWrapping="Wrap" FontSize="13" FontWeight="Normal"
-                     Text="Entries marked Sample came with NudgeJudge so you have something to try. Scan to replace them, and the sample rules, with the browsers you have installed." />
+                     Text="Entries marked Sample are part of the sample setup you loaded. Scan to replace them, and the sample rules, with the browsers you have installed." />
         </Border>
         <TextBlock Text="{Binding StatusMessage}" Classes="small muted" TextWrapping="Wrap"
                    Classes.error="{Binding StatusIsProblem}"
