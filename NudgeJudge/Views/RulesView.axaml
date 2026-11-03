@@ -40,6 +40,13 @@
     <Style Selector="StackPanel.move.alone">
       <Setter Property="IsVisible" Value="False" />
     </Style>
+    <!-- Margins live here, not on the element: a local value would beat the empty-rule style -->
+    <Style Selector="Grid.adds StackPanel.add-row">
+      <Setter Property="Margin" Value="20,0,0,0" />
+    </Style>
+    <Style Selector="Grid.adds.empty StackPanel.add-row">
+      <Setter Property="Margin" Value="-6,0,0,0" />
+    </Style>
   </UserControl.Styles>
 
   <UserControl.Resources>
@@ -65,7 +72,8 @@
   <UserControl.DataTemplates>
     <DataTemplate DataType="vm:ConditionEditorViewModel">
       <Grid ColumnDefinitions="16,*">
-        <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
+        <!-- A junction on the track: the surface behind the glyph breaks the line around it -->
+        <Panel Width="16" Height="22" VerticalAlignment="Top" Margin="0,3,0,0" Background="{DynamicResource SurfaceBrush}">
           <c:MatchKindGlyph Kind="{Binding Kind.Kind}" Foreground="{DynamicResource InkMutedBrush}"
                             IsVisible="{Binding IsLink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
           <c:Icon Data="{StaticResource Icon.App}" Width="14" Height="14" StrokeThickness="2"
@@ -161,7 +169,8 @@
     <!-- A group: the branch glyph on the parent's track, an all/any header, and its rows inset on their own track -->
     <DataTemplate DataType="vm:ConditionGroupViewModel">
       <Grid ColumnDefinitions="16,*">
-        <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
+        <!-- A junction on the track: the surface behind the glyph breaks the line around it -->
+        <Panel Width="16" Height="22" VerticalAlignment="Top" Margin="0,3,0,0" Background="{DynamicResource SurfaceBrush}">
           <c:Icon Data="{StaticResource Icon.Branch}" Width="16" Height="16" StrokeThickness="2"
                   Foreground="{DynamicResource InkMutedBrush}" />
         </Panel>
@@ -190,39 +199,43 @@
           <!-- The group's own line runs from its first row down to its add row, so the add buttons
                visibly belong to this group and not to the one around it -->
           <Grid RowDefinitions="Auto,Auto,Auto">
-            <Rectangle Grid.RowSpan="3" Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
-                       Margin="7.25,14,0,12" />
+            <Rectangle Grid.RowSpan="2" Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
+                       Margin="7.25,14,0,0" IsVisible="{Binding !IsEmpty}" />
             <ItemsControl Classes="nested" ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ConditionNode}" />
 
             <TextBlock Grid.Row="1" Classes="body faint small" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
                        Margin="26,4,0,0" Text="This group is empty. Add a condition to it, or remove the group." />
 
-            <Rectangle Grid.Row="2" Width="10" Height="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
-                       VerticalAlignment="Center" Margin="8,6,0,0" />
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="2" Margin="20,6,0,0">
-              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddLinkConditionCommand}"
-                      ToolTip.Tip="Add a link condition to this group" AutomationProperties.Name="{Binding AddLinkName}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                  <TextBlock Text="Link" />
-                </StackPanel>
-              </Button>
-              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddSourceConditionCommand}"
-                      ToolTip.Tip="Add an opened-from condition to this group" AutomationProperties.Name="{Binding AddSourceName}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                  <TextBlock Text="Opened from" />
-                </StackPanel>
-              </Button>
-              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"
-                      IsVisible="{Binding CanAddGroup}"
-                      ToolTip.Tip="Add a group inside this one" AutomationProperties.Name="{Binding AddGroupName}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                  <TextBlock Text="Group" />
-                </StackPanel>
-              </Button>
-            </StackPanel>
+            <!-- The line turns into the add row as one shape, so line and stub can't drift apart -->
+            <Grid Grid.Row="2" RowDefinitions="6,*,*">
+              <Border Grid.RowSpan="2" Width="12" HorizontalAlignment="Left" Margin="7.25,0,0,0"
+                      BorderBrush="{DynamicResource TrackBrush}" BorderThickness="1.5,0,0,1.5" CornerRadius="0,0,0,4"
+                      IsVisible="{Binding !IsEmpty}" />
+              <StackPanel Grid.Row="1" Grid.RowSpan="2" Orientation="Horizontal" Spacing="2" Margin="20,0,0,0">
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddLinkConditionCommand}"
+                        ToolTip.Tip="Add a link condition to this group" AutomationProperties.Name="{Binding AddLinkName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Link" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddSourceConditionCommand}"
+                        ToolTip.Tip="Add an opened-from condition to this group" AutomationProperties.Name="{Binding AddSourceName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Opened from" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"
+                        IsVisible="{Binding CanAddGroup}"
+                        ToolTip.Tip="Add a group inside this one" AutomationProperties.Name="{Binding AddGroupName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Group" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
           </Grid>
         </StackPanel>
       </Grid>
@@ -539,35 +552,48 @@
             </StackPanel>
           </Grid>
 
-          <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ConditionNode}" />
+          <!-- The rule's own line, like a group's: from its first row down to a stub at its add row. With no
+               conditions yet there's no line to hang the row on, so it sits flush left. -->
+          <Grid RowDefinitions="Auto,Auto,Auto" Classes="adds" Classes.empty="{Binding IsEmpty}">
+            <Rectangle Grid.RowSpan="2" Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
+                       Margin="7.25,14,0,0" IsVisible="{Binding !IsEmpty}" />
+            <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ConditionNode}" />
 
-          <TextBlock Classes="body faint small" Text="{Binding Owner.RuleError}" IsVisible="{Binding Owner.HasRuleError}" />
+            <TextBlock Grid.Row="1" Classes="body faint small" Text="{Binding Owner.RuleError}"
+                       IsVisible="{Binding Owner.HasRuleError}" TextWrapping="Wrap" />
 
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-            <Button Command="{Binding AddLinkConditionCommand}" Padding="10,4" FontSize="12"
-                    ToolTip.Tip="Add a condition on the link" AutomationProperties.Name="{Binding AddLinkName}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                <TextBlock Text="Link" />
+            <!-- The line turns into the add row as one shape, so line and stub can't drift apart -->
+            <Grid Grid.Row="2" RowDefinitions="6,*,*">
+              <Border Grid.RowSpan="2" Width="12" HorizontalAlignment="Left" Margin="7.25,0,0,0"
+                      BorderBrush="{DynamicResource TrackBrush}" BorderThickness="1.5,0,0,1.5" CornerRadius="0,0,0,4"
+                      IsVisible="{Binding !IsEmpty}" />
+              <StackPanel Grid.Row="1" Grid.RowSpan="2" Classes="add-row" Orientation="Horizontal" Spacing="2">
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddLinkConditionCommand}"
+                        ToolTip.Tip="Add a condition on the link" AutomationProperties.Name="{Binding AddLinkName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Link" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddSourceConditionCommand}"
+                        ToolTip.Tip="Add a condition on the app the link was opened from"
+                        AutomationProperties.Name="{Binding AddSourceName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Opened from" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"
+                        ToolTip.Tip="Add a group of conditions with its own all/any, e.g. this app or that one"
+                        AutomationProperties.Name="{Binding AddGroupName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Group" />
+                  </StackPanel>
+                </Button>
               </StackPanel>
-            </Button>
-            <Button Command="{Binding AddSourceConditionCommand}" Padding="10,4" FontSize="12"
-                    ToolTip.Tip="Add a condition on the app the link was opened from"
-                    AutomationProperties.Name="{Binding AddSourceName}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                <TextBlock Text="Opened from" />
-              </StackPanel>
-            </Button>
-            <Button Command="{Binding AddGroupCommand}" Padding="10,4" FontSize="12"
-                    ToolTip.Tip="Add a group of conditions with its own all/any, e.g. this app or that one"
-                    AutomationProperties.Name="{Binding AddGroupName}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                <TextBlock Text="Group" />
-              </StackPanel>
-            </Button>
-          </StackPanel>
+            </Grid>
+          </Grid>
         </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="6"
