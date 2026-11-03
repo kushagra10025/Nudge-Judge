@@ -6,6 +6,7 @@
 # Agentic AI
 .claude/
 .impeccable/
+graphify-out/
 
 # User-specific files
 *.rsuser

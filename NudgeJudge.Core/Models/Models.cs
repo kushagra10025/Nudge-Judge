@@ -37,6 +37,12 @@ public sealed class Rule
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>
+    /// True: came with the first-run sample config. False: saved by the user. Null: written before this
+    /// flag existed (sample cleanup then compares the rule with the sample templates).
+    /// </summary>
+    public bool? IsSample { get; set; }
+
     [JsonIgnore]
     public bool IsTemporary => ExpiresAt is not null || ExpiresAfterBootId is not null;
 

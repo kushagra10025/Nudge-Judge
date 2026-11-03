@@ -154,6 +154,8 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
             rule.Enabled = IsEnabled;
             rule.ExpiresAt = _expiresAt;
             rule.ExpiresAfterBootId = _expiresAfterBootId;
+            // Saving a sample makes it the user's own, so cleaning up samples leaves it alone.
+            rule.IsSample = false;
         });
         Close();
     }

@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using NudgeJudge.Core.Browsers;
+using NudgeJudge.Core.Browsers.Discovery;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Core.Routing;
@@ -48,7 +49,7 @@ public partial class App : Application
         var settings = new SettingsViewModel(config, new StubDefaultBrowserRegistrar(), new AvaloniaThemeService(), dispatcher);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher),
-            new BrowsersViewModel(config, new StubBrowserDiscovery(), router, windows, dispatcher),
+            new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
             new ActivityViewModel(activity, dispatcher),
             settings,
             config);

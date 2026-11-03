@@ -50,28 +50,76 @@ public sealed partial class BrowsersViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
+        if (!_discovery.IsSupported)
+        {
+            SetStatus("Automatic detection isn't available on this system yet. Add browsers manually.", problem: false);
+            return;
+        }
+
         IsScanning = true;
         try
         {
-            var found = await _discovery.DiscoverAsync();
-            var known = _config.Current.Browsers
-                .Select(b => (b.ExecutablePath, b.Arguments))
-                .ToHashSet();
-            var fresh = found.Where(b => !known.Contains((b.ExecutablePath, b.Arguments))).ToList();
-            if (fresh.Count > 0)
-                _config.Update(c => c.Browsers.AddRange(fresh));
-            SetStatus(fresh.Count switch
+            IReadOnlyList<BrowserProfile> found;
+            try
             {
-                0 when found.Count == 0 => "Automatic detection isn't available yet. Add browsers manually for now.",
-                0 => "No new browsers found.",
+                found = await _discovery.DiscoverAsync();
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                SetStatus("Scanning failed: " + e.Message, problem: true);
+                return;
+            }
+
+            // Same command as an existing entry means it's already known. A matching sample has now
+            // been confirmed as really installed, so it stops being labelled a sample.
+            var current = _config.Current.Browsers;
+            var fresh = found.Where(f => !current.Any(b => SameCommand(b, f))).ToList();
+            var confirmed = current.Where(b => b.Source == BrowserSource.Sample && found.Any(f => SameCommand(b, f)))
+                .Select(b => b.Id).ToHashSet();
+
+            var samplesRemoved = false;
+            if (fresh.Count > 0 || confirmed.Count > 0)
+            {
+                _config.Update(c =>
+                {
+                    c.Browsers.AddRange(fresh);
+                    foreach (var b in c.Browsers.Where(b => confirmed.Contains(b.Id)))
+                        b.Source = BrowserSource.Discovered;
+                    // Real browsers have arrived, so the sample browsers and rules have done their job.
+                    if (fresh.Count > 0)
+                        samplesRemoved = SampleData.RemoveSamples(c);
+                    if (c.FindBrowser(c.Settings.PrimaryBrowserId) is null)
+                        c.Settings.PrimaryBrowserId = c.Browsers.FirstOrDefault(b => !b.IsPrivate)?.Id ?? c.Browsers.FirstOrDefault()?.Id;
+                });
+            }
+
+            var message = fresh.Count switch
+            {
+                0 when found.Count == 0 => "No browsers found. Add one manually.",
+                0 => "No new browsers found. Everything installed is already listed.",
                 1 => "Found 1 new browser.",
                 var n => $"Found {n} new browsers.",
-            }, problem: false);
+            };
+            SetStatus(samplesRemoved ? message + " Removed the sample browsers and rules." : message, problem: false);
         }
         finally
         {
             IsScanning = false;
         }
+    }
+
+    private static bool SameCommand(BrowserProfile a, BrowserProfile b) =>
+        string.Equals(a.ExecutablePath.Trim(), b.ExecutablePath.Trim(),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) &&
+        string.Equals(NormalizeArguments(a.Arguments), NormalizeArguments(b.Arguments), StringComparison.Ordinal);
+
+    /// <summary>A trailing <c>{url}</c> means the same as none: the launcher appends the URL either way.</summary>
+    private static string NormalizeArguments(string args)
+    {
+        args = args.Trim();
+        return args.EndsWith(BrowserLauncher.UrlPlaceholder, StringComparison.Ordinal)
+            ? args[..^BrowserLauncher.UrlPlaceholder.Length].TrimEnd()
+            : args;
     }
 
     private bool CanScan() => !IsScanning;

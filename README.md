@@ -67,7 +67,7 @@ NudgeJudge.Core/          Plain .NET library with no UI dependencies
   Rules/                  PatternCompiler (pattern → matcher), RuleEngine (ordered matching + per-rule trace)
   Security/               UrlValidator
   Config/                 JsonConfigStore, AppPaths (per-OS paths, private atomic writes), SampleData
-  Browsers/               BrowserLauncher (argv-only launch), discovery interface + stub
+  Browsers/               BrowserLauncher (argv-only launch); Discovery/ finds installed browsers, private modes and profiles
   Platform/               SystemBoot (detects reboots for "until restart" rules), default-browser registration interface + stub
   Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog
 
@@ -80,7 +80,7 @@ NudgeJudge/               Avalonia UI library
   App.axaml(.cs)          Composition root and tray icon
 
 NudgeJudge.Desktop/       Executable for Linux, Windows and macOS
-NudgeJudge.Core.Tests/    xUnit tests for matching, validation, ReDoS safety and argument building
+NudgeJudge.Core.Tests/    xUnit tests for matching, validation, ReDoS safety, argument building and browser discovery
 ```
 
 Every incoming link goes through `LinkRouter.Route(string)`. Today that's the command line; later the single-instance messaging channel will feed the same method. The design system is documented in [DESIGN.md](DESIGN.md), and product context in [PRODUCT.md](PRODUCT.md).
@@ -97,13 +97,14 @@ Every incoming link goes through `LinkRouter.Route(string)`. Today that's the co
 - [x] Chooser window: tabs for links that arrive together, number-key shortcuts, open once / for N hours / until restart / always
 - [x] Tray icon and menu, keep-running-in-tray setting, routing on/off with a primary browser for pass-through
 - [x] Light, dark and follow-system themes
-- [x] 45 unit tests for the core
+- [x] Browser scanning: Linux `.desktop` entries (including Snap and Flatpak) and Windows `StartMenuInternet`, with a private-window entry per browser and Firefox profiles (both `profiles.ini` and the new profile manager) and Chrome/Chromium-family profiles when there's more than one. A scan that adds browsers removes the sample browsers and rules
+- [x] 83 unit tests for the core
 
 **Limitations right now**
 
 - NudgeJudge **cannot yet register as the default browser**. To try it, run it with a URL argument (see [Getting started](#getting-started)).
 - There's **no single-instance mode**: each launch with a URL handles that link in its own process and exits.
-- **Browser scanning finds nothing.** Add browsers manually for now.
+- Browser scanning isn't available on macOS yet.
 - The activity log is in memory only and clears when the app quits.
 - macOS isn't tested.
 
@@ -112,21 +113,17 @@ Every incoming link goes through `LinkRouter.Route(string)`. Today that's the co
 Roughly in order:
 
 1. **Single instance with secure local messaging.** The first process becomes the server and later launches send it their URLs, then exit right away. Named pipe on Windows, Unix domain socket on Linux and macOS. The server generates a random session token at startup and stores it in a `0600` file. Every message must include the token, and every URL is validated again on receipt.
-2. **Browser discovery.**
-   - Linux: `.desktop` files from the XDG data directories that handle `x-scheme-handler/http`.
-   - Windows: `HKLM`/`HKCU\SOFTWARE\Clients\StartMenuInternet`.
-   - Also detect Chrome and Firefox profiles.
-3. **Default-browser registration.**
+2. **Default-browser registration.**
    - Linux: install a `.desktop` entry and run `xdg-settings set default-web-browser`.
    - Windows: register Capabilities/URL associations in the registry, then send the user to the system Default Apps settings.
    - macOS: stub for now; later `LSSetDefaultHandlerForURLScheme`.
-4. **Start on login.**
+3. **Start on login.**
    - Linux: XDG autostart entry.
    - Windows: `Run` registry key.
-5. **Persistent activity log**, with a size limit and an option to turn it off; "create rule from this entry".
-6. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-7. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
-8. **macOS.** Real implementations for the stubs, a menu-bar icon, and testing.
+4. **Persistent activity log**, with a size limit and an option to turn it off; "create rule from this entry".
+5. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
+6. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
+7. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration), a menu-bar icon, and testing.
 
 ## Contributing
 
@@ -139,3 +136,4 @@ Designed the primary system architecture and built the core library, while Claud
 ### Skills
 
 * UI/UX - [Impeccable](https://github.com/pbakaus/impeccable)
+* Agent - [Graphify](https://github.com/Graphify-Labs/graphify)

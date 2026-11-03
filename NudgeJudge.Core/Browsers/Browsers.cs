@@ -6,16 +6,18 @@ namespace NudgeJudge.Core.Browsers;
 
 public interface IBrowserDiscovery
 {
+    /// <summary>False when this platform has no discovery yet, so the UI can say so instead of "nothing found".</summary>
+    bool IsSupported { get; }
+
     /// <summary>Finds installed browsers. Results are new <see cref="BrowserProfile"/>s with <see cref="BrowserSource.Discovered"/>.</summary>
     Task<IReadOnlyList<BrowserProfile>> DiscoverAsync(CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Placeholder until per-OS discovery lands (Linux .desktop files, Windows StartMenuInternet registry,
-/// macOS LaunchServices). Returns nothing.
-/// </summary>
+/// <summary>Used where discovery isn't built yet (macOS, LaunchServices later). Returns nothing.</summary>
 public sealed class StubBrowserDiscovery : IBrowserDiscovery
 {
+    public bool IsSupported => false;
+
     public Task<IReadOnlyList<BrowserProfile>> DiscoverAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<BrowserProfile>>([]);
 }
@@ -97,5 +99,26 @@ public static class CommandLine
         }
         if (inToken) result.Add(current.ToString());
         return result;
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="Split"/>: quotes arguments that contain whitespace or quotes.
+    /// Returns null for an argument holding both quote kinds, which <see cref="Split"/> can't represent.
+    /// </summary>
+    public static string? Join(IEnumerable<string> args)
+    {
+        var parts = new List<string>();
+        foreach (var a in args)
+        {
+            if (a.Length > 0 && !a.Any(c => char.IsWhiteSpace(c) || c is '"' or '\''))
+                parts.Add(a);
+            else if (!a.Contains('"'))
+                parts.Add('"' + a + '"');
+            else if (!a.Contains('\''))
+                parts.Add('\'' + a + '\'');
+            else
+                return null;
+        }
+        return string.Join(' ', parts);
     }
 }

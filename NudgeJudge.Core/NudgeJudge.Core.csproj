@@ -7,6 +7,9 @@
     <RootNamespace>NudgeJudge.Core</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="NudgeJudge.Core.Tests" />
   </ItemGroup>
 </Project>
