@@ -69,6 +69,7 @@ public sealed class ActivityLogTests : IDisposable
             ActivityLogEnabled = false,
             ActivityLogLimit = 250,
         };
+        settings.FlushPendingSaves();
 
         var reloaded = new JsonConfigStore(path).Current.Settings;
         Assert.False(reloaded.ActivityLogEnabled);
@@ -123,7 +124,7 @@ public sealed class ActivityLogTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void Lowering_the_limit_in_settings_deletes_the_oldest_entries_at_once()
+    public void Lowering_the_limit_in_settings_deletes_the_oldest_entries_once_it_settles()
     {
         var app = new Harness(LogPath);
         foreach (var host in new[] { "a", "b", "c", "d", "e" })
@@ -132,10 +133,49 @@ public sealed class ActivityLogTests : IDisposable
 
         Find<NumericUpDown>(window, "Activity entries to keep").Value = 2;
         Settle(window);
+        // Still inside the debounce: nothing is trimmed yet.
+        Assert.Equal(5, File.ReadAllLines(LogPath).Length);
+        app.Settings.FlushPendingSaves();
+        Settle(window);
 
         Assert.Equal(2, app.Config.Current.Settings.ActivityLogLimit);
         Assert.Equal(2, File.ReadAllLines(LogPath).Length);
         Assert.Equal(["e.example.com", "d.example.com"], app.Main.Activity.Entries.Select(e => e.Host));
+    }
+
+    [AvaloniaFact]
+    public void Spinning_the_limit_down_and_back_up_keeps_every_entry()
+    {
+        var app = new Harness(LogPath);
+        foreach (var host in new[] { "a", "b", "c", "d", "e" })
+            app.Router.Route($"https://{host}.example.com/");
+        var window = Show(app, AppPage.Settings);
+
+        var limit = Find<NumericUpDown>(window, "Activity entries to keep");
+        foreach (var value in new[] { 4, 3, 2, 1, 2, 3, 100 })
+            limit.Value = value;
+        app.Settings.FlushPendingSaves();
+        Settle(window);
+
+        Assert.Equal(100, app.Config.Current.Settings.ActivityLogLimit);
+        Assert.Equal(5, File.ReadAllLines(LogPath).Length);
+    }
+
+    [AvaloniaFact]
+    public void A_debounced_setting_saves_by_itself_after_the_delay()
+    {
+        var path = Path.Combine(_dir, "config.json");
+        var settings = new SettingsViewModel(new JsonConfigStore(path), new FakeRegistrar(), new NoTheme(), new InlineDispatcher(), new FakeStartup())
+        {
+            TemporaryRuleHours = 24,
+        };
+        Assert.Equal(8, new JsonConfigStore(path).Current.Settings.TemporaryRuleHours);
+
+        var deadline = DateTime.UtcNow + SettingsViewModel.SaveDelay + TimeSpan.FromSeconds(5);
+        while (new JsonConfigStore(path).Current.Settings.TemporaryRuleHours != 24 && DateTime.UtcNow < deadline)
+            Thread.Sleep(50);
+        Assert.Equal(24, new JsonConfigStore(path).Current.Settings.TemporaryRuleHours);
+        Assert.Equal(24, settings.TemporaryRuleHours);
     }
 
     [AvaloniaFact]

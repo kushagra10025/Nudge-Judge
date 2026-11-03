@@ -85,7 +85,8 @@ public sealed partial class BrowsersViewModel : ViewModelBase
             {
                 _config.Update(c =>
                 {
-                    c.Browsers.AddRange(fresh);
+                    // Checked again here in case the update picked up browsers another process just added.
+                    c.Browsers.AddRange(fresh.Where(f => !c.Browsers.Any(b => SameCommand(b, f))));
                     foreach (var b in c.Browsers.Where(b => confirmed.Contains(b.Id)))
                         b.Source = BrowserSource.Discovered;
                     // Real browsers have arrived, so the sample browsers and rules have done their job.
@@ -141,10 +142,11 @@ public sealed partial class BrowsersViewModel : ViewModelBase
         if (index < 0) return;
         var removed = _config.Current.Browsers[index].Clone();
         var wasPrimary = _config.Current.Settings.PrimaryBrowserId == item.Id;
+        // By id, not index: the update may first pick up another process's changes and shift the list.
         _config.Update(c =>
         {
-            c.Browsers.RemoveAt(index);
-            if (wasPrimary) c.Settings.PrimaryBrowserId = c.Browsers.FirstOrDefault()?.Id;
+            c.Browsers.RemoveAll(b => b.Id == removed.Id);
+            if (c.Settings.PrimaryBrowserId == removed.Id) c.Settings.PrimaryBrowserId = c.Browsers.FirstOrDefault()?.Id;
         });
         Undo.Show($"Removed {removed.Name}", () => _config.Update(c =>
         {

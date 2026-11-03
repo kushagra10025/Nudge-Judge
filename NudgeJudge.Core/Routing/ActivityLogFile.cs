@@ -22,27 +22,26 @@ internal sealed partial class ActivityJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Rolling activity log on disk: one JSON object per line, oldest first, readable only by the current user.
-/// Every link launch is currently its own process, so each update holds an exclusive lock on the file
-/// while it reads, trims and rewrites it. Lines that can't be parsed (a torn write, hand edits) are skipped.
+/// Normally only the primary instance writes it, but a standalone launch (single-instance unavailable) can too,
+/// so each update holds <c>activity.log.lock</c> while it reads, changes and atomically replaces the file.
+/// A crash mid-write leaves the previous file intact. Lines that can't be parsed (hand edits) are skipped.
 /// </summary>
 public sealed class ActivityLogFile(string path) : IActivityStore
 {
-    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(2);
-
     public string Path { get; } = path;
+
+    private string LockPath => Path + ".lock";
 
     public IReadOnlyList<ActivityEntry> Read()
     {
-        if (!File.Exists(Path)) return [];
-        using var stream = Open(FileMode.Open, FileAccess.Read, FileShare.Read);
-        return Parse(stream);
+        // Every write is a whole-file rename, so a plain read always sees one complete version.
+        return File.Exists(Path) ? Parse(ReadText()) : [];
     }
 
     public IReadOnlyList<ActivityEntry> Update(Action<List<ActivityEntry>> change)
     {
-        AppPaths.EnsurePrivateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-        using var stream = Open(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        var before = Parse(stream);
+        using var held = FileLock.Acquire(LockPath);
+        var before = File.Exists(Path) ? Parse(ReadText()) : [];
         var after = new List<ActivityEntry>(before);
         change(after);
         if (after.SequenceEqual(before)) return after;
@@ -50,19 +49,22 @@ public sealed class ActivityLogFile(string path) : IActivityStore
         var text = new StringBuilder();
         foreach (var entry in after)
             text.Append(JsonSerializer.Serialize(entry, ActivityJsonContext.Default.ActivityEntry)).Append('\n');
-
-        stream.Position = 0;
-        stream.SetLength(0);
-        stream.Write(Encoding.UTF8.GetBytes(text.ToString()));
-        stream.Flush(flushToDisk: true);
+        AppPaths.WritePrivateFileAtomic(Path, Encoding.UTF8.GetBytes(text.ToString()));
         return after;
     }
 
-    private static List<ActivityEntry> Parse(Stream stream)
+    /// <summary>Shares delete access so a writer's rename can replace the file while we read it (matters on Windows).</summary>
+    private string ReadText()
+    {
+        using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false);
+        return reader.ReadToEnd();
+    }
+
+    private static List<ActivityEntry> Parse(string text)
     {
         var entries = new List<ActivityEntry>();
-        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-        while (reader.ReadLine() is { } line)
+        foreach (var line in text.Split('\n'))
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             try
@@ -75,26 +77,5 @@ public sealed class ActivityLogFile(string path) : IActivityStore
             }
         }
         return entries;
-    }
-
-    private FileStream Open(FileMode mode, FileAccess access, FileShare share)
-    {
-        var options = new FileStreamOptions { Mode = mode, Access = access, Share = share };
-        if (!OperatingSystem.IsWindows() && mode == FileMode.OpenOrCreate)
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-
-        // Another NudgeJudge process may hold the lock for the few milliseconds an update takes.
-        var deadline = DateTime.UtcNow + LockTimeout;
-        while (true)
-        {
-            try
-            {
-                return new FileStream(Path, options);
-            }
-            catch (IOException) when (DateTime.UtcNow < deadline && File.Exists(Path))
-            {
-                Thread.Sleep(15);
-            }
-        }
     }
 }

@@ -75,7 +75,10 @@ public partial class App : Application
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
             new ActivityViewModel(activity, dispatcher, settings, windows),
             settings,
-            config);
+            config,
+            dispatcher);
+        // Settings typed in the last moment before quitting are still waiting out their debounce.
+        desktop.Exit += (_, _) => settings.FlushPendingSaves();
 
         windows.Main = main;
         windows.Chooser = chooser;

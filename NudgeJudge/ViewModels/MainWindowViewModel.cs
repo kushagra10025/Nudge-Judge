@@ -8,13 +8,20 @@ namespace NudgeJudge.ViewModels;
 public sealed partial class MainWindowViewModel : ViewModelBase
 {
     public MainWindowViewModel(RulesViewModel rules, BrowsersViewModel browsers, ActivityViewModel activity,
-        SettingsViewModel settings, IConfigStore config)
+        SettingsViewModel settings, IConfigStore config, IUiDispatcher? dispatcher = null)
     {
         Rules = rules;
         Browsers = browsers;
         Activity = activity;
         Settings = settings;
-        ConfigProblem = config.LoadError;
+        ConfigProblem = config.SaveError ?? config.LoadError;
+        // A save can fail (or start working again) at any time, and Changed may come from a background thread.
+        config.Changed += (_, _) =>
+        {
+            void Refresh() => ConfigProblem = config.SaveError ?? config.LoadError;
+            if (dispatcher is null) Refresh();
+            else dispatcher.Post(Refresh);
+        };
 
         rules.KnownSources = () => activity.KnownSources;
         rules.FindBrowsersRequested += (_, _) =>
@@ -33,7 +40,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public BrowsersViewModel Browsers { get; }
     public ActivityViewModel Activity { get; }
     public SettingsViewModel Settings { get; }
-    public string? ConfigProblem { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConfigProblem))]
+    public partial string? ConfigProblem { get; private set; }
+
     public bool HasConfigProblem => ConfigProblem is not null;
 
     [ObservableProperty]

@@ -33,8 +33,45 @@ NudgeJudge receives URLs from any app on the machine, so every URL is treated as
 - **URL validation.** Only absolute `http`/`https` URLs with a host are accepted (max 8,192 characters, no whitespace or control characters). Everything else is rejected and logged.
 - **No shell.** Browsers are started with an explicit argument list (`ProcessStartInfo.ArgumentList`), so neither the URL nor an argument template can inject commands. A validated URL always starts with `http(s):`, so the browser can't read it as a command-line flag.
 - **ReDoS protection.** All patterns, including those generated from wildcards, run on .NET's non-backtracking regex engine (`RegexOptions.NonBacktracking`), which matches in linear time. On top of that, patterns are limited to 512 characters and each match has a 50 ms timeout. Lookarounds, backreferences and atomic groups are rejected when you save the rule.
-- **Private config.** The config file is written atomically with owner-only permissions (`0600` file, `0700` directory on Unix).
+- **Private config.** The config file and activity log are written atomically with owner-only permissions (`0600` file, `0700` directory on Unix). See [How data is saved](#how-data-is-saved).
 - **Handler registration.** The OS tools are run with explicit argument lists, never a shell. The Linux `Exec` line follows the Desktop Entry quoting rules, and a test checks that it parses back to the same argv. Launch paths containing control characters are refused. Every argument the OS passes in is validated as a URL like any other link.
+
+## How data is saved
+
+`config.json` and `activity.log` are rewritten whole on every change. Each write follows the same steps:
+
+1. **Lock.** The writer takes an exclusive lock on a sidecar file (`config.json.lock`, `activity.log.lock`), so a standalone launch and the running instance can't interleave. A config update that can't get the lock within 2 seconds goes ahead without it rather than freeze the UI.
+2. **Re-read if changed.** If another process rewrote the config since this one last saw it, the store reloads it first and then applies its change, so neither side's edits are lost. Updates find rules and browsers by id, never by list position.
+3. **Atomic replace.** The new contents go to a temp file in the same directory, are flushed to disk, then renamed over the old file. Readers see the old version or the new one, never half of each. On Linux and macOS the directory is fsynced too, so the rename survives a power cut.
+
+When something goes wrong:
+
+| Situation | What happens |
+|---|---|
+| A save fails (disk full, file locked) | The change stays in memory, a banner reports it, and the next change retries the save. Nothing is thrown to the UI. |
+| `config.json` can't be parsed | It's kept as `config.json.broken-<timestamp>` (never overwritten) and the app starts from defaults. |
+| The config is from an older version | The original is kept as `config.json.v<N>.bak`, then the upgraded file is written. |
+| The config is from a newer version | It's opened read-only: changes work for the session but are never saved, so the newer version's settings stay intact. |
+| You spin a number field in Settings | It saves 400 ms after the last change (and on exit), so spinning the activity limit down and back up doesn't delete entries. |
+
+### Windows: known gaps and planned fixes
+
+The steps above run on Windows too, but the test suite hasn't run there yet, and two Windows-specific behaviours aren't covered.
+
+**1. The rename isn't forced to disk.** Windows has no way to fsync a directory, and .NET's `File.Move` doesn't ask for write-through. After a power cut, the config is never corrupt (NTFS journals its metadata), but it can come back as the previous version, losing the last change.
+
+*Fix:* on Windows, do the replace with `MoveFileExW(temp, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` through P/Invoke instead of `File.Move`. The call only returns once the rename is on disk. This would replace the Unix directory fsync in `AppPaths.WritePrivateFileAtomic`, leaving Linux and macOS unchanged.
+
+**2. Antivirus and indexers can make a save fail.** Defender, Windows Search and sync clients (OneDrive, Dropbox) often open a freshly written file for a few milliseconds without allowing it to be deleted. A rename that lands in that window fails with "access denied" or a sharing violation. Today:
+
+- **Config:** the change stays in memory with a warning, and the next change retries. It's lost only if the app quits before another change is made.
+- **Activity log:** that entry stays in memory but is never written to disk.
+
+Older Windows 10 builds may also refuse a rename over a file another process has open, even when that process allows deletion.
+
+*Fix:* in `WritePrivateFileAtomic`, on Windows only, retry the rename when it fails with `ERROR_ACCESS_DENIED` (5), `ERROR_SHARING_VIOLATION` (32) or `ERROR_LOCK_VIOLATION` (33). Allow about 5 attempts with a short backoff (e.g. 10, 20, 40, 60, 80 ms) before giving up and reporting the error as today. VS Code and npm handle the same problem this way.
+
+**3. Verify on a real Windows machine.** Add a GitHub Actions workflow that runs `dotnet test` on both `ubuntu-latest` and `windows-latest`. The storage tests in `NudgeJudge.Core.Tests/ConfigStoreTests.cs` run on both platforms: the failed-save test puts a directory where the file should be instead of using Unix permissions, and the Unix file-mode checks are skipped on Windows.
 
 ## Getting started
 
@@ -105,7 +142,7 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - [x] Source app detection on Linux (`/proc` parent chain, `.desktop` names, `CHROME_DESKTOP`) and Windows (Toolhelp parent chain with recycled-pid check, file descriptions, foreground window), logged in Activity and forwarded over the single-instance channel
 - [x] Temporary rules that expire after N hours or at reboot (Linux `boot_id`; uptime-based on other platforms)
 - [x] URL validation, argv-only browser launch, ReDoS-safe matching
-- [x] JSON config with atomic, owner-only writes; keeps a copy of a corrupt file and starts from defaults
+- [x] JSON config with atomic, owner-only writes, a cross-process lock and reload-before-write, retried failed saves, backups before migration, and read-only mode for configs from newer versions; keeps a copy of a corrupt file and starts from defaults (see [How data is saved](#how-data-is-saved))
 - [x] Main window: Rules (live tester + route diagram + editor), Browsers (editor with a preview of the exact command it will run, "try" button), Activity (with filtering), Settings
 - [x] Chooser window: tabs for links that arrive together, number-key shortcuts, open once / for N hours / until restart / always
 - [x] Tray icon and menu, keep-running-in-tray setting, routing on/off with a primary browser for pass-through
@@ -115,7 +152,7 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
 - [x] Single instance with secure local messaging: the first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second. Unix domain socket in an owner-only directory (`$XDG_RUNTIME_DIR/nudgejudge` on Linux), socket `0600`, peer uid checked with `SO_PEERCRED` on Linux; per-user named pipe on Windows (current-user ACL, server owner verified, first-instance check against squatting). A fresh random token per session is stored in a `0600` file and checked in constant time; messages are size-, count- and time-limited; every URL is validated again on receipt. If no server answers within 5 seconds, a launch handles its links itself rather than drop them
 - [x] Launch at startup, switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings
-- [x] 205 core unit tests and 33 headless UI tests
+- [x] 225 core unit tests and 37 headless UI tests
 
 **Limitations right now**
 
@@ -124,15 +161,17 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - Browser scanning isn't available on macOS yet.
 - A launch that only came to open links stays running as the server only when "keep running in tray" is on; otherwise it exits once its links are handled.
 - Single-instance mode is untested on Windows and macOS so far.
+- On Windows, saves aren't yet written through to disk or retried when antivirus briefly locks the file (see [Windows: known gaps and planned fixes](#windows-known-gaps-and-planned-fixes)).
 - macOS isn't tested.
 
 ## Upcoming work
 
 Roughly in order:
 
-1. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-2. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
-3. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
+1. **Windows save hardening.** Write-through renames, retries on transient sharing errors, and CI on Windows (see [above](#windows-known-gaps-and-planned-fixes)).
+2. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
+3. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
+4. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
 
 ## Contributing
 

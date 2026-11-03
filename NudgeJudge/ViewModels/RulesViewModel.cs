@@ -208,7 +208,8 @@ public sealed partial class RulesViewModel : ViewModelBase
         var index = _config.Current.Rules.FindIndex(r => r.Id == item.Id);
         if (index < 0) return;
         var removed = _config.Current.Rules[index].Clone();
-        _config.Update(c => c.Rules.RemoveAt(index));
+        // By id, not index: the update may first pick up another process's changes and shift the list.
+        _config.Update(c => c.Rules.RemoveAll(r => r.Id == removed.Id));
         Undo.Show($"Deleted rule {index + 1}  ·  {removed.Name}", () => _config.Update(c =>
         {
             if (c.Rules.Any(r => r.Id == removed.Id)) return;

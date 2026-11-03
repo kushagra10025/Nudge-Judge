@@ -16,6 +16,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IThemeService _theme;
     private readonly ILaunchAtStartup _startup;
     private bool _loading;
+    private readonly IUiDispatcher _dispatcher;
+    private readonly Dictionary<string, Action<Core.Models.AppConfig>> _pending = [];
+    private int _pendingGeneration;
+
+    /// <summary>How long a number field has to stay put before it's saved, so spinning through values writes once.</summary>
+    public static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(400);
     private bool _refreshing;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
@@ -25,6 +31,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _startup = startup;
         _registrar = registrar;
         _theme = theme;
+        _dispatcher = dispatcher;
         ConfigPath = AppPaths.ConfigFile;
         ActivityLogPath = AppPaths.ActivityLogFile;
         Theme = ThemeOption.All[0];
@@ -145,8 +152,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     partial void OnRoutingEnabledChanged(bool value) => Save(c => c.Settings.RoutingEnabled = value);
     partial void OnPrimaryBrowserChanged(BrowserOption? value) => Save(c => c.Settings.PrimaryBrowserId = value?.Id);
-    partial void OnChooserGroupingSecondsChanged(decimal? value) => Save(c => c.Settings.ChooserGroupingSeconds = (int)Math.Clamp(value ?? 5, 0, 120));
-    partial void OnTemporaryRuleHoursChanged(decimal? value) => Save(c => c.Settings.TemporaryRuleHours = (int)Math.Clamp(value ?? 8, 1, 168));
+    partial void OnChooserGroupingSecondsChanged(decimal? value) => SaveSoon(nameof(ChooserGroupingSeconds), c => c.Settings.ChooserGroupingSeconds = (int)Math.Clamp(value ?? 5, 0, 120));
+    partial void OnTemporaryRuleHoursChanged(decimal? value) => SaveSoon(nameof(TemporaryRuleHours), c => c.Settings.TemporaryRuleHours = (int)Math.Clamp(value ?? 8, 1, 168));
     partial void OnRunInBackgroundChanged(bool value) => Save(c => c.Settings.RunInBackground = value);
     partial void OnActivityLogEnabledChanged(bool value) => Save(c => c.Settings.ActivityLogEnabled = value);
 
@@ -185,7 +192,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnActivityLogLimitChanged(decimal? value) =>
-        Save(c => c.Settings.ActivityLogLimit =
+        // Debounced: lowering it trims the log, and spinning 500 → 50 → 500 mustn't drop 450 entries on the way.
+        SaveSoon(nameof(ActivityLogLimit), c => c.Settings.ActivityLogLimit =
             (int)Math.Clamp(value ?? ActivityLog.DefaultCapacity, ActivityLog.MinCapacity, ActivityLog.MaxCapacity));
 
     partial void OnThemeChanged(ThemeOption value)
@@ -199,6 +207,31 @@ public sealed partial class SettingsViewModel : ViewModelBase
         if (!_loading) _config.Update(mutate);
     }
 
+    /// <summary>Saves after <see cref="SaveDelay"/> without further changes to <paramref name="field"/> (or any other debounced field).</summary>
+    private void SaveSoon(string field, Action<Core.Models.AppConfig> mutate)
+    {
+        if (_loading) return;
+        _pending[field] = mutate;
+        var generation = ++_pendingGeneration;
+        _ = Task.Delay(SaveDelay).ContinueWith(_ => _dispatcher.Post(() =>
+        {
+            if (generation == _pendingGeneration) FlushPendingSaves();
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>Writes any debounced changes now, in one update. Call before the app exits.</summary>
+    public void FlushPendingSaves()
+    {
+        if (_pending.Count == 0) return;
+        var changes = _pending.Values.ToList();
+        _pending.Clear();
+        _pendingGeneration++;
+        _config.Update(c =>
+        {
+            foreach (var change in changes) change(c);
+        });
+    }
+
     private void Load()
     {
         _loading = true;
@@ -210,11 +243,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
             RoutingEnabled = s.RoutingEnabled;
             PrimaryBrowser = Browsers.FirstOrDefault(b => b.Id == s.PrimaryBrowserId);
-            ChooserGroupingSeconds = s.ChooserGroupingSeconds;
-            TemporaryRuleHours = s.TemporaryRuleHours;
+            // A field still waiting out its debounce keeps what the user typed rather than snapping back.
+            if (!_pending.ContainsKey(nameof(ChooserGroupingSeconds))) ChooserGroupingSeconds = s.ChooserGroupingSeconds;
+            if (!_pending.ContainsKey(nameof(TemporaryRuleHours))) TemporaryRuleHours = s.TemporaryRuleHours;
             RunInBackground = s.RunInBackground;
             ActivityLogEnabled = s.ActivityLogEnabled;
-            ActivityLogLimit = ActivityLog.ClampCapacity(s.ActivityLogLimit);
+            if (!_pending.ContainsKey(nameof(ActivityLogLimit))) ActivityLogLimit = ActivityLog.ClampCapacity(s.ActivityLogLimit);
             Theme = ThemeOption.All.First(t => t.Value == s.Theme);
             _theme.Apply(s.Theme);
             LoadStartup();

@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+
 namespace NudgeJudge.Core.Config;
 
 /// <summary>Per-user locations. Directories are created with owner-only permissions on Unix.</summary>
@@ -80,5 +83,32 @@ public static class AppPaths
         {
             if (File.Exists(temp)) File.Delete(temp);
         }
+        // The rename lives in the directory entry; without this a power cut can bring back the old file.
+        if (!OperatingSystem.IsWindows()) SyncDirectory(dir);
     }
+
+    /// <summary>Best effort: fsync a directory so a rename inside it survives a crash. Failures are ignored.</summary>
+    [UnsupportedOSPlatform("windows")]
+    private static void SyncDirectory(string dir)
+    {
+        try
+        {
+            var fd = open(dir, 0 /* O_RDONLY */);
+            if (fd < 0) return;
+            try { fsync(fd); }
+            finally { close(fd); }
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int fsync(int fd);
+
+    [DllImport("libc")]
+    private static extern int close(int fd);
 }
