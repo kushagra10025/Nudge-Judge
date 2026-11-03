@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Project Path="NudgeJudge.Android/NudgeJudge.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="NudgeJudge.Browser/NudgeJudge.Browser.csproj" />
+  <Project Path="NudgeJudge.Desktop/NudgeJudge.Desktop.csproj" />
+  <Project Path="NudgeJudge.iOS/NudgeJudge.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="NudgeJudge/NudgeJudge.csproj" />
+</Solution>
