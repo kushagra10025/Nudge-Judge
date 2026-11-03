@@ -7,6 +7,23 @@ public static class AppPaths
     public static string ConfigFile => Path.Combine(ConfigDirectory, "config.json");
     public static string ActivityLogFile => Path.Combine(ConfigDirectory, "activity.log");
 
+    /// <summary>
+    /// Where the single-instance lock, socket and session token live. On Linux this is
+    /// <c>$XDG_RUNTIME_DIR/nudgejudge</c> (a per-user tmpfs, cleared at logout) when available.
+    /// </summary>
+    public static string RuntimeDirectory { get; } = ResolveRuntimeDirectory();
+
+    private static string ResolveRuntimeDirectory()
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+            if (!string.IsNullOrEmpty(runtime) && Path.IsPathRooted(runtime) && Directory.Exists(runtime))
+                return Path.Combine(runtime, "nudgejudge");
+        }
+        return ConfigDirectory;
+    }
+
     private static string ResolveConfigDirectory()
     {
         if (OperatingSystem.IsWindows())

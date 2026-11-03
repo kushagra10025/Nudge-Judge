@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using NudgeJudge.Core.Browsers;
 using NudgeJudge.Core.Browsers.Discovery;
 using NudgeJudge.Core.Config;
+using NudgeJudge.Core.Ipc;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Core.Routing;
 using NudgeJudge.Core.Rules;
@@ -17,6 +18,12 @@ namespace NudgeJudge;
 
 public partial class App : Application
 {
+    /// <summary>
+    /// This process's single-instance claim, set by the desktop entry point. Null in the designer and in
+    /// tests, which then run without a server.
+    /// </summary>
+    public InstanceClaim? Instance { get; init; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -76,30 +83,54 @@ public partial class App : Application
             windows.ShowChooser();
         });
 
-        var args = desktop.Args ?? [];
-        var urls = args.Where(a => !a.StartsWith('-')).ToList();
-        if (urls.Count == 0)
+        var launch = LaunchArguments.Parse(desktop.Args ?? []);
+        var serving = Instance?.StartServer(request =>
+            Dispatcher.UIThread.InvokeAsync(() => HandleForwarded(request, router, windows)).GetTask()) == true;
+
+        // Stay in the tray when the user wants that. A launch that only came to open links stays only if it's
+        // the server (so the next links are handled instantly) or the user opened the main window meanwhile.
+        bool StayResident() => config.Current.Settings.RunInBackground
+                               && (serving || launch.Urls.Count == 0 || windows.MainWindowShown);
+        void ExitIfIdle()
         {
-            if (!args.Contains("--background")) windows.ShowMainWindow();
+            if (StayResident() || windows.AnyWindowOpen) return;
+            // Later launches now find no server and take over, rather than queueing behind a closing process.
+            Instance?.StopServer();
+            desktop.Shutdown();
+        }
+        windows.AllWindowsClosed += (_, _) => ExitIfIdle();
+
+        if (launch.Urls.Count == 0)
+        {
+            if (!launch.Background) windows.ShowMainWindow();
             return;
         }
 
-        // Launched with links (as the default browser would be). Until the single-instance
-        // server exists, this process handles them itself and exits when it's done.
-        var needsChoice = false;
-        foreach (var url in urls)
-            needsChoice |= router.Route(url).Kind == RouteKind.NeedsChoice;
+        // Launched with links (as the default browser is). Links forwarded by later launches join the same chooser.
+        foreach (var url in launch.Urls)
+            router.Route(url);
 
-        if (!needsChoice)
+        // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
+        Dispatcher.UIThread.Post(ExitIfIdle);
+    }
+
+    /// <summary>
+    /// The primary instance's side of the single-instance channel. The request is already authenticated;
+    /// each URL is still validated by <see cref="LinkRouter.Route"/>, as any other incoming link is.
+    /// </summary>
+    private static InstanceReply HandleForwarded(InstanceRequest request, LinkRouter router, DesktopWindowService windows)
+    {
+        switch (request.Command)
         {
-            // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
-            Dispatcher.UIThread.Post(() => desktop.Shutdown());
-            return;
+            case InstanceCommand.Show:
+                windows.ShowMainWindow();
+                break;
+            case InstanceCommand.Open:
+                foreach (var url in request.Urls)
+                    router.Route(url);
+                break;
         }
-        windows.AllWindowsClosed += (_, _) =>
-        {
-            if (!windows.MainWindowShown) desktop.Shutdown();
-        };
+        return InstanceReply.Success;
     }
 
     /// <summary>The app icon as PNG bytes, for the Linux launcher entry written when registering.</summary>

@@ -24,7 +24,10 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
     /// <summary>True once the main window has been shown in this process.</summary>
     public bool MainWindowShown { get; private set; }
 
-    /// <summary>Raised when the chooser closes and nothing else is open.</summary>
+    /// <summary>True while the main window is on screen or the chooser is open.</summary>
+    public bool AnyWindowOpen => _main is { IsVisible: true } || _chooser is not null;
+
+    /// <summary>Raised when a window closes (not just hides) and nothing else is open.</summary>
     public event EventHandler? AllWindowsClosed;
 
     public void ShowMainWindow(AppPage? page = null)
@@ -37,7 +40,11 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
             _main = new MainWindow { DataContext = Main };
             _main.Closing += OnMainClosing;
             _main.Activated += (_, _) => Main?.OnActivated();
-            _main.Closed += (_, _) => _main = null;
+            _main.Closed += (_, _) =>
+            {
+                _main = null;
+                if (!_quitting && _chooser is null) AllWindowsClosed?.Invoke(this, EventArgs.Empty);
+            };
             lifetime.MainWindow = _main;
         }
 

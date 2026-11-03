@@ -4,7 +4,7 @@ NudgeJudge is a browser router for the desktop. You set it as your system's defa
 
 Built with [Avalonia UI](https://avaloniaui.net/) and .NET 10 (C#), using a strict MVVM structure. Linux and Windows come first. macOS is planned, with stubs where platform code is needed.
 
-> **Status: early development.** The UI, the rule engine, browser scanning and default-browser registration (Linux and Windows) work. Running as a single background instance is not built yet. See [Current state](#current-state).
+> **Status: early development.** The UI, the rule engine, browser scanning and default-browser registration (Linux and Windows) and single-instance mode work. Start on login is not built yet. See [Current state](#current-state).
 
 ## Features
 
@@ -75,6 +75,7 @@ NudgeJudge.Core/          Plain .NET library with no UI dependencies
   Platform/               SystemBoot (detects reboots for "until restart" rules); default-browser registrars (Linux xdg-mime,
                           Windows registry + Default Apps, macOS stub), AppLaunchCommand, ICommandRunner
   Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog + its rolling file
+  Ipc/                    Single instance: InstanceLock, InstanceServer/InstanceClient, wire protocol, Unix socket and named-pipe transports
 
 NudgeJudge/               Avalonia UI library
   ViewModels/             CommunityToolkit.Mvvm view models; they reach windows only through interfaces in Services/
@@ -89,7 +90,7 @@ NudgeJudge.Core.Tests/    xUnit tests for matching, validation, ReDoS safety, ar
 NudgeJudge.UI.Tests/      Avalonia headless tests (xunit v3) that drive real views, e.g. the default-browser setup in Settings
 ```
 
-Every incoming link goes through `LinkRouter.Route(string)`. Today that's the command line; later the single-instance messaging channel will feed the same method. The design system is documented in [DESIGN.md](DESIGN.md), and product context in [PRODUCT.md](PRODUCT.md).
+Every incoming link goes through `LinkRouter.Route(string)`. That's the command line of the first launch, and links that later launches forward over the single-instance channel. The design system is documented in [DESIGN.md](DESIGN.md), and product context in [PRODUCT.md](PRODUCT.md).
 
 ## Current state
 
@@ -106,28 +107,28 @@ Every incoming link goes through `LinkRouter.Route(string)`. Today that's the co
 - [x] Browser scanning: Linux `.desktop` entries (including Snap and Flatpak) and Windows `StartMenuInternet`, with a private-window entry per browser and Firefox profiles (both `profiles.ini` and the new profile manager) and Chrome/Chromium-family profiles when there's more than one. A scan that adds browsers removes the sample browsers and rules
 - [x] Default-browser registration: Linux (`.desktop` entry + `xdg-mime`) and Windows (Capabilities registration + Default Apps hand-off). Status is checked whenever the main window comes forward and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering)
 - [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
-- [x] 126 core unit tests and 21 headless UI tests
+- [x] Single instance with secure local messaging: the first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second. Unix domain socket in an owner-only directory (`$XDG_RUNTIME_DIR/nudgejudge` on Linux), socket `0600`, peer uid checked with `SO_PEERCRED` on Linux; per-user named pipe on Windows (current-user ACL, server owner verified, first-instance check against squatting). A fresh random token per session is stored in a `0600` file and checked in constant time; messages are size-, count- and time-limited; every URL is validated again on receipt. If no server answers within 5 seconds, a launch handles its links itself rather than drop them
+- [x] 155 core unit tests and 21 headless UI tests
 
 **Limitations right now**
 
 - Registering from `dotnet run` points the OS at your build output; register again from the installed app once packaging exists. Registration can't be undone from inside the app yet (pick another browser in your system settings instead).
 - Default-browser registration isn't available on macOS yet.
-- There's **no single-instance mode**: each launch with a URL handles that link in its own process and exits.
 - Browser scanning isn't available on macOS yet.
-- Without single-instance mode, a running window picks up links that other launches logged when it next comes forward, not instantly.
+- A launch that only came to open links stays running as the server only when "keep running in tray" is on; otherwise it exits once its links are handled.
+- Single-instance mode is untested on Windows and macOS so far.
 - macOS isn't tested.
 
 ## Upcoming work
 
 Roughly in order:
 
-1. **Single instance with secure local messaging.** The first process becomes the server and later launches send it their URLs, then exit right away. Named pipe on Windows, Unix domain socket on Linux and macOS. The server generates a random session token at startup and stores it in a `0600` file. Every message must include the token, and every URL is validated again on receipt.
-2. **Start on login.**
+1. **Start on login.**
    - Linux: XDG autostart entry.
    - Windows: `Run` registry key.
-3. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-4. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
-5. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
+2. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
+3. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`.
+4. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
 
 ## Contributing
 

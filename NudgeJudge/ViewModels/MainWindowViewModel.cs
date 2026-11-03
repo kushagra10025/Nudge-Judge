@@ -55,7 +55,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     public void OnActivated()
     {
         if (Settings.RefreshRegistrationCommand.CanExecute(null)) Settings.RefreshRegistrationCommand.Execute(null);
-        // Each link launch is its own process for now, so links handled while this window was away are on disk.
+        // Picks up links a standalone launch handled (when the single-instance server couldn't be reached).
         Activity.Reload();
     }
 }
