@@ -9,8 +9,9 @@ using NudgeJudge.Core.Rules;
 namespace NudgeJudge.ViewModels;
 
 /// <summary>
-/// The rule editor: a required name, conditions joined by all/any, and the browser to open in.
-/// Validates as you type and, while the tester is open, says whether the rule catches its link.
+/// The rule editor: a required name, conditions joined by all/any (groups of conditions nest up to
+/// <see cref="RuleCondition.MaxDepth"/> levels), and the browser to open in. Validates as you type and,
+/// while the tester is open, says whether the rule catches its link.
 /// </summary>
 public sealed partial class RuleEditorViewModel : ViewModelBase
 {
@@ -22,6 +23,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     private bool _autoName;
     private bool _settingName;
     private bool _loading;
+    private bool _compiles;
 
     public RuleEditorViewModel(IConfigStore config, RuleEngine engine, ObservableCollection<BrowserOption> browsers, Func<LinkContext?> testLink)
     {
@@ -29,13 +31,18 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         _engine = engine;
         _testLink = testLink;
         Browsers = browsers;
-        Join = JoinOption.All[0];
-        Conditions.CollectionChanged += (_, _) => OnConditionsChanged();
+        _loading = true;
+        Root = new ConditionGroupViewModel(this, depth: 1, RuleJoin.All);
+        _loading = false;
     }
 
-    public IReadOnlyList<JoinOption> Joins => JoinOption.All;
     public ObservableCollection<BrowserOption> Browsers { get; }
-    public ObservableCollection<ConditionEditorViewModel> Conditions { get; } = [];
+
+    /// <summary>The rule's own level: its join and its conditions and groups.</summary>
+    public ConditionGroupViewModel Root { get; }
+
+    /// <summary>The rule's top-level conditions and groups.</summary>
+    public ObservableCollection<ConditionNodeViewModel> Conditions => Root.Items;
 
     /// <summary>Program names seen in Activity, offered when typing a source app.</summary>
     public ObservableCollection<string> KnownApps { get; } = [];
@@ -63,8 +70,6 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(HasNameError))]
     public partial string? NameError { get; set; }
 
-    [ObservableProperty] public partial JoinOption Join { get; set; }
-
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     public partial BrowserOption? Browser { get; set; }
@@ -89,16 +94,17 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     public bool IsTemporary => ExpiryText is not null;
     public bool HasNoBrowsers => Browsers.Count == 0;
 
-    /// <summary>The all/any choice only means something with two or more conditions.</summary>
-    public bool ShowJoin => Conditions.Count > 1;
-    public bool HasNoConditions => Conditions.Count == 0;
-    public bool HasSourceCondition => Conditions.Any(c => c.IsSource);
-
-    partial void OnJoinChanged(JoinOption value)
+    /// <summary>How the rule's top level is joined.</summary>
+    public JoinOption Join
     {
-        foreach (var c in Conditions) c.UpdateJoin(value.Join);
-        Validate();
+        get => Root.Join;
+        set => Root.Join = value;
     }
+
+    /// <summary>The all/any choice only means something with two or more conditions.</summary>
+    public bool ShowJoin => Root.ShowJoin;
+    public bool HasNoConditions => Root.IsEmpty;
+    public bool HasSourceCondition => Root.Leaves().Any(c => c.IsSource);
 
     partial void OnNameChanged(string value)
     {
@@ -112,9 +118,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         _loading = true;
         EditingId = null;
         IsNew = true;
-        Join = JoinOption.All[0];
-        Conditions.Clear();
-        Conditions.Add(NewLinkCondition(MatchKind.Wildcard, pattern));
+        Root.Load(RuleJoin.All, [RuleCondition.Link(MatchKind.Wildcard, pattern)]);
         Browser = Browsers.FirstOrDefault(b => b.Id == browserId) ?? Browsers.FirstOrDefault();
         IsEnabled = true;
         _expiresAt = null;
@@ -124,7 +128,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         _autoName = true;
         _loading = false;
         RefreshKnownApps();
-        Validate();
+        StructureChanged();
         IsOpen = true;
     }
 
@@ -134,9 +138,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         EditingId = rule.Id;
         IsNew = false;
         Name = rule.Name;
-        Join = JoinOption.For(rule.Join);
-        Conditions.Clear();
-        foreach (var c in rule.Conditions) Conditions.Add(ConditionEditorViewModel.From(this, c));
+        Root.Load(rule.Join, rule.Conditions);
         Browser = Browsers.FirstOrDefault(b => b.Id == rule.BrowserId);
         IsEnabled = rule.Enabled;
         _expiresAt = rule.ExpiresAt;
@@ -146,7 +148,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         _autoName = false;
         _loading = false;
         RefreshKnownApps();
-        Validate();
+        StructureChanged();
         IsOpen = true;
     }
 
@@ -167,18 +169,6 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     public void RefreshTestVerdict() => Validate();
 
     [RelayCommand]
-    private void AddLinkCondition() => Conditions.Add(NewLinkCondition(MatchKind.Wildcard, ""));
-
-    [RelayCommand]
-    private void AddSourceCondition()
-    {
-        RefreshKnownApps();
-        var condition = new ConditionEditorViewModel(this, ConditionField.SourceApp);
-        condition.Values.Add(new ConditionValueViewModel(condition, SuggestedSource?.Name ?? ""));
-        Conditions.Add(condition);
-    }
-
-    [RelayCommand]
     private void MakePermanent()
     {
         _expiresAt = null;
@@ -196,7 +186,8 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         if (!CanSave()) return;
 
         var id = EditingId;
-        var conditions = Conditions.Select(c => c.ToModel()).ToList();
+        var join = Root.Join.Join;
+        var conditions = Root.Items.Select(c => c.ToModel()).ToList();
         _config.Update(c =>
         {
             var rule = id is { } existing ? c.Rules.Find(r => r.Id == existing) : null;
@@ -206,7 +197,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
                 c.Rules.Add(rule);
             }
             rule.Name = Name.Trim();
-            rule.Join = Join.Join;
+            rule.Join = join;
             rule.Conditions = conditions;
             rule.BrowserId = Browser!.Id;
             rule.Enabled = IsEnabled;
@@ -219,10 +210,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     }
 
     private bool CanSave() =>
-        Browser is not null && !string.IsNullOrWhiteSpace(Name) && RuleError is null &&
-        Conditions.Count > 0 && Conditions.All(c => c.HasAnyValue && !c.HasValueErrors);
-
-    internal void Remove(ConditionEditorViewModel condition) => Conditions.Remove(condition);
+        Browser is not null && !string.IsNullOrWhiteSpace(Name) && RuleError is null && _compiles && Root.IsComplete;
 
     /// <summary>Something in a condition changed.</summary>
     internal void ConditionChanged()
@@ -230,25 +218,20 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         if (!_loading) Validate();
     }
 
-    private ConditionEditorViewModel NewLinkCondition(MatchKind kind, string pattern)
+    /// <summary>A condition or group was added or removed somewhere.</summary>
+    internal void StructureChanged()
     {
-        var condition = new ConditionEditorViewModel(this, ConditionField.Link) { Kind = MatchKindOption.For(kind) };
-        condition.Values.Add(new ConditionValueViewModel(condition, pattern));
-        return condition;
-    }
-
-    private void OnConditionsChanged()
-    {
-        for (var i = 0; i < Conditions.Count; i++)
-        {
-            Conditions[i].IsFirst = i == 0;
-            Conditions[i].IsLast = i == Conditions.Count - 1;
-            Conditions[i].UpdateJoin(Join.Join);
-        }
         OnPropertyChanged(nameof(ShowJoin));
         OnPropertyChanged(nameof(HasNoConditions));
         OnPropertyChanged(nameof(HasSourceCondition));
         if (!_loading) Validate();
+    }
+
+    /// <summary>The app a new source condition starts with, after refreshing the suggestions.</summary>
+    internal string SuggestedAppName()
+    {
+        RefreshKnownApps();
+        return SuggestedSource?.Name ?? "";
     }
 
     private void RefreshKnownApps()
@@ -263,20 +246,21 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     private Rule Draft() => new()
     {
         Name = Name,
-        Join = Join.Join,
-        Conditions = Conditions.Select(c => c.ToModel()).ToList(),
+        Join = Root.Join.Join,
+        Conditions = Root.Items.Select(c => c.ToModel()).ToList(),
     };
 
     private void Validate()
     {
         var draft = Draft();
         var compiled = _engine.Compile(draft);
+        _compiles = compiled.Success;
 
-        for (var i = 0; i < Conditions.Count && i < compiled.Conditions.Count; i++)
-            Conditions[i].ApplyErrors(compiled.Conditions[i]);
+        for (var i = 0; i < Root.Items.Count && i < compiled.Conditions.Count; i++)
+            Root.Items[i].ApplyErrors(compiled.Conditions[i]);
 
         // Blank conditions are "not yet", not errors: Save stays disabled until they're filled in.
-        RuleError = Conditions.Count == 0 ? "Add a condition: a link pattern, the app it was opened from, or both." : null;
+        RuleError = Root.IsEmpty ? "Add a condition: a link pattern, the app it was opened from, or both." : null;
         SaveCommand.NotifyCanExecuteChanged();
 
         if (_autoName) SuggestName();
@@ -302,23 +286,210 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
 
     private void SuggestName()
     {
-        var link = Conditions.FirstOrDefault(c => c.IsLink && !c.IsNegated)?.FirstValue;
-        var app = Conditions.FirstOrDefault(c => c.IsSource && !c.IsNegated)?.FirstValue;
+        var leaves = NameableLeaves(Root).ToList();
+        var link = leaves.FirstOrDefault(c => c.IsLink && !c.IsNegated)?.FirstValue;
+        var app = leaves.FirstOrDefault(c => c.IsSource && !c.IsNegated)?.FirstValue;
         var known = app is null ? null : KnownSources?.Invoke().FirstOrDefault(a => string.Equals(a.Name, app, StringComparison.OrdinalIgnoreCase));
         _settingName = true;
         Name = RuleNaming.Suggest(link, known?.DisplayName ?? app);
         _settingName = false;
     }
+
+    /// <summary>
+    /// The conditions a suggested name may describe: the rule's own, and those in "all of" groups below it.
+    /// An "any of" group's conditions are alternatives, so naming the rule after one of them would mislead.
+    /// </summary>
+    private static IEnumerable<ConditionEditorViewModel> NameableLeaves(ConditionGroupViewModel group)
+    {
+        foreach (var item in group.Items)
+        {
+            if (item is ConditionEditorViewModel c) yield return c;
+            else if (item is ConditionGroupViewModel { Join.Join: RuleJoin.All } g)
+                foreach (var leaf in NameableLeaves(g)) yield return leaf;
+        }
+    }
+}
+
+/// <summary>A row on the editor's track: one condition, or a group of them.</summary>
+public abstract partial class ConditionNodeViewModel : ViewModelBase
+{
+    protected ConditionNodeViewModel(RuleEditorViewModel owner) => Owner = owner;
+
+    public RuleEditorViewModel Owner { get; }
+
+    /// <summary>The group this sits in; null only for the rule's own level.</summary>
+    public ConditionGroupViewModel? Parent { get; internal set; }
+
+    public abstract bool IsGroup { get; }
+
+    /// <summary>"and" / "or" shown on the track above every condition but the first.</summary>
+    [ObservableProperty] public partial string JoinLabel { get; set; } = "and";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowJoinLabel), nameof(CanMoveUp), nameof(IsOnly))]
+    [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
+    public partial bool IsFirst { get; set; }
+
+    /// <summary>The track runs on from this row's glyph down to the next one.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanMoveDown), nameof(IsOnly))]
+    [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
+    public partial bool IsLast { get; set; } = true;
+
+    public bool ShowJoinLabel => !IsFirst;
+    public bool CanMoveUp => !IsFirst;
+    public bool CanMoveDown => !IsLast;
+
+    /// <summary>The only row in its group: nothing to reorder.</summary>
+    public bool IsOnly => IsFirst && IsLast;
+
+    /// <summary>Every value filled in and valid, all the way down.</summary>
+    public abstract bool IsComplete { get; }
+
+    public abstract RuleCondition ToModel();
+
+    /// <summary>The link and app conditions here, depth first.</summary>
+    public abstract IEnumerable<ConditionEditorViewModel> Leaves();
+
+    internal abstract void ApplyErrors(ConditionCompileResult result);
+
+    internal void UpdateJoin(RuleJoin join) => JoinLabel = join == RuleJoin.Any ? "or" : "and";
+
+    [RelayCommand]
+    private void Remove() => Parent?.Remove(this);
+
+    /// <summary>Order within a group doesn't change what matches; it's for reading the rule the way you think of it.</summary>
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private void MoveUp() => Parent?.Move(this, -1);
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private void MoveDown() => Parent?.Move(this, +1);
+
+    internal static ConditionNodeViewModel From(RuleEditorViewModel owner, RuleCondition model, int depth)
+    {
+        if (!model.IsGroup) return ConditionEditorViewModel.From(owner, model);
+        var group = new ConditionGroupViewModel(owner, depth, model.Join);
+        group.Load(model.Join, model.Conditions ?? []);
+        return group;
+    }
+}
+
+/// <summary>
+/// Conditions joined by all/any: the rule's own level (depth 1) or a group inside it. Groups add
+/// conditions and, above the deepest level, further groups.
+/// </summary>
+public sealed partial class ConditionGroupViewModel : ConditionNodeViewModel
+{
+    private bool _loading;
+
+    public ConditionGroupViewModel(RuleEditorViewModel owner, int depth, RuleJoin join) : base(owner)
+    {
+        Depth = depth;
+        Join = JoinOption.For(join);
+        Items.CollectionChanged += (_, _) => OnItemsChanged();
+    }
+
+    /// <summary>1 for the rule itself, 2 for a group in it, and so on.</summary>
+    public int Depth { get; }
+    public bool IsRoot => Depth == 1;
+    public override bool IsGroup => true;
+    public IReadOnlyList<JoinOption> Joins => JoinOption.All;
+    public ObservableCollection<ConditionNodeViewModel> Items { get; } = [];
+
+    [ObservableProperty] public partial JoinOption Join { get; set; }
+
+    /// <summary>The rule's all/any choice appears only with two or more conditions; a group always shows its own.</summary>
+    public bool ShowJoin => Items.Count > 1;
+    public bool IsEmpty => Items.Count == 0;
+    public bool CanAddGroup => Depth < RuleCondition.MaxDepth;
+
+    public string AddLinkName => IsRoot ? "Add link condition" : "Add link condition to this group";
+    public string AddSourceName => IsRoot ? "Add source app condition" : "Add source app condition to this group";
+    public string AddGroupName => IsRoot ? "Add condition group" : "Add condition group inside this group";
+
+    public override bool IsComplete => Items.Count > 0 && Items.All(i => i.IsComplete);
+
+    partial void OnJoinChanged(JoinOption value)
+    {
+        foreach (var item in Items) item.UpdateJoin(value.Join);
+        Owner.ConditionChanged();
+    }
+
+    [RelayCommand]
+    private void AddLinkCondition() => Items.Add(ConditionEditorViewModel.NewLink(Owner, MatchKind.Wildcard, ""));
+
+    [RelayCommand]
+    private void AddSourceCondition()
+    {
+        var condition = new ConditionEditorViewModel(Owner, ConditionField.SourceApp);
+        condition.Values.Add(new ConditionValueViewModel(condition, Owner.SuggestedAppName()));
+        Items.Add(condition);
+    }
+
+    /// <summary>
+    /// A new group starts with one blank link condition and the opposite join to this one: a group with
+    /// the same join as its parent would change nothing.
+    /// </summary>
+    [RelayCommand]
+    private void AddGroup()
+    {
+        if (!CanAddGroup) return;
+        var group = new ConditionGroupViewModel(Owner, Depth + 1, Join.Join == RuleJoin.All ? RuleJoin.Any : RuleJoin.All);
+        group.Items.Add(ConditionEditorViewModel.NewLink(Owner, MatchKind.Wildcard, ""));
+        Items.Add(group);
+    }
+
+    internal void Remove(ConditionNodeViewModel node) => Items.Remove(node);
+
+    internal void Move(ConditionNodeViewModel node, int delta)
+    {
+        var from = Items.IndexOf(node);
+        var to = from + delta;
+        if (from < 0 || to < 0 || to >= Items.Count) return;
+        Items.Move(from, to);
+    }
+
+    internal void Load(RuleJoin join, IEnumerable<RuleCondition> conditions)
+    {
+        _loading = true;
+        Join = JoinOption.For(join);
+        Items.Clear();
+        foreach (var c in conditions) Items.Add(From(Owner, c, Depth + 1));
+        _loading = false;
+        OnItemsChanged();
+    }
+
+    public override RuleCondition ToModel() => RuleCondition.Group(Join.Join, [.. Items.Select(i => i.ToModel())]);
+
+    public override IEnumerable<ConditionEditorViewModel> Leaves() => Items.SelectMany(i => i.Leaves());
+
+    internal override void ApplyErrors(ConditionCompileResult result)
+    {
+        var children = result.Children ?? [];
+        for (var i = 0; i < Items.Count && i < children.Count; i++) Items[i].ApplyErrors(children[i]);
+    }
+
+    private void OnItemsChanged()
+    {
+        if (_loading) return;
+        for (var i = 0; i < Items.Count; i++)
+        {
+            Items[i].Parent = this;
+            Items[i].IsFirst = i == 0;
+            Items[i].IsLast = i == Items.Count - 1;
+            Items[i].UpdateJoin(Join.Join);
+        }
+        OnPropertyChanged(nameof(ShowJoin));
+        OnPropertyChanged(nameof(IsEmpty));
+        Owner.StructureChanged();
+    }
 }
 
 /// <summary>One condition in the editor: what it looks at, how, and its OR'd values.</summary>
-public sealed partial class ConditionEditorViewModel : ViewModelBase
+public sealed partial class ConditionEditorViewModel : ConditionNodeViewModel
 {
-    private readonly RuleEditorViewModel _owner;
-
-    public ConditionEditorViewModel(RuleEditorViewModel owner, ConditionField field)
+    public ConditionEditorViewModel(RuleEditorViewModel owner, ConditionField field) : base(owner)
     {
-        _owner = owner;
         Field = field;
         Kind = MatchKindOption.All[0];
         Operators = field == ConditionField.SourceApp ? OperatorOption.Source : OperatorOption.Link;
@@ -330,7 +501,7 @@ public sealed partial class ConditionEditorViewModel : ViewModelBase
                 Values[i].CanRemove = Values.Count > 1;
                 Values[i].IsFirst = i == 0;
             }
-            _owner.ConditionChanged();
+            Owner.ConditionChanged();
         };
     }
 
@@ -346,15 +517,22 @@ public sealed partial class ConditionEditorViewModel : ViewModelBase
         return c;
     }
 
-    public RuleEditorViewModel Owner => _owner;
+    internal static ConditionEditorViewModel NewLink(RuleEditorViewModel owner, MatchKind kind, string pattern)
+    {
+        var condition = new ConditionEditorViewModel(owner, ConditionField.Link) { Kind = MatchKindOption.For(kind) };
+        condition.Values.Add(new ConditionValueViewModel(condition, pattern));
+        return condition;
+    }
+
     public ConditionField Field { get; }
+    public override bool IsGroup => false;
     public bool IsLink => Field == ConditionField.Link;
     public bool IsSource => Field == ConditionField.SourceApp;
     public string Heading => IsLink ? "Link" : "Opened from";
     public IReadOnlyList<MatchKindOption> Kinds => MatchKindOption.All;
     public IReadOnlyList<OperatorOption> Operators { get; }
     public ObservableCollection<ConditionValueViewModel> Values { get; } = [];
-    public ObservableCollection<string> KnownApps => _owner.KnownApps;
+    public ObservableCollection<string> KnownApps => Owner.KnownApps;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowCaseSensitive), nameof(Placeholder), nameof(Hint))]
@@ -366,27 +544,17 @@ public sealed partial class ConditionEditorViewModel : ViewModelBase
 
     [ObservableProperty] public partial bool CaseSensitive { get; set; }
 
-    /// <summary>"and" / "or" shown above every condition but the first.</summary>
-    [ObservableProperty] public partial string JoinLabel { get; set; } = "and";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowJoinLabel))]
-    public partial bool IsFirst { get; set; }
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     public partial string? Error { get; set; }
 
-    /// <summary>The track runs on from this condition's glyph down to the next one.</summary>
-    [ObservableProperty] public partial bool IsLast { get; set; } = true;
-
-    public bool ShowJoinLabel => !IsFirst;
     public bool IsNegated => Operator.Negate;
     public bool ShowCaseSensitive => IsLink && Kind.Kind is MatchKind.Regex or MatchKind.PathPrefix;
     public bool HasError => Error is not null;
     public bool HasAnyValue => Values.Any(v => !string.IsNullOrWhiteSpace(v.Text));
     public bool HasValueErrors => Values.Any(v => v.HasError);
     public string? FirstValue => Values.Select(v => v.Text.Trim()).FirstOrDefault(t => t.Length > 0);
+    public override bool IsComplete => HasAnyValue && !HasValueErrors;
 
     public string Placeholder => IsLink ? Kind.Example : "ms-teams.exe";
 
@@ -397,32 +565,29 @@ public sealed partial class ConditionEditorViewModel : ViewModelBase
     /// <summary>"or…" adds another alternative.</summary>
     public string AddValueLabel => IsLink ? "Or another pattern" : "Or another app";
 
-    partial void OnKindChanged(MatchKindOption value) => _owner.ConditionChanged();
-    partial void OnOperatorChanged(OperatorOption value) => _owner.ConditionChanged();
-    partial void OnCaseSensitiveChanged(bool value) => _owner.ConditionChanged();
+    partial void OnKindChanged(MatchKindOption value) => Owner.ConditionChanged();
+    partial void OnOperatorChanged(OperatorOption value) => Owner.ConditionChanged();
+    partial void OnCaseSensitiveChanged(bool value) => Owner.ConditionChanged();
 
-    internal void UpdateJoin(RuleJoin join) => JoinLabel = join == RuleJoin.Any ? "or" : "and";
-
-    internal void ValueChanged() => _owner.ConditionChanged();
+    internal void ValueChanged() => Owner.ConditionChanged();
 
     [RelayCommand]
     private void AddValue() => Values.Add(new ConditionValueViewModel(this, ""));
-
-    [RelayCommand]
-    private void Remove() => _owner.Remove(this);
 
     internal void RemoveValue(ConditionValueViewModel value)
     {
         if (Values.Count > 1) Values.Remove(value);
     }
 
-    internal void ApplyErrors(ConditionCompileResult result)
+    internal override void ApplyErrors(ConditionCompileResult result)
     {
         for (var i = 0; i < Values.Count; i++)
             Values[i].Error = i < result.ValueErrors.Count ? result.ValueErrors[i] : null;
     }
 
-    public RuleCondition ToModel() => new()
+    public override IEnumerable<ConditionEditorViewModel> Leaves() => [this];
+
+    public override RuleCondition ToModel() => new()
     {
         Field = Field,
         MatchKind = Kind.Kind,

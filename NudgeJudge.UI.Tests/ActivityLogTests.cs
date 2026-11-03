@@ -259,7 +259,7 @@ public sealed class ActivityLogTests : IDisposable
         Assert.Equal((int)AppPage.Rules, app.Main.SelectedPageIndex);
         Assert.True(rules.Editor.IsOpen);
         Assert.True(rules.Editor.IsNew);
-        Assert.Equal("*.acme.io", rules.Editor.Conditions.Single().FirstValue);
+        Assert.Equal("*.acme.io", rules.Editor.Conditions.OfType<ConditionEditorViewModel>().Single().FirstValue);
         Assert.Equal("acme.io", rules.Editor.Name); // a suggested name, so the required field never starts empty
         Assert.Equal(app.Chrome.Id, rules.Editor.Browser?.Id);
         Assert.Equal(url.AbsoluteUri, rules.TestUrl);
@@ -290,7 +290,7 @@ public sealed class ActivityLogTests : IDisposable
         Settle(window);
 
         Assert.Equal(app.Chrome.Id, app.Main.Rules.Editor.Browser?.Id);
-        Assert.Equal("*.example.org", app.Main.Rules.Editor.Conditions.Single().FirstValue);
+        Assert.Equal("*.example.org", app.Main.Rules.Editor.Conditions.OfType<ConditionEditorViewModel>().Single().FirstValue);
     }
 
     [AvaloniaFact]

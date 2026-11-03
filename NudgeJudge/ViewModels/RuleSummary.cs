@@ -16,7 +16,10 @@ public enum SummaryPartKind
 
 public sealed record SummaryPart(string Text, SummaryPartKind Kind, MatchKind Glyph = MatchKind.Wildcard);
 
-/// <summary>A rule's conditions as one line: ◇ youtube.com or youtu.be  and  ▦ from ms-teams.exe</summary>
+/// <summary>
+/// A rule's conditions as one line: ◇ youtube.com or youtu.be  and  ▦ from ms-teams.exe. Groups sit in
+/// parentheses with tighter spacing around their join word: ◇ acme.io  and  (▦ from Teams or ◇ github.com/acme)
+/// </summary>
 public static class RuleSummary
 {
     private const int MaxValuesShown = 3;
@@ -24,15 +27,35 @@ public static class RuleSummary
     public static IReadOnlyList<SummaryPart> Describe(Rule rule)
     {
         var parts = new List<SummaryPart>();
-        var conditions = rule.Conditions.Where(c => c.Values.Any(v => !string.IsNullOrWhiteSpace(v))).ToList();
-        for (var i = 0; i < conditions.Count; i++)
-        {
-            if (i > 0) parts.Add(new(rule.Join == RuleJoin.Any ? "   or   " : "   and   ", SummaryPartKind.Text));
-            Describe(conditions[i], parts);
-        }
+        DescribeAll(rule.Conditions, rule.Join, nested: false, parts);
         if (parts.Count == 0) parts.Add(new("No conditions yet", SummaryPartKind.Text));
         return parts;
     }
+
+    private static void DescribeAll(List<RuleCondition> conditions, RuleJoin join, bool nested, List<SummaryPart> parts)
+    {
+        var shown = conditions.Where(HasContent).ToList();
+        var word = join == RuleJoin.Any ? "or" : "and";
+        for (var i = 0; i < shown.Count; i++)
+        {
+            if (i > 0) parts.Add(new(nested ? $"  {word}  " : $"   {word}   ", SummaryPartKind.Text));
+            var c = shown[i];
+            if (!c.IsGroup)
+            {
+                Describe(c, parts);
+                continue;
+            }
+            // A group of one reads as its only condition; brackets only where they change the meaning.
+            var inner = c.Conditions!.Where(HasContent).ToList();
+            var bracket = inner.Count > 1;
+            if (bracket) parts.Add(new("(", SummaryPartKind.Text));
+            DescribeAll(inner, c.Join, nested: true, parts);
+            if (bracket) parts.Add(new(")", SummaryPartKind.Text));
+        }
+    }
+
+    private static bool HasContent(RuleCondition c) =>
+        c.IsGroup ? (c.Conditions ?? []).Any(HasContent) : c.Values.Any(v => !string.IsNullOrWhiteSpace(v));
 
     /// <summary>The same line as plain text, for tooltips and search.</summary>
     public static string DescribeText(Rule rule) =>

@@ -28,6 +28,9 @@ public enum ConditionField
 
     /// <summary>The app the link was opened from, e.g. <c>ms-teams.exe</c>.</summary>
     SourceApp,
+
+    /// <summary>A nested group: its own <see cref="RuleCondition.Conditions"/>, combined with <see cref="RuleCondition.Join"/>.</summary>
+    Group,
 }
 
 /// <summary>How a rule combines its conditions.</summary>
@@ -43,11 +46,29 @@ public enum RuleJoin
 
 /// <summary>
 /// One test in a rule. It holds when any of its <see cref="Values"/> matches (or, with
-/// <see cref="Negate"/>, when none does).
+/// <see cref="Negate"/>, when none does). A <see cref="ConditionField.Group"/> instead holds when its
+/// <see cref="Conditions"/> do, combined by <see cref="Join"/>.
 /// </summary>
 public sealed class RuleCondition
 {
+    /// <summary>
+    /// How many levels conditions may nest, counting the rule itself: a rule, a group in it, and a group in
+    /// that. Deeper rules are hard to read and never needed in practice.
+    /// </summary>
+    public const int MaxDepth = 3;
+
     public ConditionField Field { get; set; } = ConditionField.Link;
+
+    /// <summary>Groups only: how the group combines its conditions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public RuleJoin Join { get; set; } = RuleJoin.All;
+
+    /// <summary>Groups only: the conditions (and groups) inside it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RuleCondition>? Conditions { get; set; }
+
+    [JsonIgnore]
+    public bool IsGroup => Field == ConditionField.Group;
 
     /// <summary>Link conditions only.</summary>
     public MatchKind MatchKind { get; set; } = MatchKind.Wildcard;
@@ -67,9 +88,18 @@ public sealed class RuleCondition
     public static RuleCondition Source(params string[] apps) =>
         new() { Field = ConditionField.SourceApp, Values = [.. apps] };
 
+    public static RuleCondition Group(RuleJoin join, params RuleCondition[] conditions) =>
+        new() { Field = ConditionField.Group, Join = join, Conditions = [.. conditions] };
+
+    /// <summary>This condition, or every link and app condition inside the group, depth first.</summary>
+    public IEnumerable<RuleCondition> Leaves() =>
+        IsGroup ? (Conditions ?? []).SelectMany(c => c.Leaves()) : [this];
+
     public RuleCondition Clone() => new()
     {
         Field = Field,
+        Join = Join,
+        Conditions = Conditions?.Select(c => c.Clone()).ToList(),
         MatchKind = MatchKind,
         CaseSensitive = CaseSensitive,
         Negate = Negate,
@@ -122,6 +152,9 @@ public sealed class Rule
     [JsonIgnore]
     public RuleCondition? FirstLinkCondition => Conditions.Find(c => c.Field == ConditionField.Link);
 
+    /// <summary>Every link and app condition, including those inside groups.</summary>
+    public IEnumerable<RuleCondition> Leaves() => Conditions.SelectMany(c => c.Leaves());
+
     public bool IsExpired(DateTimeOffset now, ISystemBoot boot) =>
         (ExpiresAt is { } at && now >= at) ||
         (ExpiresAfterBootId is { } id && !boot.IsCurrentBoot(id));
@@ -156,7 +189,7 @@ public sealed class Rule
         }
         if (string.IsNullOrWhiteSpace(Name))
         {
-            Name = Conditions.SelectMany(c => c.Values).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? "Untitled rule";
+            Name = Leaves().SelectMany(c => c.Values).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? "Untitled rule";
             changed = true;
         }
         return changed;

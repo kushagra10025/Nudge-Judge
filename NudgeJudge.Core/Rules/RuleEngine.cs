@@ -37,8 +37,11 @@ public sealed class CompiledRule
     public bool IsMatch(LinkContext link) => _predicate(link);
 }
 
-/// <summary>One condition's compile outcome. <see cref="ValueErrors"/> lines up with the condition's values.</summary>
-public sealed record ConditionCompileResult(string? Error, IReadOnlyList<string?> ValueErrors)
+/// <summary>
+/// One condition's compile outcome. <see cref="ValueErrors"/> lines up with the condition's values; for a
+/// group, <see cref="Children"/> lines up with the group's conditions.
+/// </summary>
+public sealed record ConditionCompileResult(string? Error, IReadOnlyList<string?> ValueErrors, IReadOnlyList<ConditionCompileResult>? Children = null)
 {
     public bool Success => Error is null;
 }
@@ -68,9 +71,15 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         return _sourceCache.GetOrAdd(value ?? "", static v => SourceAppPattern.Compile(v));
     }
 
-    /// <summary>Compiles one condition. Blank values are ignored; a condition needs at least one other.</summary>
-    public (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition)
+    /// <summary>Compiles one condition or group. Blank values are ignored; a condition needs at least one other.</summary>
+    public (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition) =>
+        Compile(condition, depth: 2);
+
+    /// <param name="depth">The level this condition sits at: 2 directly in a rule, 3 inside a group.</param>
+    private (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition, int depth)
     {
+        if (condition.IsGroup) return CompileGroup(condition, depth);
+
         var errors = new string?[condition.Values.Count];
         var tests = new List<Func<LinkContext, bool>>();
         string? first = null;
@@ -119,26 +128,57 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
 
     public RuleCompileResult Compile(Rule rule)
     {
-        var results = new List<ConditionCompileResult>(rule.Conditions.Count);
-        var predicates = new List<Func<LinkContext, bool>>(rule.Conditions.Count);
-        string? error = null;
-
-        for (var i = 0; i < rule.Conditions.Count; i++)
-        {
-            var (predicate, result) = Compile(rule.Conditions[i]);
-            results.Add(result);
-            if (predicate is not null) predicates.Add(predicate);
-            else error ??= rule.Conditions.Count > 1 ? $"Condition {i + 1}: {result.Error}" : result.Error;
-        }
-
+        var (predicate, results, error) = CompileAll(rule.Conditions, rule.Join, depth: 2);
         if (rule.Conditions.Count == 0) error = "Add a condition.";
         if (error is not null) return new RuleCompileResult(null, error, results);
+        return new RuleCompileResult(new CompiledRule(predicate!), null, results);
+    }
+
+    private (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) CompileGroup(RuleCondition group, int depth)
+    {
+        if (depth > RuleCondition.MaxDepth)
+            return (null, new ConditionCompileResult("Groups can only go two levels deep.", []));
+
+        var conditions = group.Conditions ?? [];
+        var (predicate, results, error) = CompileAll(conditions, group.Join, depth + 1);
+        if (conditions.Count == 0) error = "Add a condition to this group.";
+        return (error is null ? predicate : null, new ConditionCompileResult(error, [], results));
+    }
+
+    /// <summary>
+    /// Compiles conditions joined by all/any. Errors name the condition by its position, with groups
+    /// numbered like outlines: "Condition 3.2: Enter a pattern."
+    /// </summary>
+    private (Func<LinkContext, bool>? Predicate, List<ConditionCompileResult> Results, string? Error) CompileAll(
+        List<RuleCondition> conditions, RuleJoin join, int depth)
+    {
+        var results = new List<ConditionCompileResult>(conditions.Count);
+        var predicates = new List<Func<LinkContext, bool>>(conditions.Count);
+        string? error = null;
+
+        for (var i = 0; i < conditions.Count; i++)
+        {
+            var (predicate, result) = Compile(conditions[i], depth);
+            results.Add(result);
+            if (predicate is not null) predicates.Add(predicate);
+            else error ??= conditions.Count > 1 || conditions[i].IsGroup || depth > 2 ? Locate(i + 1, result.Error!) : result.Error;
+        }
+        if (error is not null) return (null, results, error);
 
         var all = predicates.ToArray();
-        Func<LinkContext, bool> combined = rule.Join == RuleJoin.Any
+        Func<LinkContext, bool> combined = join == RuleJoin.Any
             ? link => { foreach (var p in all) if (p(link)) return true; return false; }
             : link => { foreach (var p in all) if (!p(link)) return false; return true; };
-        return new RuleCompileResult(new CompiledRule(combined), null, results);
+        return (combined, results, null);
+    }
+
+    /// <summary>"Condition 2: x" for a direct error; "Condition 3: Condition 2: x" folds into "Condition 3.2: x".</summary>
+    private static string Locate(int number, string error)
+    {
+        const string prefix = "Condition ";
+        if (error.StartsWith(prefix, StringComparison.Ordinal))
+            return $"{prefix}{number}.{error[prefix.Length..]}";
+        return $"{prefix}{number}: {error}";
     }
 
     public MatchResult Match(Uri url, IReadOnlyList<Rule> rules, SourceApp? source = null)

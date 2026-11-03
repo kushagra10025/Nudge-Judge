@@ -359,7 +359,7 @@ public sealed partial class RuleItemViewModel : ViewModelBase
         ExpiryText = expiryText;
         IsExpired = isExpired;
         IsSample = rule.IsSample == true;
-        UsesSource = rule.Conditions.Any(c => c.Field == ConditionField.SourceApp);
+        UsesSource = rule.Leaves().Any(c => c.Field == ConditionField.SourceApp);
         CanMoveUp = number > 1;
         CanMoveDown = number < count;
         IsEnabled = rule.Enabled;

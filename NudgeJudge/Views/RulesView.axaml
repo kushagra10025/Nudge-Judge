@@ -28,7 +28,206 @@
     <Style Selector="Grid#Root.narrow Panel#ScrimHost">
       <Setter Property="IsVisible" Value="True" />
     </Style>
+    <!-- Condition and group move arrows: like rule rows, hidden at rest and shown on hover and keyboard focus.
+         A condition reveals them anywhere over its own fields; a group only over its header, so hovering a
+         condition inside it doesn't light up the group's arrows too. Alone in its group, there's nothing to move. -->
+    <Style Selector="StackPanel.move">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="StackPanel.condition:pointerover > Grid > StackPanel.move, StackPanel.condition:focus-within > Grid > StackPanel.move, Grid.group-header:pointerover > StackPanel.move, Grid.group-header:focus-within > StackPanel.move">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="StackPanel.move.alone">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
   </UserControl.Styles>
+
+  <UserControl.Resources>
+    <!-- One row on the editor's track: the join word above it, and the track running on below its glyph.
+         The row's own content (a condition or a group) comes from the DataTemplates below. -->
+    <DataTemplate x:Key="ConditionNode" DataType="vm:ConditionNodeViewModel">
+      <StackPanel>
+        <Grid ColumnDefinitions="16,*" Height="28" IsVisible="{Binding ShowJoinLabel}">
+          <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center" />
+          <TextBlock Grid.Column="1" Classes="small" Text="{Binding JoinLabel}" FontWeight="SemiBold"
+                     Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
+        </Grid>
+        <Grid ColumnDefinitions="16,*">
+          <!-- The track continues below this glyph to the join word and the next row -->
+          <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center"
+                     Margin="0,28,0,0" IsVisible="{Binding !IsLast}" />
+          <ContentControl Grid.ColumnSpan="2" Content="{Binding}" HorizontalContentAlignment="Stretch" />
+        </Grid>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:ConditionEditorViewModel">
+      <Grid ColumnDefinitions="16,*">
+        <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
+          <c:MatchKindGlyph Kind="{Binding Kind.Kind}" Foreground="{DynamicResource InkMutedBrush}"
+                            IsVisible="{Binding IsLink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          <c:Icon Data="{StaticResource Icon.App}" Width="14" Height="14" StrokeThickness="2"
+                  Foreground="{DynamicResource InkMutedBrush}" IsVisible="{Binding IsSource}" />
+        </Panel>
+        <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="6" Classes="condition" Background="Transparent">
+          <!-- The spacer column, not the operator, gives way when the move arrows appear in a narrow group -->
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+            <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Operators}" SelectedItem="{Binding Operator}"
+                      MinWidth="0" Padding="10,2,8,2" FontSize="12" HorizontalAlignment="Left"
+                      AutomationProperties.Name="{Binding Heading, StringFormat='{}{0} operator'}" />
+            <StackPanel Grid.Column="3" Classes="move" Classes.alone="{Binding IsOnly}" Orientation="Horizontal">
+              <Button Classes="ghost icon" Width="24" Padding="0" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}"
+                      ToolTip.Tip="Move up" AutomationProperties.Name="Move condition up">
+                <c:Icon Data="{StaticResource Icon.Up}" />
+              </Button>
+              <Button Classes="ghost icon" Width="24" Padding="0" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
+                      ToolTip.Tip="Move down" AutomationProperties.Name="Move condition down">
+                <c:Icon Data="{StaticResource Icon.Down}" />
+              </Button>
+            </StackPanel>
+            <Button Grid.Column="4" Classes="ghost icon danger" Command="{Binding RemoveCommand}"
+                    ToolTip.Tip="Remove this condition" AutomationProperties.Name="Remove condition">
+              <c:Icon Data="{StaticResource Icon.Trash}" />
+            </Button>
+          </Grid>
+
+          <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch"
+                    IsVisible="{Binding IsLink}" AutomationProperties.Name="Match type">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:MatchKindOption">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:MatchKindGlyph Kind="{Binding Kind}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <!-- Alternatives, OR'd: each after the first says so inside its field -->
+          <ItemsControl ItemsSource="{Binding Values}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:ConditionValueViewModel">
+                <StackPanel Spacing="4">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsLink}"
+                             PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Pattern"
+                         ToolTip.Tip="{Binding Condition.Hint}">
+                      <TextBox.InnerLeftContent>
+                        <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   IsVisible="{Binding ShowOr}" />
+                      </TextBox.InnerLeftContent>
+                    </TextBox>
+                    <AutoCompleteBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsSource}"
+                                     ItemsSource="{Binding Condition.KnownApps}" FilterMode="Contains" MinimumPrefixLength="0"
+                                     PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Source app"
+                                 ToolTip.Tip="{Binding Condition.Hint}">
+                      <AutoCompleteBox.InnerLeftContent>
+                        <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   IsVisible="{Binding ShowOr}" />
+                      </AutoCompleteBox.InnerLeftContent>
+                    </AutoCompleteBox>
+                    <Button Grid.Column="1" Classes="ghost icon" Margin="4,0,0,0" Command="{Binding RemoveCommand}"
+                            IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this alternative"
+                            AutomationProperties.Name="Remove alternative">
+                      <c:Icon Data="{StaticResource Icon.Close}" />
+                    </Button>
+                  </Grid>
+                  <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Grid ColumnDefinitions="Auto,*">
+            <Button Classes="ghost" Padding="6,2" Margin="-6,0,0,0" FontSize="12" Command="{Binding AddValueCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                <TextBlock Text="{Binding AddValueLabel}" />
+              </StackPanel>
+            </Button>
+            <CheckBox Grid.Column="1" Content="Match case" IsChecked="{Binding CaseSensitive}" FontSize="12"
+                      IsVisible="{Binding ShowCaseSensitive}" HorizontalAlignment="Right" MinHeight="0" />
+          </Grid>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+
+    <!-- A group: the branch glyph on the parent's track, an all/any header, and its rows inset on their own track -->
+    <DataTemplate DataType="vm:ConditionGroupViewModel">
+      <Grid ColumnDefinitions="16,*">
+        <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
+          <c:Icon Data="{StaticResource Icon.Branch}" Width="16" Height="16" StrokeThickness="2"
+                  Foreground="{DynamicResource InkMutedBrush}" />
+        </Panel>
+        <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="6">
+          <Grid Classes="group-header" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" MinHeight="28" Background="Transparent">
+            <TextBlock Text="Match" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Joins}" SelectedItem="{Binding Join}" MinWidth="0"
+                      Padding="10,2,8,2" FontSize="12" AutomationProperties.Name="Match all or any in this group" />
+            <TextBlock Grid.Column="2" Classes="small muted" Text="of these" VerticalAlignment="Center" Margin="6,0,0,0" />
+            <StackPanel Grid.Column="4" Classes="move" Classes.alone="{Binding IsOnly}" Orientation="Horizontal">
+              <Button Classes="ghost icon" Width="24" Padding="0" Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}"
+                      ToolTip.Tip="Move up" AutomationProperties.Name="Move group up">
+                <c:Icon Data="{StaticResource Icon.Up}" />
+              </Button>
+              <Button Classes="ghost icon" Width="24" Padding="0" Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
+                      ToolTip.Tip="Move down" AutomationProperties.Name="Move group down">
+                <c:Icon Data="{StaticResource Icon.Down}" />
+              </Button>
+            </StackPanel>
+            <Button Grid.Column="5" Classes="ghost icon danger" Command="{Binding RemoveCommand}"
+                    ToolTip.Tip="Remove this group and everything in it" AutomationProperties.Name="Remove group">
+              <c:Icon Data="{StaticResource Icon.Trash}" />
+            </Button>
+          </Grid>
+
+          <!-- The group's own line runs from its first row down to its add row, so the add buttons
+               visibly belong to this group and not to the one around it -->
+          <Grid RowDefinitions="Auto,Auto,Auto">
+            <Rectangle Grid.RowSpan="3" Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
+                       Margin="7.25,14,0,12" />
+            <ItemsControl Classes="nested" ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ConditionNode}" />
+
+            <TextBlock Grid.Row="1" Classes="body faint small" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap"
+                       Margin="26,4,0,0" Text="This group is empty. Add a condition to it, or remove the group." />
+
+            <Rectangle Grid.Row="2" Width="10" Height="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Left"
+                       VerticalAlignment="Center" Margin="8,6,0,0" />
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="2" Margin="20,6,0,0">
+              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddLinkConditionCommand}"
+                      ToolTip.Tip="Add a link condition to this group" AutomationProperties.Name="{Binding AddLinkName}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                  <TextBlock Text="Link" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddSourceConditionCommand}"
+                      ToolTip.Tip="Add an opened-from condition to this group" AutomationProperties.Name="{Binding AddSourceName}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                  <TextBlock Text="Opened from" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"
+                      IsVisible="{Binding CanAddGroup}"
+                      ToolTip.Tip="Add a group inside this one" AutomationProperties.Name="{Binding AddGroupName}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                  <TextBlock Text="Group" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+  </UserControl.DataTemplates>
 
   <Grid x:Name="Root" ColumnDefinitions="*,Auto" Margin="32,28,32,0">
 
@@ -326,8 +525,10 @@
           <TextBlock Classes="error" Text="{Binding NameError}" IsVisible="{Binding HasNameError}" TextWrapping="Wrap" />
         </StackPanel>
 
-        <!-- Conditions sit on a track, like junctions on the line; the join word sits on the track between them -->
+        <!-- Conditions sit on a track, like junctions on the line; the join word sits on the track between them.
+             A group is a siding: its own all/any header, and its conditions on their own track, inset. -->
         <StackPanel Spacing="8">
+        <StackPanel Spacing="8" DataContext="{Binding Root}" x:DataType="vm:ConditionGroupViewModel">
           <Grid ColumnDefinitions="*,Auto" MinHeight="28">
             <TextBlock Classes="label" Text="When" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowJoin}">
@@ -338,108 +539,13 @@
             </StackPanel>
           </Grid>
 
-          <ItemsControl ItemsSource="{Binding Conditions}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="vm:ConditionEditorViewModel">
-                <StackPanel>
-                  <Grid ColumnDefinitions="16,*" Height="28" IsVisible="{Binding ShowJoinLabel}">
-                    <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Classes="small" Text="{Binding JoinLabel}" FontWeight="SemiBold"
-                               Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" Margin="10,0,0,0" />
-                  </Grid>
-                  <Grid ColumnDefinitions="16,*">
-                    <!-- The track continues below this glyph to the join word and the next condition -->
-                    <Rectangle Width="1.5" Fill="{DynamicResource TrackBrush}" HorizontalAlignment="Center"
-                               Margin="0,28,0,0" IsVisible="{Binding !IsLast}" />
-                    <Panel Width="16" Height="16" VerticalAlignment="Top" Margin="0,6,0,0">
-                      <c:MatchKindGlyph Kind="{Binding Kind.Kind}" Foreground="{DynamicResource InkMutedBrush}"
-                                        IsVisible="{Binding IsLink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                      <c:Icon Data="{StaticResource Icon.App}" Width="14" Height="14" StrokeThickness="2"
-                              Foreground="{DynamicResource InkMutedBrush}" IsVisible="{Binding IsSource}" />
-                    </Panel>
-                    <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="6">
-                      <Grid ColumnDefinitions="Auto,*,Auto">
-                        <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding Operators}" SelectedItem="{Binding Operator}"
-                                  MinWidth="0" Padding="10,2,8,2" FontSize="12" HorizontalAlignment="Left"
-                                  AutomationProperties.Name="{Binding Heading, StringFormat='{}{0} operator'}" />
-                        <Button Grid.Column="2" Classes="ghost icon danger" Command="{Binding RemoveCommand}"
-                                ToolTip.Tip="Remove this condition" AutomationProperties.Name="Remove condition">
-                          <c:Icon Data="{StaticResource Icon.Trash}" />
-                        </Button>
-                      </Grid>
+          <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ConditionNode}" />
 
-                      <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch"
-                                IsVisible="{Binding IsLink}" AutomationProperties.Name="Match type">
-                        <ComboBox.ItemTemplate>
-                          <DataTemplate DataType="vm:MatchKindOption">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <c:MatchKindGlyph Kind="{Binding Kind}" VerticalAlignment="Center" />
-                              <TextBlock Text="{Binding Label}" />
-                            </StackPanel>
-                          </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                      </ComboBox>
-
-                      <!-- Alternatives, OR'd: each after the first says so inside its field -->
-                      <ItemsControl ItemsSource="{Binding Values}">
-                        <ItemsControl.ItemsPanel>
-                          <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate DataType="vm:ConditionValueViewModel">
-                            <StackPanel Spacing="4">
-                              <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsLink}"
-                                         PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Pattern">
-                                  <TextBox.InnerLeftContent>
-                                    <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
-                                               IsVisible="{Binding ShowOr}" />
-                                  </TextBox.InnerLeftContent>
-                                </TextBox>
-                                <AutoCompleteBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsSource}"
-                                                 ItemsSource="{Binding Condition.KnownApps}" FilterMode="Contains" MinimumPrefixLength="0"
-                                                 PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Source app">
-                                  <AutoCompleteBox.InnerLeftContent>
-                                    <TextBlock Classes="small faint" Text="or" Margin="10,0,0,0" VerticalAlignment="Center"
-                                               IsVisible="{Binding ShowOr}" />
-                                  </AutoCompleteBox.InnerLeftContent>
-                                </AutoCompleteBox>
-                                <Button Grid.Column="1" Classes="ghost icon" Margin="4,0,0,0" Command="{Binding RemoveCommand}"
-                                        IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove this alternative"
-                                        AutomationProperties.Name="Remove alternative">
-                                  <c:Icon Data="{StaticResource Icon.Close}" />
-                                </Button>
-                              </Grid>
-                              <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap" />
-                            </StackPanel>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-
-                      <Grid ColumnDefinitions="Auto,*">
-                        <Button Classes="ghost" Padding="6,2" Margin="-6,0,0,0" FontSize="12" Command="{Binding AddValueCommand}">
-                          <StackPanel Orientation="Horizontal" Spacing="4">
-                            <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
-                            <TextBlock Text="{Binding AddValueLabel}" />
-                          </StackPanel>
-                        </Button>
-                        <CheckBox Grid.Column="1" Content="Case-sensitive" IsChecked="{Binding CaseSensitive}" FontSize="12"
-                                  IsVisible="{Binding ShowCaseSensitive}" HorizontalAlignment="Right" MinHeight="0" />
-                      </Grid>
-                      <TextBlock Classes="body faint small" Text="{Binding Hint}" />
-                    </StackPanel>
-                  </Grid>
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-
-          <TextBlock Classes="body faint small" Text="{Binding RuleError}" IsVisible="{Binding HasRuleError}" />
+          <TextBlock Classes="body faint small" Text="{Binding Owner.RuleError}" IsVisible="{Binding Owner.HasRuleError}" />
 
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
             <Button Command="{Binding AddLinkConditionCommand}" Padding="10,4" FontSize="12"
-                    ToolTip.Tip="Add a condition on the link" AutomationProperties.Name="Add link condition">
+                    ToolTip.Tip="Add a condition on the link" AutomationProperties.Name="{Binding AddLinkName}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
                 <TextBlock Text="Link" />
@@ -447,13 +553,22 @@
             </Button>
             <Button Command="{Binding AddSourceConditionCommand}" Padding="10,4" FontSize="12"
                     ToolTip.Tip="Add a condition on the app the link was opened from"
-                    AutomationProperties.Name="Add source app condition">
+                    AutomationProperties.Name="{Binding AddSourceName}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
                 <TextBlock Text="Opened from" />
               </StackPanel>
             </Button>
+            <Button Command="{Binding AddGroupCommand}" Padding="10,4" FontSize="12"
+                    ToolTip.Tip="Add a group of conditions with its own all/any, e.g. this app or that one"
+                    AutomationProperties.Name="{Binding AddGroupName}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                <TextBlock Text="Group" />
+              </StackPanel>
+            </Button>
           </StackPanel>
+        </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="6"
                       IsVisible="{Binding TestVerdict, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">

@@ -171,5 +171,7 @@
   <StreamGeometry x:Key="Icon.Shield">M12 3.5L19 6.5V11.5C19 15.5 16 18.8 12 20.5C8 18.8 5 15.5 5 11.5V6.5Z</StreamGeometry>
   <!-- An app window with its own content: "opened from this app" -->
   <StreamGeometry x:Key="Icon.App">M4.5 5H19.5V19H4.5Z M4.5 9H19.5 M8 12.5H16 M8 15.5H13</StreamGeometry>
+  <!-- Points: a line diverging off the main line: "a group of conditions" -->
+  <StreamGeometry x:Key="Icon.Branch">M8 3V21 M8 7.5L16.5 15V21</StreamGeometry>
   <StreamGeometry x:Key="Icon.Mask">M3.5 9C3.5 7.5 6 6.5 9 7L12 8L15 7C18 6.5 20.5 7.5 20.5 9C20.5 13 18 15 15.5 15C13.5 15 13 13.5 12 13.5C11 13.5 10.5 15 8.5 15C6 15 3.5 13 3.5 9Z</StreamGeometry>
 </ResourceDictionary>

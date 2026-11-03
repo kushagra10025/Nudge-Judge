@@ -117,6 +117,135 @@ public sealed class CompoundRuleUiTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Building_nested_groups_in_the_editor()
+    {
+        var app = new Harness();
+        var window = Show(app, AppPage.Rules);
+        Click(window, Find<Button>(window, "Add rule", byContent: true));
+        Settle(window);
+        var editor = app.Main.Rules.Editor;
+
+        // acme.io links, and (under /admin, or from Teams, or (under /docs and from Slack)).
+        Type(window, Finds<TextBox>(window, "Pattern")[0], "*.acme.io");
+        Click(window, Find<Button>(window, "Add condition group"));
+        Settle(window);
+
+        // A new group starts with a blank link condition and the opposite join to its parent.
+        var group = Assert.IsType<ConditionGroupViewModel>(editor.Conditions[1]);
+        Assert.Equal(RuleJoin.Any, group.Join.Join);
+        Assert.Equal(2, Finds<TextBox>(window, "Pattern").Count);
+        Assert.False(editor.SaveCommand.CanExecute(null)); // the blank pattern isn't filled in yet
+        Type(window, Finds<TextBox>(window, "Pattern")[1], "*.acme.io/admin/*");
+
+        Click(window, Find<Button>(window, "Add source app condition to this group"));
+        Settle(window);
+        Type(window, Find<AutoCompleteBox>(window, "Source app"), "ms-teams.exe");
+
+        Click(window, Find<Button>(window, "Add condition group inside this group"));
+        Settle(window);
+        var inner = Assert.IsType<ConditionGroupViewModel>(group.Items[2]);
+        Assert.Equal(RuleJoin.All, inner.Join.Join);
+        Type(window, Finds<TextBox>(window, "Pattern")[2], "*.acme.io/docs/*");
+        // The inner group's buttons come first: they sit above the outer group's foot.
+        Click(window, Finds<Button>(window, "Add source app condition to this group")[0]);
+        Settle(window);
+        Type(window, Finds<AutoCompleteBox>(window, "Source app")[1], "slack");
+
+        // Three levels is the limit: the innermost group offers no further group.
+        Assert.Single(Finds<Button>(window, "Add condition group inside this group"));
+        Assert.Equal(2, Finds<ComboBox>(window, "Match all or any in this group").Count);
+
+        // Each track says its own join word.
+        var joins = VisibleTextBlocks(window).Select(t => t.Text).Where(t => t is "and" or "or").ToList();
+        Assert.Equal(["and", "or", "or", "and"], joins);
+
+        Find<ComboBox>(window, "Open in").SelectedIndex = 1; // Chrome
+        Settle(window);
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+
+        var rule = Assert.Single(app.Config.Current.Rules);
+        Assert.Equal("acme.io", rule.Name);
+        var saved = rule.Conditions[1];
+        Assert.True(saved.IsGroup);
+        Assert.Equal(3, saved.Conditions!.Count);
+        Assert.Equal(["slack"], saved.Conditions[2].Conditions![1].Values);
+
+        // The list summarises it with brackets.
+        var summary = window.GetVisualDescendants().OfType<ConditionSummary>().Single(s => s.IsEffectivelyVisible);
+        Assert.Equal("*.acme.io   and   (*.acme.io/admin/*  or  from ms-teams.exe  or  (*.acme.io/docs/*  and  from slack))", InlineText(summary));
+
+        // And it routes that way.
+        app.Router.Route("https://app.acme.io/admin/x", null);
+        app.Router.Route("https://app.acme.io/x", Teams);
+        app.Router.Route("https://app.acme.io/docs/a", Slack);
+        Assert.Equal(3, app.Launcher.Launched.Count(l => l.Browser == app.Chrome));
+        Assert.Equal(RouteKind.NeedsChoice, app.Router.Route("https://app.acme.io/x", Slack).Kind);
+
+        // Reopening it brings the groups back, and removing a group takes its conditions with it.
+        editor.OpenExisting(rule);
+        Settle(window);
+        Assert.Equal(3, Finds<TextBox>(window, "Pattern").Count);
+        Click(window, Finds<Button>(window, "Remove group")[1]);
+        Settle(window);
+        Assert.Equal(2, Finds<TextBox>(window, "Pattern").Count);
+        Assert.Single(Finds<AutoCompleteBox>(window, "Source app"));
+        Assert.Equal(2, Assert.IsType<ConditionGroupViewModel>(editor.Conditions[1]).Items.Count);
+    }
+
+    [AvaloniaFact]
+    public void Conditions_and_groups_reorder_with_arrows_shown_on_hover()
+    {
+        var app = new Harness();
+        var window = Show(app, AppPage.Rules);
+        Click(window, Find<Button>(window, "Add rule", byContent: true));
+        Settle(window);
+        var editor = app.Main.Rules.Editor;
+
+        // Alone in the rule, a condition has nothing to move.
+        Hover(window, VisibleTextBlocks(window).First(t => t.Text == "Link"));
+        Assert.Empty(Finds<Button>(window, "Move condition down"));
+
+        Type(window, Finds<TextBox>(window, "Pattern")[0], "*.acme.io");
+        Click(window, Find<Button>(window, "Add source app condition"));
+        Settle(window);
+        Type(window, Find<AutoCompleteBox>(window, "Source app"), "slack");
+        Click(window, Find<Button>(window, "Add condition group"));
+        Settle(window);
+
+        // Arrows are hidden at rest, appear over a condition, and the first can't move up.
+        Hover(window, Find<ComboBox>(window, "Match all or any conditions"));
+        Assert.Empty(Finds<Button>(window, "Move condition down"));
+        Hover(window, Finds<TextBox>(window, "Pattern")[0]);
+        var down = Assert.Single(Finds<Button>(window, "Move condition down"));
+        Assert.False(Assert.Single(Finds<Button>(window, "Move condition up")).IsEnabled);
+
+        Click(window, down);
+        Settle(window);
+        Assert.Equal(["SourceApp", "Link", "Group"], editor.Conditions.Select(c => c is ConditionEditorViewModel e ? e.Field.ToString() : "Group"));
+        Assert.Equal("and", editor.Conditions[1].JoinLabel); // join words follow the new order
+        Assert.False(editor.Conditions[0].ShowJoinLabel);
+
+        // A group moves as a whole, from its header.
+        Hover(window, Find<ComboBox>(window, "Match all or any in this group"));
+        Assert.Empty(Finds<Button>(window, "Move condition up")); // the group's own condition is alone
+        Click(window, Assert.Single(Finds<Button>(window, "Move group up")));
+        Settle(window);
+        Assert.IsType<ConditionGroupViewModel>(editor.Conditions[1]);
+
+        // Hints are tooltips on the fields, never inline text.
+        Assert.DoesNotContain(VisibleTextBlocks(window), t => t.Text?.StartsWith("Use * for any text") == true);
+        Assert.StartsWith("Use * for any text", ToolTip.GetTip(Finds<TextBox>(window, "Pattern")[0]) as string);
+
+        Find<ComboBox>(window, "Open in").SelectedIndex = 1;
+        Type(window, Finds<TextBox>(window, "Pattern")[0], "github.com/acme/*"); // the group, now above the link
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+        var rule = Assert.Single(app.Config.Current.Rules);
+        Assert.Equal([ConditionField.SourceApp, ConditionField.Group, ConditionField.Link], rule.Conditions.Select(c => c.Field));
+    }
+
+    [AvaloniaFact]
     public void The_name_is_required()
     {
         var app = new Harness();
@@ -392,9 +521,20 @@ public sealed class CompoundRuleUiTests : IDisposable
         Settle(window);
     }
 
+    private static void Hover(Window window, Control control)
+    {
+        control.BringIntoView();
+        Settle(window);
+        window.MouseMove(control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value);
+        Settle(window);
+    }
+
     /// <summary>Hovers first: row actions only appear on hover.</summary>
     private static void Click(Window window, Control control)
     {
+        // Tall editors scroll: bring the target on screen first, as a user would.
+        control.BringIntoView();
+        Settle(window);
         var center = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
         window.MouseMove(center);
         Dispatcher.UIThread.RunJobs();
