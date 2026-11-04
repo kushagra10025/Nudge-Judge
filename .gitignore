@@ -6,7 +6,10 @@
 # Agentic AI
 .claude/
 .impeccable/
+.agents/
 graphify-out/
+brag-output/
+skills-lock.json
 
 # User-specific files
 *.rsuser

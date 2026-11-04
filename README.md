@@ -231,3 +231,7 @@ Designed the primary system architecture and built the core library, while Claud
 
 * UI/UX - [Impeccable](https://github.com/pbakaus/impeccable)
 * Agent - [Graphify](https://github.com/Graphify-Labs/graphify)
+
+## License
+
+NudgeJudge is released under the [MIT License](LICENSE).
