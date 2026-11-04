@@ -27,6 +27,13 @@ public interface IDefaultBrowserRegistrar
     /// until the user has chosen NudgeJudge.
     /// </summary>
     Task<RegistrationStatus> RegisterAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls <paramref name="changed"/> (on a background thread) whenever the OS's http/https handler may have
+    /// changed, where the platform can tell. Windows: the user finishes setup in Default Apps while NudgeJudge may
+    /// not be focused, so waiting for the window to come forward leaves the status stale.
+    /// </summary>
+    void WatchForChanges(Action changed) { }
 }
 
 public static class DefaultBrowserRegistration

@@ -159,6 +159,58 @@ public sealed class DefaultBrowserSetupTests
     }
 
     [AvaloniaFact]
+    public async Task A_change_in_the_os_updates_the_status_without_refocusing()
+    {
+        var registrar = new FakeRegistrar();
+        var vm = ViewModel(registrar);
+        var window = Show(vm);
+        await vm.RefreshRegistrationCommand.ExecuteAsync(null);
+        await Settle(window);
+
+        // The user picks NudgeJudge in Default Apps; NudgeJudge's window never gets focus back.
+        registrar.Status = new(RegistrationState.Registered, "Links come here first.");
+        registrar.Changed!();
+        await Settle(window);
+
+        Assert.True(Shows(window, DefaultLabel));
+    }
+
+    [AvaloniaFact]
+    public async Task A_change_during_a_check_is_checked_again()
+    {
+        var registrar = new FakeRegistrar();
+        var vm = ViewModel(registrar);
+        var window = Show(vm);
+        await vm.RefreshRegistrationCommand.ExecuteAsync(null);
+        await Settle(window);
+
+        // Windows writes http then https: the second change lands while the first check still reads "only HTTP".
+        var gate = new TaskCompletionSource();
+        registrar.StatusGate = gate;
+        registrar.Status = new(RegistrationState.NotRegistered, "Only HTTP links come here.");
+        registrar.Changed!();
+        registrar.Changed!();
+        registrar.Status = new(RegistrationState.Registered, "Links come here first.");
+        gate.SetResult();
+        await Settle(window);
+
+        Assert.Equal(3, registrar.StatusChecks);
+        Assert.True(Shows(window, DefaultLabel));
+    }
+
+    [AvaloniaFact]
+    public void A_change_before_the_first_check_spawns_nothing()
+    {
+        var registrar = new FakeRegistrar();
+        var vm = ViewModel(registrar);
+        Show(vm);
+
+        registrar.Changed!();
+
+        Assert.Equal(0, registrar.StatusChecks);
+    }
+
+    [AvaloniaFact]
     public async Task Unsupported_platform_explains_without_a_button()
     {
         var registrar = new FakeRegistrar

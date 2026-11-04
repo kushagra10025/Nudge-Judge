@@ -83,6 +83,32 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
         return true;
     }
 
+    public void WatchForChanges(Action changed)
+    {
+        // RegNotifyChangeKeyValue fires once per arm, so a background thread re-arms it after each change.
+        // Watches the whole subtree: Default Apps deletes and recreates the UserChoice keys under it.
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var signal = new AutoResetEvent(false);
+                while (true)
+                {
+                    using var key = Registry.CurrentUser.CreateSubKey(AssociationsKey, writable: false);
+                    if (RegNotifyChangeKeyValue(key.Handle.DangerousGetHandle(), 1, RegNotifyChangeName | RegNotifyChangeLastSet,
+                            signal.SafeWaitHandle.DangerousGetHandle(), 1) != 0) return;
+                    signal.WaitOne();
+                    changed();
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                // No live updates then; the check when the window comes forward still works.
+            }
+        }) { IsBackground = true, Name = "Default browser watcher" };
+        thread.Start();
+    }
+
     private RegistrationStatus ReadStatus()
     {
         if (Plan is not { } plan) return CantLocateSelf;
@@ -116,6 +142,13 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
 
     private const uint ShcneAssocChanged = 0x08000000;
     private const uint ShcnfIdList = 0x0000;
+
+    private const uint RegNotifyChangeName = 0x1;
+    private const uint RegNotifyChangeLastSet = 0x4;
+
+    [DllImport("advapi32.dll")]
+    private static extern int RegNotifyChangeKeyValue(IntPtr key, int watchSubtree, uint filter, IntPtr eventHandle,
+        int asynchronous);
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);

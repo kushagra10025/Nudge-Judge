@@ -23,6 +23,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>How long a number field has to stay put before it's saved, so spinning through values writes once.</summary>
     public static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(400);
     private bool _refreshing;
+    private bool _refreshAgain;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
         ILaunchAtStartup startup, UpdatesViewModel? updates = null)
@@ -39,6 +40,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _loading = true;
         Theme = ThemeOption.All[0];
         config.Changed += (_, _) => dispatcher.Post(Load);
+        // Only re-checks once the OS has been asked (a window was opened), like the activation check.
+        registrar.WatchForChanges(() => dispatcher.Post(() =>
+        {
+            if (RegistrationChecked) _ = RefreshRegistrationCommand.ExecuteAsync(null);
+        }));
         Load();
     }
 
@@ -136,18 +142,32 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// Asks the OS again. Run whenever the main window comes forward, since the default can change outside
     /// the app (and on Windows, registering finishes in the system's Default Apps page).
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RefreshRegistrationAsync()
     {
-        if (_refreshing || RegisterCommand.IsRunning) return;
+        if (RegisterCommand.IsRunning) return;
+        // Asked again mid-check (Windows writes http and https as separate changes): check once more after,
+        // so the last answer reflects the last change.
+        if (_refreshing)
+        {
+            _refreshAgain = true;
+            return;
+        }
         _refreshing = true;
         try
         {
-            Apply(await _registrar.GetStatusAsync());
-        }
-        catch (Exception e)
-        {
-            Apply(new RegistrationStatus(RegistrationState.Unknown, "Couldn't check the default browser: " + e.Message));
+            do
+            {
+                _refreshAgain = false;
+                try
+                {
+                    Apply(await _registrar.GetStatusAsync());
+                }
+                catch (Exception e)
+                {
+                    Apply(new RegistrationStatus(RegistrationState.Unknown, "Couldn't check the default browser: " + e.Message));
+                }
+            } while (_refreshAgain);
         }
         finally
         {

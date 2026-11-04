@@ -30,14 +30,27 @@ internal sealed class FakeRegistrar : IDefaultBrowserRegistrar
     /// <summary>When set, RegisterAsync waits on it, so a test can look at the in-progress state.</summary>
     public TaskCompletionSource? Gate { get; set; }
 
+    /// <summary>When set, GetStatusAsync waits on it, so a test can trigger another check mid-check.</summary>
+    public TaskCompletionSource? StatusGate { get; set; }
+
+    /// <summary>What the view model asked to be told about OS-side changes; a test calls it to simulate one.</summary>
+    public Action? Changed { get; private set; }
+
     public int StatusChecks { get; private set; }
     public int Registrations { get; private set; }
 
-    public Task<RegistrationStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<RegistrationStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         StatusChecks++;
-        return Task.FromResult(Status);
+        if (StatusGate is { } gate)
+        {
+            StatusGate = null;
+            await gate.Task;
+        }
+        return Status;
     }
+
+    public void WatchForChanges(Action changed) => Changed = changed;
 
     public async Task<RegistrationStatus> RegisterAsync(CancellationToken cancellationToken = default)
     {
