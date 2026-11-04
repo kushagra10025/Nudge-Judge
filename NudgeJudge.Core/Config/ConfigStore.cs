@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NudgeJudge.Core.Models;
@@ -38,8 +37,11 @@ public sealed class JsonConfigStore : IConfigStore
     private readonly string _lockPath;
     private readonly Lock _gate = new();
 
-    /// <summary>Hash of the file as we last read or wrote it; null when we haven't seen a readable file.</summary>
-    private byte[]? _diskHash;
+    /// <summary>
+    /// The file as we last read or wrote it; null when we haven't seen a readable file. Kept whole rather than
+    /// hashed: it's a few KB, and a hash would load the crypto library on every start.
+    /// </summary>
+    private byte[]? _diskBytes;
 
     /// <summary>Memory holds changes the file doesn't (a failed write). They win over a newer file and are retried.</summary>
     private bool _unsaved;
@@ -101,7 +103,7 @@ public sealed class JsonConfigStore : IConfigStore
             return new AppConfig();
         }
 
-        _diskHash = SHA256.HashData(bytes);
+        _diskBytes = bytes;
         if (!TryParse(bytes, out var config, out var error))
         {
             var backup = KeepCopy(bytes, "broken-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
@@ -143,14 +145,13 @@ public sealed class JsonConfigStore : IConfigStore
             return;
         }
 
-        var hash = SHA256.HashData(bytes);
-        if (_diskHash is not null && hash.AsSpan().SequenceEqual(_diskHash)) return;
+        if (_diskBytes is not null && bytes.AsSpan().SequenceEqual(_diskBytes)) return;
         // Unreadable or from a newer version: keep what we have, and our next save replaces it as before.
         if (!TryParse(bytes, out var config, out _) || config.Version > AppConfig.CurrentVersion) return;
 
         config.Upgrade();
         Current = config;
-        _diskHash = hash;
+        _diskBytes = bytes;
         // A previous load failure no longer describes what's in memory.
         LoadError = null;
     }
@@ -208,7 +209,7 @@ public sealed class JsonConfigStore : IConfigStore
         {
             var bytes = JsonSerializer.SerializeToUtf8Bytes(Current, ConfigJsonContext.Default.AppConfig);
             AppPaths.WritePrivateFileAtomic(_path, bytes);
-            _diskHash = SHA256.HashData(bytes);
+            _diskBytes = bytes;
             _unsaved = false;
             SaveError = null;
         }

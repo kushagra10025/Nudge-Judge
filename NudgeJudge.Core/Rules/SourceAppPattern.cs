@@ -27,11 +27,18 @@ public static class SourceAppPattern
 
         if (value.Contains('*') || value.Contains('?'))
         {
-            var regex = PatternCompiler.BuildRegex("^" + Glob(value) + "$", caseSensitive: false);
+            // Plain string matching for '*'; the rarer '?' goes through the (non-backtracking) regex engine.
+            SpanTest glob;
+            if (StarGlob.TryCreate(value) is { } star) glob = star.IsMatch;
+            else
+            {
+                var regex = PatternCompiler.BuildRegex("^" + Glob(value) + "$", caseSensitive: false);
+                glob = regex.IsMatch;
+            }
             return new(app => app is not null &&
-                              (regex.IsMatch(app.Name) || regex.IsMatch(WithoutExe(app.Name)) ||
-                               (app.Title is { } t && regex.IsMatch(t)) ||
-                               (app.Path is { } p && regex.IsMatch(p))), null);
+                              (glob(app.Name) || (HasExe(app.Name) && glob(app.Name.AsSpan()[..^4])) ||
+                               (app.Title is { } t && glob(t)) ||
+                               (app.Path is { } p && glob(p))), null);
         }
 
         if (value.Contains('/') || value.Contains('\\'))
@@ -42,11 +49,17 @@ public static class SourceAppPattern
 
         var bare = WithoutExe(value);
         return new(app => app is not null &&
-                          (string.Equals(WithoutExe(app.Name), bare, StringComparison.OrdinalIgnoreCase) ||
+                          (WithoutExe(app.Name.AsSpan()).Equals(bare, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(app.Title, value, StringComparison.OrdinalIgnoreCase)), null);
     }
 
-    private static string WithoutExe(string name) =>
+    private delegate bool SpanTest(ReadOnlySpan<char> s);
+
+    private static bool HasExe(string name) => name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+
+    private static string WithoutExe(string name) => HasExe(name) ? name[..^4] : name;
+
+    private static ReadOnlySpan<char> WithoutExe(ReadOnlySpan<char> name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
 
     private static string Glob(string glob)

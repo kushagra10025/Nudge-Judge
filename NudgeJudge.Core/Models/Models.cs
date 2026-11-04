@@ -133,6 +133,9 @@ public sealed class Rule
     /// </summary>
     public bool? IsSample { get; set; }
 
+    /// <summary>The rule engine's compiled form of this rule. Never saved; checked against the conditions on every use.</summary>
+    internal Rules.CompiledRuleCache? Compiled;
+
     // Config files written before rules had conditions held one link pattern per rule.
     // These read it; Upgrade() folds it into Conditions and clears them, so they're never written back.
 

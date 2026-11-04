@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using NudgeJudge.Core.Models;
 
@@ -7,11 +6,13 @@ namespace NudgeJudge.Core.Rules;
 /// <summary>A compiled, reusable URL predicate.</summary>
 public sealed class CompiledPattern
 {
-    private readonly Func<Uri, bool> _predicate;
-    internal CompiledPattern(Func<Uri, bool> predicate) => _predicate = predicate;
+    internal CompiledPattern(Func<LinkInput, bool> predicate) => Predicate = predicate;
+
+    /// <summary>The test itself, for the rule engine to call without going through this wrapper.</summary>
+    internal Func<LinkInput, bool> Predicate { get; }
 
     /// <exception cref="RegexMatchTimeoutException">The pattern exceeded its time budget.</exception>
-    public bool IsMatch(Uri url) => _predicate(url);
+    public bool IsMatch(Uri url) => Predicate(new LinkInput(url, null));
 }
 
 public readonly record struct PatternCompileResult(CompiledPattern? Pattern, string? Error)
@@ -20,7 +21,8 @@ public readonly record struct PatternCompileResult(CompiledPattern? Pattern, str
 }
 
 /// <summary>
-/// Turns user patterns into predicates.
+/// Turns user patterns into predicates. Domains, wildcards and path prefixes compile to plain string
+/// comparisons (<see cref="StarGlob"/>); only user-written regular expressions use the regex engine.
 /// ReDoS defence, in layers: every regex (user-written or generated from a glob) runs on
 /// <see cref="RegexOptions.NonBacktracking"/>, which matches in linear time and rejects the
 /// constructs that need backtracking; patterns are length-capped; and a match timeout backs both up.
@@ -71,7 +73,7 @@ public static class PatternCompiler
         if (host.Contains('*') || host.Contains('?'))
             return Fail("Domain rules don't take wildcards. Switch to Wildcard for patterns like *.example.com.");
 
-        return Ok(url => string.Equals(NormalizeHost(url), host, StringComparison.OrdinalIgnoreCase));
+        return Ok(link => string.Equals(link.Host, host, StringComparison.Ordinal));
     }
 
     private static PatternCompileResult CompileWildcard(string pattern)
@@ -79,14 +81,13 @@ public static class PatternCompiler
         if (!TrySplitHostAndPath(pattern, out var host, out var path, out var error))
             return Fail(error);
 
-        var hostRegex = BuildRegex(HostGlobToRegex(host), caseSensitive: false);
-        // Hosts are case-insensitive; paths are matched case-insensitively for globs as well,
-        // which is what people expect when typing a quick pattern.
-        var pathRegex = path.Length > 0 ? BuildRegex("^" + GlobToRegex(path, star: ".*", single: ".") + "$", caseSensitive: false) : null;
+        var hostGlob = new HostGlob(host);
+        if (path.Length == 0) return Ok(hostGlob.IsMatch);
 
-        return Ok(url =>
-            HostMatches(hostRegex, url) &&
-            (pathRegex is null || pathRegex.IsMatch(url.AbsolutePath)));
+        // Hosts are case-insensitive; paths are matched case-insensitively for globs as well,
+        // which is what people expect when typing a quick pattern. ('?' starts a query, so it never gets here.)
+        var pathGlob = StarGlob.TryCreate(path)!;
+        return Ok(link => hostGlob.IsMatch(link) && pathGlob.IsMatch(link.Path));
     }
 
     private static PatternCompileResult CompilePathPrefix(string pattern, bool caseSensitive)
@@ -98,14 +99,14 @@ public static class PatternCompiler
         if (path.Contains('*') || path.Contains('?'))
             return Fail("Path prefixes are literal. Use Wildcard for * in paths.");
 
-        var hostRegex = BuildRegex(HostGlobToRegex(host), caseSensitive: false);
+        var hostGlob = new HostGlob(host);
         var prefix = path.TrimEnd('/');
         var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
-        return Ok(url =>
+        return Ok(link =>
         {
-            if (!HostMatches(hostRegex, url)) return false;
-            var p = url.AbsolutePath;
+            if (!hostGlob.IsMatch(link)) return false;
+            var p = link.Path;
             if (prefix.Length == 0) return true;
             // Match on segment boundaries: /acme matches /acme and /acme/x but not /acmecorp.
             return p.StartsWith(prefix, comparison) && (p.Length == prefix.Length || p[prefix.Length] == '/');
@@ -132,7 +133,7 @@ public static class PatternCompiler
             return Fail("Not a valid regular expression.");
         }
 
-        return Ok(url => regex.IsMatch(url.AbsoluteUri));
+        return Ok(link => regex.IsMatch(link.AbsoluteUri));
     }
 
     /// <summary>Plain-language version of .NET's parser message, pointing at the character that broke it.</summary>
@@ -162,29 +163,6 @@ public static class PatternCompiler
         var options = RegexOptions.NonBacktracking | RegexOptions.CultureInvariant;
         if (!caseSensitive) options |= RegexOptions.IgnoreCase;
         return new Regex(pattern, options, MatchTimeout);
-    }
-
-    /// <summary>Host glob. A leading "*." also matches the bare domain (*.acme.io matches acme.io).</summary>
-    private static string HostGlobToRegex(string host)
-    {
-        if (host.StartsWith("*.", StringComparison.Ordinal))
-            return "^(?:[^/]*\\.)?" + GlobToRegex(host[2..], star: "[^/]*", single: "[^/]") + "$";
-        return "^" + GlobToRegex(host, star: "[^/]*", single: "[^/]") + "$";
-    }
-
-    private static string GlobToRegex(string glob, string star, string single)
-    {
-        var sb = new StringBuilder(glob.Length * 2);
-        foreach (var c in glob)
-        {
-            sb.Append(c switch
-            {
-                '*' => star,
-                '?' => single,
-                _ => Regex.Escape(c.ToString()),
-            });
-        }
-        return sb.ToString();
     }
 
     /// <summary>Accepts "host", "host/path" or a full URL and splits it into lower-case host and path.</summary>
@@ -231,14 +209,23 @@ public static class PatternCompiler
         return true;
     }
 
-    private static string NormalizeHost(Uri url) => url.IdnHost.TrimEnd('.');
-
-    /// <summary>A glob inside a non-ASCII label ("*münchen.de") can't be punycoded, so also try the Unicode host.</summary>
-    private static bool HostMatches(Regex host, Uri url) =>
-        host.IsMatch(NormalizeHost(url)) || (url.Host != url.IdnHost && host.IsMatch(url.Host.TrimEnd('.')));
-
     private static bool IsIpAddress(string host) => System.Net.IPAddress.TryParse(host.Trim('[', ']'), out _);
 
-    private static PatternCompileResult Ok(Func<Uri, bool> predicate) => new(new CompiledPattern(predicate), null);
+    private static PatternCompileResult Ok(Func<LinkInput, bool> predicate) => new(new CompiledPattern(predicate), null);
     private static PatternCompileResult Fail(string error) => new(null, error);
+}
+
+/// <summary>
+/// Host glob, tried against the ASCII host and then the Unicode one. A leading "*." also matches the bare
+/// domain: "*.acme.io" is "acme.io" or anything ending in ".acme.io" (the "*" may span dots).
+/// Both sides are lower case (the pattern from TrySplitHostAndPath, the link from <see cref="LinkInput"/>).
+/// </summary>
+internal sealed class HostGlob(string host)
+{
+    private readonly StarGlob _glob = StarGlob.TryCreate(host, StringComparison.Ordinal)!;
+    private readonly StarGlob? _bare = host.StartsWith("*.", StringComparison.Ordinal) ? StarGlob.TryCreate(host[2..], StringComparison.Ordinal) : null;
+
+    public bool IsMatch(LinkInput link) => Matches(link.Host) || (link.UnicodeHost is { } u && Matches(u));
+
+    private bool Matches(string h) => _glob.IsMatch(h) || (_bare is not null && _bare.IsMatch(h));
 }

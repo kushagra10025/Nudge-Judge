@@ -18,14 +18,32 @@ public sealed record IncomingLink(Uri Url, SourceApp? Source = null);
 /// The single entry point for incoming links (this launch's command line, or one forwarded by a later launch).
 /// Validate, then pass through, match or ask.
 /// </summary>
-public sealed class LinkRouter(
-    IConfigStore config,
-    RuleEngine engine,
-    IBrowserLauncher launcher,
-    ActivityLog activity,
-    TimeProvider? time = null)
+public sealed class LinkRouter
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly IConfigStore config;
+    private readonly RuleEngine engine;
+    private readonly IBrowserLauncher launcher;
+    private readonly ActivityLog activity;
+    private readonly TimeProvider _time;
+
+    /// <summary>The config's rules, compiled. Dropped on every config change (rules only change through <see cref="IConfigStore.Update"/>).</summary>
+    private volatile PreparedRules? _prepared;
+
+    private int _configVersion;
+
+    public LinkRouter(IConfigStore config, RuleEngine engine, IBrowserLauncher launcher, ActivityLog activity, TimeProvider? time = null)
+    {
+        this.config = config;
+        this.engine = engine;
+        this.launcher = launcher;
+        this.activity = activity;
+        _time = time ?? TimeProvider.System;
+        config.Changed += (_, _) =>
+        {
+            Interlocked.Increment(ref _configVersion);
+            _prepared = null;
+        };
+    }
 
     /// <summary>Raised (on the caller's thread) when no rule matches and the user must choose.</summary>
     public event EventHandler<IncomingLink>? ChoiceRequested;
@@ -53,14 +71,14 @@ public sealed class LinkRouter(
         }
         else
         {
-            var result = engine.Match(url, cfg.Rules, source);
-            if (result.Rule is { } rule)
+            var (rule, index) = engine.FindMatch(url, PreparedRules(cfg), source);
+            if (rule is not null)
             {
                 var browser = cfg.FindBrowser(rule.BrowserId);
                 if (browser is null)
-                    Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: result.RuleIndex + 1, RuleName: rule.Name,
+                    Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: index + 1, RuleName: rule.Name,
                         Detail: "The rule's browser no longer exists. Asking instead.", Source: source));
-                else if (Launch(browser, url, source, ActivityOutcome.Routed, result.RuleIndex + 1, rule.Name) is { Kind: not RouteKind.Failed } routed)
+                else if (Launch(browser, url, source, ActivityOutcome.Routed, index + 1, rule.Name) is { Kind: not RouteKind.Failed } routed)
                     return routed;
             }
         }
@@ -68,6 +86,17 @@ public sealed class LinkRouter(
         Log(new(Now, url.AbsoluteUri, ActivityOutcome.Asked, Source: source));
         ChoiceRequested?.Invoke(this, new IncomingLink(url, source));
         return new RouteDecision(RouteKind.NeedsChoice, url);
+    }
+
+    private PreparedRules PreparedRules(AppConfig cfg)
+    {
+        if (_prepared is { } ready) return ready;
+
+        // Only keep it if no change landed while it was being made; otherwise the next link prepares again.
+        var version = Volatile.Read(ref _configVersion);
+        var fresh = engine.Prepare(cfg.Rules);
+        if (version == Volatile.Read(ref _configVersion)) _prepared = fresh;
+        return fresh;
     }
 
     /// <summary>Opens a URL the user explicitly chose a browser for (chooser window).</summary>

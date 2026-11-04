@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -7,6 +8,8 @@ namespace NudgeJudge.Core.Platform;
 public static class AppLaunchCommand
 {
     /// <summary>Null when it can't be worked out (e.g. no process path); registration is then unavailable.</summary>
+    [UnconditionalSuppressMessage("SingleFile", "IL3000",
+        Justification = "In a native (AOT) or single-file build Location is empty, which Resolve reads as \"no dll\": the process path alone, the right command there.")]
     public static IReadOnlyList<string>? Current()
     {
         var root = RuntimeRoot();

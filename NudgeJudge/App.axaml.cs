@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using NudgeJudge.Core;
 using NudgeJudge.Core.Browsers;
 using NudgeJudge.Core.Browsers.Discovery;
 using NudgeJudge.Core.Config;
@@ -26,6 +27,15 @@ public partial class App : Application
 
     /// <summary>The app that opened the links on this launch's command line, when the entry point could tell.</summary>
     public NudgeJudge.Core.Models.SourceApp? LaunchSource { get; init; }
+
+    /// <summary>
+    /// Config, rules and router, when the entry point already built them to route this launch's links before
+    /// the UI started. Null means the links (if any) haven't been routed yet, and the app builds its own.
+    /// </summary>
+    public CoreServices? Core { get; init; }
+
+    /// <summary>With <see cref="Core"/>: this launch's links that no rule took, waiting for the chooser.</summary>
+    public IReadOnlyList<IncomingLink> PendingLinks { get; init; } = [];
 
     public override void Initialize()
     {
@@ -57,14 +67,8 @@ public partial class App : Application
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var dispatcher = new AvaloniaUiDispatcher();
-        var boot = new SystemBoot();
-        var config = new JsonConfigStore(AppPaths.ConfigFile, SampleData.FirstRun);
-        var engine = new RuleEngine(boot);
-        // Temporary rules that ran out while the app was closed (every "until restart" rule, after a reboot).
-        if (config.Current.Rules.Any(r => r.IsExpired(DateTimeOffset.UtcNow, boot)))
-            config.Update(c => c.Rules.RemoveAll(r => r.IsExpired(DateTimeOffset.UtcNow, boot)));
-        var activity = ActivityLog.FollowingSettings(config, new ActivityLogFile(AppPaths.ActivityLogFile));
-        var router = new LinkRouter(config, engine, new BrowserLauncher(), activity);
+        var core = Core ?? CoreServices.Load();
+        var (boot, config, engine, activity, router) = (core.Boot, core.Config, core.Engine, core.Activity, core.Router);
         var windows = new DesktopWindowService(desktop);
 
         var chooser = new ChooserViewModel(config, router, boot, dispatcher);
@@ -118,8 +122,21 @@ public partial class App : Application
         }
 
         // Launched with links (as the default browser is). Links forwarded by later launches join the same chooser.
-        foreach (var url in launch.Urls)
-            router.Route(url, LaunchSource);
+        if (Core is null)
+        {
+            foreach (var url in launch.Urls)
+                router.Route(url, LaunchSource);
+        }
+        else
+        {
+            // Routed by the entry point before the UI started; only the ones no rule took are left.
+            foreach (var link in PendingLinks)
+                dispatcher.Post(() =>
+                {
+                    chooser.Enqueue(link.Url, link.Source);
+                    windows.ShowChooser();
+                });
+        }
 
         // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
         Dispatcher.UIThread.Post(ExitIfIdle);

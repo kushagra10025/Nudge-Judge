@@ -30,11 +30,13 @@ public readonly record struct LinkContext(Uri Url, SourceApp? Source);
 /// <summary>A rule's conditions, compiled into one predicate.</summary>
 public sealed class CompiledRule
 {
-    private readonly Func<LinkContext, bool> _predicate;
-    internal CompiledRule(Func<LinkContext, bool> predicate) => _predicate = predicate;
+    private readonly Func<LinkInput, bool> _predicate;
+    internal CompiledRule(Func<LinkInput, bool> predicate) => _predicate = predicate;
 
     /// <exception cref="RegexMatchTimeoutException">A pattern exceeded its time budget.</exception>
-    public bool IsMatch(LinkContext link) => _predicate(link);
+    public bool IsMatch(LinkContext link) => _predicate(new LinkInput(link.Url, link.Source));
+
+    internal bool IsMatch(LinkInput link) => _predicate(link);
 }
 
 /// <summary>
@@ -46,15 +48,41 @@ public sealed record ConditionCompileResult(string? Error, IReadOnlyList<string?
     public bool Success => Error is null;
 }
 
+/// <summary>
+/// A rule list made ready for repeated matching: matching skips the check that each rule still looks
+/// the way it did when compiled. Holds a copy of the list, so prepare a new one whenever the rules change.
+/// Rules are compiled the first time matching reaches them, so a link that matches early pays for nothing below.
+/// </summary>
+public sealed class PreparedRules
+{
+    internal PreparedRules(IReadOnlyList<Rule> rules)
+    {
+        Rules = [.. rules];
+        Compiled = new RuleCompileResult?[Rules.Length];
+    }
+
+    internal Rule[] Rules { get; }
+
+    /// <summary>Filled in as matching reaches each rule. Two threads may both fill a slot; they'd store the same thing.</summary>
+    internal RuleCompileResult?[] Compiled { get; }
+}
+
+/// <summary>A rule's compiled form, with a copy of the conditions it was compiled from.</summary>
+internal sealed record CompiledRuleCache(RuleJoin Join, List<RuleCondition> Conditions, RuleCompileResult Result);
+
 public sealed record RuleCompileResult(CompiledRule? Rule, string? Error, IReadOnlyList<ConditionCompileResult> Conditions)
 {
     public bool Success => Rule is not null;
 }
 
-/// <summary>Ordered, first-match-wins rule evaluation with a compiled-pattern cache.</summary>
+/// <summary>
+/// Ordered, first-match-wins rule evaluation. Each rule is compiled once into a tree of string comparisons
+/// and kept until its contents change, so matching a link does no parsing and allocates almost nothing.
+/// </summary>
 public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     private readonly ConcurrentDictionary<(MatchKind, string, bool), PatternCompileResult> _cache = new();
     private readonly ConcurrentDictionary<string, SourceAppCompileResult> _sourceCache = new(StringComparer.Ordinal);
 
@@ -72,16 +100,16 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     }
 
     /// <summary>Compiles one condition or group. Blank values are ignored; a condition needs at least one other.</summary>
-    public (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition) =>
+    internal (Func<LinkInput, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition) =>
         Compile(condition, depth: 2);
 
     /// <param name="depth">The level this condition sits at: 2 directly in a rule, 3 inside a group.</param>
-    private (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition, int depth)
+    private (Func<LinkInput, bool>? Predicate, ConditionCompileResult Result) Compile(RuleCondition condition, int depth)
     {
         if (condition.IsGroup) return CompileGroup(condition, depth);
 
         var errors = new string?[condition.Values.Count];
-        var tests = new List<Func<LinkContext, bool>>();
+        var tests = new List<Func<LinkInput, bool>>();
         string? first = null;
 
         for (var i = 0; i < condition.Values.Count; i++)
@@ -105,7 +133,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
                 if (compiled.Success)
                 {
                     var p = compiled.Pattern!;
-                    tests.Add(link => p.IsMatch(link.Url));
+                    tests.Add(p.Predicate);
                 }
                 errors[i] = compiled.Error;
             }
@@ -116,17 +144,24 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
             first = condition.Field == ConditionField.SourceApp ? "Enter an app, e.g. ms-teams.exe." : "Enter a pattern.";
         if (first is not null) return (null, new ConditionCompileResult(first, errors));
 
-        var negate = condition.Negate;
-        var all = tests.ToArray();
-        return (link =>
-        {
-            foreach (var t in all)
-                if (t(link)) return !negate;
-            return negate;
-        }, new ConditionCompileResult(null, errors));
+        var any = AnyOf(tests);
+        return (condition.Negate ? link => !any(link) : any, new ConditionCompileResult(null, errors));
     }
 
+    /// <summary>Compiles a rule, or returns the compiled form from last time if the rule hasn't changed since.</summary>
     public RuleCompileResult Compile(Rule rule)
+    {
+        // Rules are edited in place, so the cache keeps a copy of what it was compiled from and is rebuilt
+        // once the rule no longer looks like that. A compiled rule depends on nothing but the conditions.
+        if (rule.Compiled is { } cached && cached.Join == rule.Join && SameConditions(cached.Conditions, rule.Conditions))
+            return cached.Result;
+
+        var result = CompileFresh(rule);
+        rule.Compiled = new CompiledRuleCache(rule.Join, rule.Conditions.Select(c => c.Clone()).ToList(), result);
+        return result;
+    }
+
+    private RuleCompileResult CompileFresh(Rule rule)
     {
         var (predicate, results, error) = CompileAll(rule.Conditions, rule.Join, depth: 2);
         if (rule.Conditions.Count == 0) error = "Add a condition.";
@@ -134,7 +169,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         return new RuleCompileResult(new CompiledRule(predicate!), null, results);
     }
 
-    private (Func<LinkContext, bool>? Predicate, ConditionCompileResult Result) CompileGroup(RuleCondition group, int depth)
+    private (Func<LinkInput, bool>? Predicate, ConditionCompileResult Result) CompileGroup(RuleCondition group, int depth)
     {
         if (depth > RuleCondition.MaxDepth)
             return (null, new ConditionCompileResult("Groups can only go two levels deep.", []));
@@ -149,11 +184,11 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     /// Compiles conditions joined by all/any. Errors name the condition by its position, with groups
     /// numbered like outlines: "Condition 3.2: Enter a pattern."
     /// </summary>
-    private (Func<LinkContext, bool>? Predicate, List<ConditionCompileResult> Results, string? Error) CompileAll(
+    private (Func<LinkInput, bool>? Predicate, List<ConditionCompileResult> Results, string? Error) CompileAll(
         List<RuleCondition> conditions, RuleJoin join, int depth)
     {
         var results = new List<ConditionCompileResult>(conditions.Count);
-        var predicates = new List<Func<LinkContext, bool>>(conditions.Count);
+        var predicates = new List<Func<LinkInput, bool>>(conditions.Count);
         string? error = null;
 
         for (var i = 0; i < conditions.Count; i++)
@@ -165,11 +200,64 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         }
         if (error is not null) return (null, results, error);
 
-        var all = predicates.ToArray();
-        Func<LinkContext, bool> combined = join == RuleJoin.Any
-            ? link => { foreach (var p in all) if (p(link)) return true; return false; }
-            : link => { foreach (var p in all) if (!p(link)) return false; return true; };
-        return (combined, results, null);
+        return (join == RuleJoin.Any ? AnyOf(predicates) : AllOf(predicates), results, null);
+    }
+
+    // A single test needs no wrapper, which keeps the common one-condition, one-value rule a single call deep.
+
+    private static Func<LinkInput, bool> AnyOf(List<Func<LinkInput, bool>> tests)
+    {
+        if (tests.Count == 1) return tests[0];
+        if (tests.Count == 2)
+        {
+            var (a, b) = (tests[0], tests[1]);
+            return link => a(link) || b(link);
+        }
+        var all = tests.ToArray();
+        return link =>
+        {
+            foreach (var t in all)
+                if (t(link)) return true;
+            return false;
+        };
+    }
+
+    private static Func<LinkInput, bool> AllOf(List<Func<LinkInput, bool>> tests)
+    {
+        if (tests.Count == 1) return tests[0];
+        if (tests.Count == 2)
+        {
+            var (a, b) = (tests[0], tests[1]);
+            return link => a(link) && b(link);
+        }
+        var all = tests.ToArray();
+        return link =>
+        {
+            foreach (var t in all)
+                if (!t(link)) return false;
+            return true;
+        };
+    }
+
+    /// <summary>
+    /// Whether two condition lists would compile the same. Unchanged strings are the same objects, so this is quick.
+    /// Compares every field <see cref="RuleCondition.Clone"/> copies; a new condition field needs adding to both.
+    /// </summary>
+    private static bool SameConditions(List<RuleCondition>? a, List<RuleCondition>? b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a is null || b is null || a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++)
+        {
+            var (x, y) = (a[i], b[i]);
+            if (x.Field != y.Field || x.Join != y.Join || x.MatchKind != y.MatchKind || x.CaseSensitive != y.CaseSensitive ||
+                x.Negate != y.Negate || x.Values.Count != y.Values.Count || !SameConditions(x.Conditions, y.Conditions))
+                return false;
+            for (var v = 0; v < x.Values.Count; v++)
+                if (!string.Equals(x.Values[v], y.Values[v], StringComparison.Ordinal))
+                    return false;
+        }
+        return true;
     }
 
     /// <summary>"Condition 2: x" for a direct error; "Condition 3: Condition 2: x" folds into "Condition 3.2: x".</summary>
@@ -181,56 +269,73 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         return $"{prefix}{number}: {error}";
     }
 
+    /// <summary>Runs <paramref name="url"/> past every rule and reports what each one did (for the rule tester).</summary>
     public MatchResult Match(Uri url, IReadOnlyList<Rule> rules, SourceApp? source = null)
     {
         var started = Stopwatch.GetTimestamp();
-        var now = _time.GetUtcNow();
-        var link = new LinkContext(url, source);
         var evaluations = new RuleEvaluation[rules.Count];
-        Rule? winner = null;
-        var winnerIndex = -1;
+        var index = Evaluate(new LinkInput(url, source), rules, evaluations, null);
+        for (var i = index + 1; index >= 0 && i < rules.Count; i++)
+            evaluations[i] = new(rules[i], RuleEvaluationState.NotReached);
+        return new MatchResult(url, source, index >= 0 ? rules[index] : null, index, evaluations, Stopwatch.GetElapsedTime(started));
+    }
 
+    /// <summary>The first matching rule and its index, without the per-rule report <see cref="Match"/> builds.</summary>
+    public (Rule? Rule, int Index) FindMatch(Uri url, IReadOnlyList<Rule> rules, SourceApp? source = null)
+    {
+        var index = Evaluate(new LinkInput(url, source), rules, null, null);
+        return index >= 0 ? (rules[index], index) : (null, -1);
+    }
+
+    /// <summary>Copies <paramref name="rules"/> for the fastest matching, as long as they don't change. See <see cref="PreparedRules"/>.</summary>
+    public PreparedRules Prepare(IReadOnlyList<Rule> rules) => new(rules);
+
+    /// <inheritdoc cref="FindMatch(Uri, IReadOnlyList{Rule}, SourceApp?)"/>
+    public (Rule? Rule, int Index) FindMatch(Uri url, PreparedRules rules, SourceApp? source = null)
+    {
+        var index = Evaluate(new LinkInput(url, source), rules.Rules, null, rules.Compiled);
+        return index >= 0 ? (rules.Rules[index], index) : (null, -1);
+    }
+
+    /// <summary>
+    /// Index of the first matching rule, or -1. Fills <paramref name="evaluations"/> up to that rule when given.
+    /// <paramref name="prepared"/>, when given, holds compiled rules known to be current (see <see cref="PreparedRules"/>).
+    /// </summary>
+    private int Evaluate(LinkInput link, IReadOnlyList<Rule> rules, RuleEvaluation[]? evaluations, RuleCompileResult?[]? prepared)
+    {
+        var now = _time.GetUtcNow();
         for (var i = 0; i < rules.Count; i++)
         {
             var rule = rules[i];
-            if (winner is not null)
+            RuleEvaluation outcome;
+            var compiled = !rule.IsActive(now, boot) ? null : prepared is null ? Compile(rule) : prepared[i] ??= Compile(rule);
+            if (compiled is null)
             {
-                evaluations[i] = new(rule, RuleEvaluationState.NotReached);
-                continue;
+                outcome = new(rule, RuleEvaluationState.Inactive);
             }
-            if (!rule.IsActive(now, boot))
+            else if (compiled.Rule is null)
             {
-                evaluations[i] = new(rule, RuleEvaluationState.Inactive);
-                continue;
+                outcome = new(rule, RuleEvaluationState.Error, compiled.Error);
             }
-
-            var compiled = Compile(rule);
-            if (!compiled.Success)
+            else
             {
-                evaluations[i] = new(rule, RuleEvaluationState.Error, compiled.Error);
-                continue;
-            }
-
-            try
-            {
-                if (compiled.Rule!.IsMatch(link))
+                try
                 {
-                    winner = rule;
-                    winnerIndex = i;
-                    evaluations[i] = new(rule, RuleEvaluationState.Matched);
+                    if (compiled.Rule.IsMatch(link))
+                    {
+                        if (evaluations is not null) evaluations[i] = new(rule, RuleEvaluationState.Matched);
+                        return i;
+                    }
+                    outcome = new(rule, RuleEvaluationState.NoMatch);
                 }
-                else
+                catch (RegexMatchTimeoutException)
                 {
-                    evaluations[i] = new(rule, RuleEvaluationState.NoMatch);
+                    outcome = new(rule, RuleEvaluationState.Error, "Match timed out and was skipped.");
                 }
             }
-            catch (RegexMatchTimeoutException)
-            {
-                evaluations[i] = new(rule, RuleEvaluationState.Error, "Match timed out and was skipped.");
-            }
+            if (evaluations is not null) evaluations[i] = outcome;
         }
-
-        return new MatchResult(url, source, winner, winnerIndex, evaluations, Stopwatch.GetElapsedTime(started));
+        return -1;
     }
 
     private static int Count(RuleCondition c) => c.Values.Count(v => !string.IsNullOrWhiteSpace(v));
