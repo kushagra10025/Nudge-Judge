@@ -104,7 +104,7 @@ public sealed class BrowserDiscoveryTests : IDisposable
         Assert.Empty(Discover());
     }
 
-    [Fact]
+    [LinuxFact]
     public void Linux_accepts_http_and_https_handlers_without_category()
     {
         var chrome = Path.Combine(_root, "opt/google/chrome-stable");
@@ -116,7 +116,7 @@ public sealed class BrowserDiscoveryTests : IDisposable
         Assert.Equal("--flag", b.Arguments);
     }
 
-    [Fact]
+    [LinuxFact]
     public void Linux_flatpak_entry_keeps_run_command_and_gets_private_flag()
     {
         var flatpak = Path.Combine(_root, "bin/flatpak");
@@ -223,7 +223,7 @@ public sealed class BrowserDiscoveryTests : IDisposable
         }
     }
 
-    [Fact]
+    [LinuxFact]
     public void Chromium_profiles_read_from_local_state()
     {
         var linkDir = Dir("bin2");

@@ -115,7 +115,7 @@ public sealed class LinuxRegistrarTests : IDisposable
         Assert.Equal([executable, BrowserLauncher.UrlPlaceholder], argv);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Program_path_with_spaces_goes_through_a_wrapper_xdg_utils_can_read()
     {
         var registrar = Registrar(["/home/me/My Apps/NudgeJudge"]);
@@ -127,10 +127,10 @@ public sealed class LinuxRegistrarTests : IDisposable
         Assert.Equal($"{registrar.LauncherPath} %u", exec);
     }
 
-    [Fact]
+    [LinuxFact]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     public async Task Wrapper_runs_the_app_with_the_link_intact()
     {
-        if (!OperatingSystem.IsLinux()) return;
 
         // A program whose path needs every kind of shell quoting, which echoes its argv.
         var dir = Path.Combine(_dataHome, "My Apps", "it's \"odd\" $HOME `x`");
@@ -170,7 +170,7 @@ public sealed class LinuxRegistrarTests : IDisposable
             LinuxBrowserDiscovery.ParseExec(LinuxBrowserDiscovery.Unescape(exec)));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Icon_is_installed_and_referenced_when_supplied()
     {
         byte[] png = [0x89, 0x50, 0x4E, 0x47];
@@ -282,7 +282,9 @@ public sealed class RegistrationPlumbingTests
         // .NET lives in ~/.dotnet and only ~/.bashrc sets DOTNET_ROOT. Desktop apps (VS Code, mail, chat) start the
         // link handler without it, so the app's own launcher can't find .NET: run the dll on that runtime's host.
         const string app = "/src/NudgeJudge.Desktop/bin/Debug/net10.0/NudgeJudge.Desktop";
-        Assert.Equal(["/home/me/.dotnet/dotnet", app + ".dll"],
+        // The host's name follows the OS (dotnet.exe on Windows), so this checks both branches.
+        var host = Path.Combine("/home/me/.dotnet", OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
+        Assert.Equal([host, app + ".dll"],
             AppLaunchCommand.Resolve(app, app + ".dll", null, "/home/me/.dotnet", ["/usr/lib/dotnet", "/usr/share/dotnet"]));
     }
 
@@ -333,6 +335,22 @@ public sealed class RegistrationPlumbingTests
 public sealed class WindowsRegistrationPlanTests
 {
     private const string Exe = @"C:\Users\me\AppData\Local\Programs\NudgeJudge\NudgeJudge.Desktop.exe";
+
+    [Fact]
+    public void Windows_uninstall_removes_everything_registering_wrote_and_nothing_shared()
+    {
+        var plan = WindowsRegistration.Build([Exe])!;
+        foreach (var value in plan.Values)
+        {
+            var underOwnedKey = WindowsRegistration.OwnedKeys.Any(k =>
+                value.Key.Equals(k, StringComparison.OrdinalIgnoreCase) ||
+                value.Key.StartsWith(k + @"\", StringComparison.OrdinalIgnoreCase));
+            var ownedValue = WindowsRegistration.OwnedValues.Contains((value.Key, value.Name ?? ""));
+            Assert.True(underOwnedKey || ownedValue, $@"Uninstall would leave {value.Key}\{value.Name}");
+        }
+        // Whole keys removed are ours alone: never a shared parent such as Software\Classes or RegisteredApplications.
+        Assert.All(WindowsRegistration.OwnedKeys, k => Assert.Contains("NudgeJudge", k));
+    }
 
     private static string? ValueOf(WindowsRegistration.Plan plan, string key, string? name) =>
         plan.Values.SingleOrDefault(v => v.Key == key && v.Name == name)?.Data;

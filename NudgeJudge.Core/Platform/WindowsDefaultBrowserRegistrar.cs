@@ -59,6 +59,30 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
             "Default apps is open. Choose NudgeJudge there (“Set default”), then come back here.");
     }, cancellationToken);
 
+    /// <summary>
+    /// Removes everything <see cref="RegisterAsync"/> wrote, for the uninstaller. Only when the registration points at
+    /// this copy: another copy (a dev build, a second install) registered since keeps its own. Windows keeps the user's
+    /// protected default choice; with the ProgId gone it asks which browser to use next time. Returns true if removed.
+    /// </summary>
+    public bool Unregister()
+    {
+        if (Plan is not { } plan) return false;
+        using (var command = Registry.CurrentUser.OpenSubKey(WindowsRegistration.ProgIdCommandKey))
+        {
+            if (command?.GetValue(null) as string != plan.OpenCommand) return false;
+        }
+
+        foreach (var key in WindowsRegistration.OwnedKeys)
+            Registry.CurrentUser.DeleteSubKeyTree(key, throwOnMissingSubKey: false);
+        foreach (var (key, name) in WindowsRegistration.OwnedValues)
+        {
+            using var parent = Registry.CurrentUser.OpenSubKey(key, writable: true);
+            parent?.DeleteValue(name, throwOnMissingValue: false);
+        }
+        SHChangeNotify(ShcneAssocChanged, ShcnfIdList, IntPtr.Zero, IntPtr.Zero);
+        return true;
+    }
+
     private RegistrationStatus ReadStatus()
     {
         if (Plan is not { } plan) return CantLocateSelf;
@@ -108,6 +132,14 @@ internal static class WindowsRegistration
     public const string CapabilitiesKey = ClientKey + @"\Capabilities";
     private const string Description = "Opens each link in the browser your rules choose.";
 
+    private const string RegisteredApplicationsKey = @"Software\RegisteredApplications";
+
+    /// <summary>Keys that are NudgeJudge's alone, removed whole on uninstall.</summary>
+    public static IReadOnlyList<string> OwnedKeys { get; } = [ProgIdKey, ClientKey];
+
+    /// <summary>NudgeJudge's values inside keys other apps share, removed one by one on uninstall.</summary>
+    public static IReadOnlyList<(string Key, string Name)> OwnedValues { get; } = [(RegisteredApplicationsKey, AppName)];
+
     /// <param name="Name">Value name; null is the key's default value.</param>
     public sealed record Value(string Key, string? Name, string Data);
 
@@ -144,7 +176,7 @@ internal static class WindowsRegistration
             new(CapabilitiesKey + @"\URLAssociations", "http", ProgId),
             new(CapabilitiesKey + @"\URLAssociations", "https", ProgId),
 
-            new(@"Software\RegisteredApplications", AppName, CapabilitiesKey),
+            new(RegisteredApplicationsKey, AppName, CapabilitiesKey),
         ]);
     }
 

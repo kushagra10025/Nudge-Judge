@@ -20,7 +20,7 @@ internal sealed class Program
         // Must run first: the installer and updater start the app with hook arguments, handled here and then exited.
         var velopack = VelopackApp.Build();
         // Only the Windows installer runs uninstall hooks (Linux ships as a single AppImage file).
-        if (OperatingSystem.IsWindows()) velopack.OnBeforeUninstallFastCallback(_ => RemoveStartupEntry());
+        if (OperatingSystem.IsWindows()) velopack.OnBeforeUninstallFastCallback(_ => CleanUpBeforeUninstall());
         velopack.Run();
 
         var launch = LaunchArguments.Parse(args);
@@ -46,9 +46,13 @@ internal sealed class Program
         return BuildAvaloniaApp(claim, launch.Source, core, pending).StartWithClassicDesktopLifetime(args);
     }
 
-    /// <summary>Uninstalling deletes the app, so a startup entry left behind would point at nothing.</summary>
-    private static void RemoveStartupEntry()
+    /// <summary>
+    /// Uninstalling deletes the app, so the startup entry and the browser registration would point at nothing.
+    /// Each step is best effort: the uninstall goes ahead regardless.
+    /// </summary>
+    private static void CleanUpBeforeUninstall()
     {
+        if (!OperatingSystem.IsWindows()) return;
         try
         {
             var startup = LaunchAtStartup.ForCurrentPlatform();
@@ -57,6 +61,15 @@ internal sealed class Program
         catch (Exception e)
         {
             Trace.TraceWarning($"NudgeJudge: couldn't remove the startup entry on uninstall: {e.Message}");
+        }
+
+        try
+        {
+            new WindowsDefaultBrowserRegistrar(AppLaunchCommand.Current()).Unregister();
+        }
+        catch (Exception e)
+        {
+            Trace.TraceWarning($"NudgeJudge: couldn't remove the browser registration on uninstall: {e.Message}");
         }
     }
 

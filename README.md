@@ -41,7 +41,7 @@ NudgeJudge receives URLs from any app on the machine, so every URL is treated as
 
 `config.json` and `activity.log` are rewritten whole on every change. Each write follows the same steps:
 
-1. **Lock.** The writer takes an exclusive lock on a sidecar file (`config.json.lock`, `activity.log.lock`), so a standalone launch and the running instance can't interleave. A config update that can't get the lock within 2 seconds goes ahead without it rather than freeze the UI.
+1. **Lock.** The writer takes an exclusive lock on a sidecar file (`config.json.lock`, `activity.log.lock`), so a standalone launch and the running instance can't interleave. Waiters queue on a second file (`….lock.turn`) while they wait, so a process writing in a burst (many links at once) can't keep taking the lock back before a waiting one gets a turn. A config update that can't get the lock within 2 seconds goes ahead without it rather than freeze the UI.
 2. **Re-read if changed.** If another process rewrote the config since this one last saw it, the store reloads it first and then applies its change, so neither side's edits are lost. Updates find rules and browsers by id, never by list position.
 3. **Atomic replace.** The new contents go to a temp file in the same directory, are flushed to disk, then renamed over the old file. Readers see the old version or the new one, never half of each. On Linux and macOS the directory is fsynced too, so the rename survives a power cut.
 
@@ -224,7 +224,7 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 
 **Limitations right now**
 
-- Registering from `dotnet run` points the OS at your build output; register again from the installed app once packaging exists. Registration can't be undone from inside the app yet (pick another browser in your system settings instead).
+- Registering from `dotnet run` points the OS at your build output; register again from the installed app once packaging exists. Registration can't be undone from inside the app yet (pick another browser in your system settings instead). Uninstalling on Windows removes it, along with the startup entry, when it points at the copy being uninstalled.
 - Default-browser registration and launch at startup aren't available on macOS yet.
 - Browser scanning isn't available on macOS yet.
 - A launch that only came to open links stays running as the server only when "keep running in tray" is on; otherwise it exits once its links are handled.

@@ -437,12 +437,12 @@ public class SourceAppDetectorTests
         public SourceApp? EnvironmentHint => null;
     }
 
-    [Theory]
+    [LinuxTheory]
     [InlineData("1234 (teams-for-linux) S 99 1234 1234 0 -1 4194560 1 0 0 0 0 0 0 0 20 0 1 0 5551 0 0", "teams-for-linux", 99, 5551L)]
     [InlineData("77 (Web Content (x)) R 12 77 0 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 42 0 0", "Web Content (x)", 12, 42L)]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     public void Parses_proc_stat_with_awkward_names(string stat, string name, int parent, long started)
     {
-        if (!OperatingSystem.IsLinux()) return;
         var info = LinuxProcessTable.ParseStat(1, stat, null);
         Assert.NotNull(info);
         Assert.Equal(name, info.Name);
@@ -450,10 +450,10 @@ public class SourceAppDetectorTests
         Assert.Equal(started, info.Started);
     }
 
-    [Fact]
+    [LinuxFact]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
     public void Reads_a_proc_tree_and_desktop_names_from_disk()
     {
-        if (!OperatingSystem.IsLinux()) return;
         var root = Directory.CreateTempSubdirectory("nj-proc-").FullName;
         try
         {

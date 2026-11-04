@@ -175,4 +175,35 @@ public sealed class ConfigStoreTests : IDisposable
 
         Assert.Equal(20, new ActivityLogFile(path).Read().Count);
     }
+
+    [Fact]
+    public async Task A_waiting_writer_gets_a_turn_between_another_writers_back_to_back_holds()
+    {
+        // The holder releases and immediately takes the lock again, as a burst of links does. A waiter that only
+        // polls never lands in that gap; it has to be let in.
+        var path = Path.Combine(_dir, "burst.lock");
+        using var stop = new CancellationTokenSource();
+        using var hogging = new ManualResetEventSlim();
+        var hog = Task.Run(() =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                using (FileLock.Acquire(path))
+                {
+                    hogging.Set();
+                    Thread.Sleep(40);
+                }
+            }
+        });
+        try
+        {
+            Assert.True(hogging.Wait(TimeSpan.FromSeconds(5)));
+            using (FileLock.Acquire(path, TimeSpan.FromSeconds(1))) { }
+        }
+        finally
+        {
+            stop.Cancel();
+            await hog;
+        }
+    }
 }
