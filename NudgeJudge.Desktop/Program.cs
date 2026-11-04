@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
 using Avalonia;
+using Velopack;
 using NudgeJudge.Core;
 using NudgeJudge.Core.Ipc;
 using NudgeJudge.Core.Platform;
@@ -16,6 +17,12 @@ internal sealed class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Must run first: the installer and updater start the app with hook arguments, handled here and then exited.
+        var velopack = VelopackApp.Build();
+        // Only the Windows installer runs uninstall hooks (Linux ships as a single AppImage file).
+        if (OperatingSystem.IsWindows()) velopack.OnBeforeUninstallFastCallback(_ => RemoveStartupEntry());
+        velopack.Run();
+
         var launch = LaunchArguments.Parse(args);
         // First thing, while the app that opened the link is still our parent (helpers like xdg-open exit quickly).
         if (launch.Urls.Count > 0) launch = launch with { Source = SourceAppDetector.ForCurrentPlatform().Detect() };
@@ -37,6 +44,20 @@ internal sealed class Program
         }
 
         return BuildAvaloniaApp(claim, launch.Source, core, pending).StartWithClassicDesktopLifetime(args);
+    }
+
+    /// <summary>Uninstalling deletes the app, so a startup entry left behind would point at nothing.</summary>
+    private static void RemoveStartupEntry()
+    {
+        try
+        {
+            var startup = LaunchAtStartup.ForCurrentPlatform();
+            if (startup.IsSupported && startup.IsEnabled()) startup.SetEnabled(false);
+        }
+        catch (Exception e)
+        {
+            Trace.TraceWarning($"NudgeJudge: couldn't remove the startup entry on uninstall: {e.Message}");
+        }
     }
 
     private static InstanceClaim? ClaimInstance(LaunchArguments launch)

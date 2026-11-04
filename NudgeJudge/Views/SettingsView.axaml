@@ -158,6 +158,61 @@
         </StackPanel>
       </Border>
 
+      <TextBlock Classes="section" Text="Updates" />
+      <Border Classes="surface" DataContext="{Binding Updates}" x:DataType="vm:UpdatesViewModel" IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Check for updates automatically" />
+              <TextBlock Classes="body muted" Text="Looks for a new release on GitHub. Nothing is downloaded until you choose to update." />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding CheckAutomatically}" OnContent="On" OffContent="Off"
+                          IsEnabled="{Binding IsSupported}" AutomationProperties.Name="Check for updates automatically" />
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="How often" />
+              <TextBlock Classes="body muted" Text="While NudgeJudge stays in the tray, daily and weekly checks still run on time." />
+            </StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Frequencies}" SelectedItem="{Binding Frequency}" MinWidth="180"
+                      VerticalAlignment="Center" AutomationProperties.Name="How often to check for updates">
+              <ComboBox.IsEnabled>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="IsSupported" />
+                  <Binding Path="CheckAutomatically" />
+                </MultiBinding>
+              </ComboBox.IsEnabled>
+            </ComboBox>
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="{Binding StatusText}" TextWrapping="Wrap" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="label" Text="{Binding CurrentVersion, StringFormat='Version {0}'}"
+                         IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+              <TextBlock Classes="body muted" Text="{Binding LastCheckedText}" IsVisible="{Binding IsSupported}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="accent" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Data="{StaticResource Icon.Down}" />
+                  <TextBlock Text="{Binding UpdateLabel}" />
+                </StackPanel>
+              </Button>
+              <Button Command="{Binding CheckNowCommand}" IsVisible="{Binding !HasUpdate}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Data="{StaticResource Icon.Refresh}" />
+                  <TextBlock Text="Check now" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Minimum="0" Maximum="100" Value="{Binding Progress}"
+                         IsIndeterminate="{Binding !IsDownloading}" IsVisible="{Binding IsBusy}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <TextBlock Classes="section" Text="Files" />
       <Border Classes="surface">
         <StackPanel>
@@ -173,6 +228,30 @@
                                  Text="{Binding ActivityLogPath}" Margin="0,4,0,0" TextWrapping="Wrap" />
           </Grid>
         </StackPanel>
+      </Border>
+
+      <!-- Last: who made this and where it lives -->
+      <TextBlock Classes="section" Text="About" />
+      <Border Classes="surface">
+        <Grid Classes="setting" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+          <Image Source="/Assets/nudgejudge.png" Width="48" Height="48" Margin="0,2,16,0" VerticalAlignment="Top" />
+          <StackPanel Grid.Column="1" Spacing="2">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Classes="label" Text="NudgeJudge" FontSize="15" />
+              <TextBlock Classes="muted mono" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,0,1"
+                         Text="{Binding AppVersion, StringFormat='v{0}'}" />
+            </StackPanel>
+            <TextBlock Classes="body muted" TextWrapping="Wrap"
+                       Text="A browser router: every link goes to the browser or profile your rules pick, or to a quick chooser when none do." />
+            <TextBlock Classes="body muted" Text="© 2026 Kushagra · MIT License" Margin="0,6,0,0" />
+          </StackPanel>
+          <WrapPanel Grid.Row="1" Grid.Column="1" Margin="-8,8,0,0">
+            <HyperlinkButton Content="Source on GitHub" NavigateUri="{Binding RepositoryUrl}" />
+            <HyperlinkButton Content="Release notes" NavigateUri="{Binding ReleasesUrl}" />
+            <HyperlinkButton Content="Report a problem" NavigateUri="{Binding IssuesUrl}" />
+            <HyperlinkButton Content="License" NavigateUri="{Binding LicenseUrl}" />
+          </WrapPanel>
+        </Grid>
       </Border>
     </StackPanel>
   </ScrollViewer>

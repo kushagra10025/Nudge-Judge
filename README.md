@@ -22,6 +22,7 @@ Built with [Avalonia UI](https://avaloniaui.net/) and .NET 10 (C#), using a stri
 - **Activity log.** Shows every link handled, the app it was opened from, and the rule or choice that sent it where it went. It's kept between runs in `activity.log` next to the config (one JSON object per line, owner-only). Settings → Activity sets how many entries to keep (100 by default; the oldest are deleted past that) or turns logging off. "Create rule" on an entry opens the rule editor with a pattern suggested from the link and the browser it went to; "Opened from" then starts with that entry's app.
 - **Tray menu.** Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit.
 - **Light and dark themes**, following the system by default.
+- **Updates.** Installed copies check GitHub Releases on startup, daily or weekly (Settings → Updates, or "Check now"). A new release shows a dismissable notice above the routing switch in the sidebar. "Update and restart" downloads it (as a small delta when possible), installs it and restarts. Nothing is downloaded until you click. Settings → About shows the version and project links.
 - **Default-browser setup** from Settings → "Make default":
   - **Linux:** installs `~/.local/share/applications/nudgejudge.desktop` and makes it the `x-scheme-handler/http` and `https` default via `xdg-mime`. It deliberately does not claim `text/html`, so local HTML files keep opening in a real browser.
   - **Windows:** registers NudgeJudge per user (HKCU, no admin) as a browser with Capabilities, then opens *Default apps*. Windows only lets the user pick the default, so you click "Set default" there. NudgeJudge checks again when you return to its window.
@@ -144,6 +145,26 @@ The config file is stored at:
 
 > **Linux tray:** works on KDE, Cinnamon and most other desktops. GNOME needs the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).
 
+## Releasing
+
+Installers and updates are built with [Velopack](https://velopack.io) and hosted on GitHub Releases. To release, push a semantic-version tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) then builds the native app for `win-x64` and `linux-x64` with that version, packs it with `vpk` (a `Setup.exe` for Windows and an AppImage for Linux, plus delta packages against the previous release) and uploads both to one release. Installed copies pick it up on their next check.
+
+To try the update flow locally, install the `vpk` tool (same version as the `Velopack` package), then pack two versions into the same folder and install the older one:
+
+```bash
+dotnet tool install -g vpk --version 1.2.161
+dotnet publish NudgeJudge.Desktop -c Release -r linux-x64 -p:Version=0.1.0 -o publish
+vpk pack --packId NudgeJudge --packVersion 0.1.0 --packDir publish --mainExe NudgeJudge.Desktop
+```
+
+Copies run with `dotnet run` or from a plain publish folder aren't installed, so Settings → Updates says updates aren't available there and nothing is checked.
+
 ## Project structure
 
 ```
@@ -167,7 +188,8 @@ NudgeJudge/               Avalonia UI library
   ViewModels/             CommunityToolkit.Mvvm view models; they reach windows only through interfaces in Services/
   Views/                  MainWindow, the Rules/Browsers/Activity/Settings pages, ChooserWindow
   Controls/               RouteDiagram, MatchKindGlyph, Icon (custom-drawn controls)
-  Services/               IWindowService, IDialogService, IThemeService, IUiDispatcher + Avalonia implementations
+  Services/               IWindowService, IDialogService, IThemeService, IUiDispatcher + Avalonia implementations;
+                          IUpdateService + its Velopack implementation (GitHub Releases), AppInfo (version, project links)
   Styles/                 Theme.axaml (colour and icon resources), Styles.axaml (shared styles)
   App.axaml(.cs)          Composition root and tray icon
 
@@ -197,7 +219,8 @@ Every incoming link goes through `LinkRouter.Route(string)`. That's the command 
 - [x] Persistent activity log: rolling file with a configurable limit, an off switch, and "create rule from this entry"
 - [x] Single instance with secure local messaging: the first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second. Unix domain socket in an owner-only directory (`$XDG_RUNTIME_DIR/nudgejudge` on Linux), socket `0600`, peer uid checked with `SO_PEERCRED` on Linux; per-user named pipe on Windows (current-user ACL, server owner verified, first-instance check against squatting). A fresh random token per session is stored in a `0600` file and checked in constant time; messages are size-, count- and time-limited; every URL is validated again on receipt. If no server answers within 5 seconds, a launch handles its links itself rather than drop them
 - [x] Launch at startup, switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings
-- [x] 788 core test cases and 37 headless UI tests
+- [x] Update checks and one-click updates from GitHub Releases (Velopack), with a sidebar notice and Settings → Updates / About
+- [x] 788 core test cases and 48 headless UI tests
 
 **Limitations right now**
 
@@ -216,7 +239,7 @@ Roughly in order:
 
 1. **Windows save hardening.** Write-through renames, retries on transient sharing errors, and CI on Windows (see [above](#windows-known-gaps-and-planned-fixes)).
 2. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-3. **Packaging.** Linux AppImage or Flatpak, Windows installer (MSIX or Inno Setup), and the Linux executable renamed to `nudgejudge`. Packages should ship the native (AOT) build.
+3. **Packaging.** The Velopack release workflow (Windows `Setup.exe`, Linux AppImage) needs a first real run; then a Flatpak, and the Linux executable renamed to `nudgejudge`.
 4. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
 
 ## Contributing

@@ -61,3 +61,16 @@ public sealed record RememberOption(RememberKind Kind, string Label)
     public bool SavesRule => Kind != RememberKind.Once;
     public override string ToString() => Label;
 }
+
+public sealed record UpdateFrequencyOption(UpdateCheckFrequency Value, string Label)
+{
+    public static IReadOnlyList<UpdateFrequencyOption> All { get; } =
+    [
+        new(UpdateCheckFrequency.Startup, "Every time it starts"),
+        new(UpdateCheckFrequency.Daily, "Once a day"),
+        new(UpdateCheckFrequency.Weekly, "Once a week"),
+    ];
+
+    public static UpdateFrequencyOption For(UpdateCheckFrequency value) => All.FirstOrDefault(o => o.Value == value) ?? All[0];
+    public override string ToString() => Label;
+}

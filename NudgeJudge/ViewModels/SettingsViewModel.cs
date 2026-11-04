@@ -25,8 +25,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private bool _refreshing;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
-        ILaunchAtStartup startup)
+        ILaunchAtStartup startup, UpdatesViewModel? updates = null)
     {
+        Updates = updates;
         _config = config;
         _startup = startup;
         _registrar = registrar;
@@ -34,12 +35,23 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _dispatcher = dispatcher;
         ConfigPath = AppPaths.ConfigFile;
         ActivityLogPath = AppPaths.ActivityLogFile;
+        // Guarded: this placeholder must not be saved over the user's theme before Load reads it.
+        _loading = true;
         Theme = ThemeOption.All[0];
         config.Changed += (_, _) => dispatcher.Post(Load);
         Load();
     }
 
     public ObservableCollection<BrowserOption> Browsers { get; } = [];
+
+    /// <summary>Settings → Updates and the sidebar update toast. Null where updates aren't wired up (tests).</summary>
+    public UpdatesViewModel? Updates { get; }
+
+    public string AppVersion => Updates?.CurrentVersion ?? AppInfo.BuildVersion;
+    public Uri RepositoryUrl { get; } = new(AppInfo.RepositoryUrl);
+    public Uri ReleasesUrl { get; } = new(AppInfo.ReleasesUrl);
+    public Uri IssuesUrl { get; } = new(AppInfo.IssuesUrl);
+    public Uri LicenseUrl { get; } = new(AppInfo.LicenseUrl);
     public IReadOnlyList<ThemeOption> Themes => ThemeOption.All;
     public string ConfigPath { get; }
     public string ActivityLogPath { get; }

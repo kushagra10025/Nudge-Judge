@@ -197,6 +197,37 @@
     <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
   </Style>
 
+  <!-- Update toast on the signalling panel: raised like the routing signal, edged in lamp amber -->
+  <Style Selector="Border.update-toast">
+    <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PanelLampBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="12" />
+  </Style>
+  <Style Selector="Button.panel-icon">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource PanelMutedBrush}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.panel-icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PanelHoverBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PanelInkBrush}" />
+  </Style>
+  <Style Selector="ProgressBar.panel">
+    <Setter Property="Foreground" Value="{StaticResource PanelLampBrush}" />
+    <Setter Property="Background" Value="{StaticResource PanelLineBrush}" />
+    <!-- Fluent's 200px minimum is wider than the sidebar card -->
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="4" />
+    <Setter Property="Height" Value="4" />
+  </Style>
+
   <!-- Rows -->
   <Style Selector="Border.row">
     <Setter Property="Background" Value="Transparent" />

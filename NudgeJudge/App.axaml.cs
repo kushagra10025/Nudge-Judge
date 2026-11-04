@@ -76,7 +76,8 @@ public partial class App : Application
         var registrar = DefaultBrowserRegistration.ForCurrentPlatform(ReadAppIcon);
         var startup = LaunchAtStartup.ForCurrentPlatform();
         RefreshStartupEntry(startup);
-        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup);
+        var updates = new UpdatesViewModel(config, new VelopackUpdateService(), dispatcher);
+        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup, updates);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
@@ -114,6 +115,20 @@ public partial class App : Application
             desktop.Shutdown();
         }
         windows.AllWindowsClosed += (_, _) => ExitIfIdle();
+
+        // Installing an update closes this process: save what's pending and let the next launch take over the server.
+        updates.PreparingToRestart = () =>
+        {
+            settings.FlushPendingSaves();
+            Instance?.StopServer();
+        };
+        // Only a process that sticks around checks; one that just routes a link and exits never touches the network.
+        if (launch.Urls.Count == 0 || serving)
+        {
+            var schedule = new CancellationTokenSource();
+            desktop.Exit += (_, _) => schedule.Cancel();
+            _ = updates.RunScheduleAsync(schedule.Token);
+        }
 
         if (launch.Urls.Count == 0)
         {

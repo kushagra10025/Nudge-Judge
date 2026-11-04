@@ -265,6 +265,10 @@ public sealed class BrowserProfile
 [JsonConverter(typeof(JsonStringEnumConverter<ThemePreference>))]
 public enum ThemePreference { System, Light, Dark }
 
+/// <summary>How often the app looks for a newer release on its own.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<UpdateCheckFrequency>))]
+public enum UpdateCheckFrequency { Startup, Daily, Weekly }
+
 public sealed class AppSettings
 {
     /// <summary>When false every link passes straight through to <see cref="PrimaryBrowserId"/>.</summary>
@@ -292,6 +296,14 @@ public sealed class AppSettings
     /// Absent from configs written before first-run onboarding existed, so those users are never asked.
     /// </summary>
     public bool OfferSamples { get; set; }
+
+    /// <summary>Look for a newer release without being asked. Off means only Settings → "Check now".</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    public UpdateCheckFrequency UpdateCheckFrequency { get; set; } = UpdateCheckFrequency.Startup;
+
+    /// <summary>When the last automatic or manual check finished, so daily and weekly checks survive restarts.</summary>
+    public DateTimeOffset? LastUpdateCheck { get; set; }
 }
 
 public sealed class AppConfig

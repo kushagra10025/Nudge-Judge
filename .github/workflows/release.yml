@@ -1,0 +1,63 @@
+# Push a tag like v0.2.0 to build the native app for Windows and Linux, pack it with Velopack
+# and publish both to one GitHub Release. Installed copies find it from Settings → Updates.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  # Keep in step with the Velopack package version in Directory.Packages.props.
+  VPK_VERSION: 1.2.161
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Version from tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+      - run: dotnet test -c Release
+      - run: dotnet publish NudgeJudge.Desktop -c Release -r win-x64 -p:Version=${{ env.VERSION }} -o publish
+      # Fetches the previous release so this one can ship as a small delta. Nothing to fetch on the first release.
+      - run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - run: >
+          vpk pack --packId NudgeJudge --packVersion ${{ env.VERSION }} --packDir publish
+          --mainExe NudgeJudge.Desktop.exe --packTitle NudgeJudge --packAuthors Kushagra
+          --icon NudgeJudge/Assets/nudgejudge.ico
+      - run: >
+          vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+          --tag ${{ github.ref_name }} --releaseName "NudgeJudge ${{ env.VERSION }}" --merge --publish
+
+  # After Windows, so the two jobs don't race to create the release; this one adds the Linux files to it.
+  linux:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+      - run: dotnet publish NudgeJudge.Desktop -c Release -r linux-x64 -p:Version=${{ env.VERSION }} -o publish
+      - run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - run: >
+          vpk pack --packId NudgeJudge --packVersion ${{ env.VERSION }} --packDir publish
+          --mainExe NudgeJudge.Desktop --packTitle NudgeJudge --packAuthors Kushagra
+          --icon NudgeJudge/Assets/nudgejudge.png
+      - run: >
+          vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+          --tag ${{ github.ref_name }} --releaseName "NudgeJudge ${{ env.VERSION }}" --merge --publish

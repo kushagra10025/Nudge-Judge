@@ -14,6 +14,9 @@
 
         <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 
+        <!-- Installer, delta updates and update checks against GitHub Releases -->
+        <PackageVersion Include="Velopack" Version="1.2.161" />
+
         <!-- Reads Firefox's profile-manager store during browser discovery -->
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
 
