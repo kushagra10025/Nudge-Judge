@@ -60,6 +60,9 @@ public partial class App : Application
         var boot = new SystemBoot();
         var config = new JsonConfigStore(AppPaths.ConfigFile, SampleData.FirstRun);
         var engine = new RuleEngine(boot);
+        // Temporary rules that ran out while the app was closed (every "until restart" rule, after a reboot).
+        if (config.Current.Rules.Any(r => r.IsExpired(DateTimeOffset.UtcNow, boot)))
+            config.Update(c => c.Rules.RemoveAll(r => r.IsExpired(DateTimeOffset.UtcNow, boot)));
         var activity = ActivityLog.FollowingSettings(config, new ActivityLogFile(AppPaths.ActivityLogFile));
         var router = new LinkRouter(config, engine, new BrowserLauncher(), activity);
         var windows = new DesktopWindowService(desktop);

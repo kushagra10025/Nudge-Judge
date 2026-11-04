@@ -208,6 +208,43 @@ public class CompoundRuleTests
         public event EventHandler? Changed { add { } remove { } }
     }
 
+    private sealed class BrokenLauncher : IBrowserLauncher
+    {
+        public void Launch(BrowserProfile browser, Uri url) => throw new System.ComponentModel.Win32Exception(2);
+    }
+
+    [Fact]
+    public void Router_asks_when_the_rules_browser_wont_start()
+    {
+        var config = new AppConfig
+        {
+            Browsers = [new() { Id = Chrome, Name = "Chrome", ExecutablePath = "chrome" }],
+            Rules = [new() { Name = "All", Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*")], BrowserId = Chrome }],
+        };
+        var log = new ActivityLog();
+        var router = new LinkRouter(new Store(config), new RuleEngine(new Boot()), new BrokenLauncher(), log);
+        IncomingLink? asked = null;
+        router.ChoiceRequested += (_, link) => asked = link;
+
+        Assert.Equal(RouteKind.NeedsChoice, router.Route("https://example.com/").Kind);
+        Assert.NotNull(asked);
+        Assert.Equal([ActivityOutcome.Failed, ActivityOutcome.Asked], log.Snapshot().Select(e => e.Outcome));
+    }
+
+    [Fact]
+    public void Saving_a_chooser_rule_removes_expired_ones()
+    {
+        var expired = new Rule { Name = "Old", ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1) };
+        var oldBoot = new Rule { Name = "Last boot", ExpiresAfterBootId = "previous" };
+        var kept = new Rule { Name = "Kept" };
+        var config = new AppConfig { Rules = [expired, oldBoot, kept] };
+        var router = new LinkRouter(new Store(config), new RuleEngine(new Boot()), new Launcher(), new ActivityLog());
+
+        router.AddRule(new Rule { Name = "New" }, TimeSpan.FromHours(8), untilReboot: false, new Boot());
+
+        Assert.Equal(["New", "Kept"], config.Rules.Select(r => r.Name));
+    }
+
     [Fact]
     public void Router_routes_on_the_source_and_logs_it_with_the_rule_name()
     {

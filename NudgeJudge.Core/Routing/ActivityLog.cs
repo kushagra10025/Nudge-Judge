@@ -45,7 +45,8 @@ public sealed class ActivityLog
 {
     public const int DefaultCapacity = 100;
     public const int MinCapacity = 1;
-    public const int MaxCapacity = 10_000;
+    // Every link rewrites the whole file on the UI thread, so keep it small.
+    public const int MaxCapacity = 1_000;
 
     private readonly IActivityStore? _store;
     private readonly Lock _gate = new();

@@ -25,6 +25,9 @@ public class PatternCompilerTests
     [InlineData("github.com/acme/*", "https://github.com/acme/repo", true)]
     [InlineData("github.com/acme/*", "https://github.com/other/repo", false)]
     [InlineData("docs.*.com", "https://docs.example.com/", true)]
+    [InlineData("*.münchen.de", "https://www.münchen.de/", true)]
+    [InlineData("*münchen.de", "https://www.münchen.de/", true)]
+    [InlineData("*münchen.de", "https://www.example.de/", false)]
     public void Wildcard(string pattern, string url, bool expected) =>
         Assert.Equal(expected, Matches(MatchKind.Wildcard, pattern, url));
 
@@ -40,6 +43,8 @@ public class PatternCompilerTests
     [InlineData("youtube.com", "https://youtube.com/watch", true)]
     [InlineData("youtube.com", "https://www.youtube.com/watch", false)]
     [InlineData("https://YouTube.com/", "https://youtube.com/", true)]
+    [InlineData("münchen.de", "https://münchen.de/", true)]
+    [InlineData("xn--mnchen-3ya.de", "https://münchen.de/", true)]
     public void Domain(string pattern, string url, bool expected) =>
         Assert.Equal(expected, Matches(MatchKind.Domain, pattern, url));
 

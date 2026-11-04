@@ -47,9 +47,9 @@ public sealed class LinkRouter(
         if (!cfg.Settings.RoutingEnabled)
         {
             var primary = cfg.FindBrowser(cfg.Settings.PrimaryBrowserId);
-            if (primary is not null)
-                return Launch(primary, url, source, ActivityOutcome.PassedThrough);
-            // No primary browser configured: fall through to asking rather than dropping the link.
+            // No primary browser, or it wouldn't start: fall through to asking rather than dropping the link.
+            if (primary is not null && Launch(primary, url, source, ActivityOutcome.PassedThrough) is { Kind: not RouteKind.Failed } passed)
+                return passed;
         }
         else
         {
@@ -57,10 +57,11 @@ public sealed class LinkRouter(
             if (result.Rule is { } rule)
             {
                 var browser = cfg.FindBrowser(rule.BrowserId);
-                if (browser is not null)
-                    return Launch(browser, url, source, ActivityOutcome.Routed, result.RuleIndex + 1, rule.Name);
-                Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: result.RuleIndex + 1, RuleName: rule.Name,
-                    Detail: "The rule's browser no longer exists. Asking instead.", Source: source));
+                if (browser is null)
+                    Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: result.RuleIndex + 1, RuleName: rule.Name,
+                        Detail: "The rule's browser no longer exists. Asking instead.", Source: source));
+                else if (Launch(browser, url, source, ActivityOutcome.Routed, result.RuleIndex + 1, rule.Name) is { Kind: not RouteKind.Failed } routed)
+                    return routed;
             }
         }
 
@@ -85,6 +86,8 @@ public sealed class LinkRouter(
         rule.ExpiresAfterBootId = untilReboot ? boot.CurrentBootId : null;
         config.Update(c =>
         {
+            // Temporary rules pile up at the top otherwise; this is where they're made, so clean up here.
+            c.Rules.RemoveAll(r => r.IsExpired(now, boot));
             if (rule.IsTemporary) c.Rules.Insert(0, rule);
             else c.Rules.Add(rule);
         });

@@ -244,8 +244,9 @@ public sealed partial class RulesViewModel : ViewModelBase
             var rule = cfg.Rules[i];
             var browser = cfg.FindBrowser(rule.BrowserId);
             var compiled = _engine.Compile(rule);
+            var expired = rule.IsExpired(now, _boot);
             Rules.Add(new RuleItemViewModel(this, rule, i + 1, cfg.Rules.Count,
-                browser?.Name, compiled.Error, ExpiryText(rule, now), rule.IsExpired(now, _boot)));
+                browser?.Name, compiled.Error, expired ? "Expired" : ExpiryText(rule, now), expired));
         }
         if (KnownSources?.Invoke() is { } known)
         {

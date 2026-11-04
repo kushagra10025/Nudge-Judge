@@ -85,7 +85,7 @@ public static class PatternCompiler
         var pathRegex = path.Length > 0 ? BuildRegex("^" + GlobToRegex(path, star: ".*", single: ".") + "$", caseSensitive: false) : null;
 
         return Ok(url =>
-            hostRegex.IsMatch(NormalizeHost(url)) &&
+            HostMatches(hostRegex, url) &&
             (pathRegex is null || pathRegex.IsMatch(url.AbsolutePath)));
     }
 
@@ -104,7 +104,7 @@ public static class PatternCompiler
 
         return Ok(url =>
         {
-            if (!hostRegex.IsMatch(NormalizeHost(url))) return false;
+            if (!HostMatches(hostRegex, url)) return false;
             var p = url.AbsolutePath;
             if (prefix.Length == 0) return true;
             // Match on segment boundaries: /acme matches /acme and /acme/x but not /acmecorp.
@@ -215,10 +215,27 @@ public static class PatternCompiler
         }
         if (host.Contains(':'))
             host = host[..host.IndexOf(':')]; // ports aren't matched
+
+        // URLs are matched on their ASCII (punycode) host, so "münchen.de" must become "xn--mnchen-3ya.de".
+        try
+        {
+            var idn = new System.Globalization.IdnMapping();
+            host = string.Join('.', host.Split('.').Select(l =>
+                l.Any(c => c > 127) && !l.Contains('*') && !l.Contains('?') ? idn.GetAscii(l) : l));
+        }
+        catch (ArgumentException)
+        {
+            error = "The host isn't a valid domain name.";
+            return false;
+        }
         return true;
     }
 
     private static string NormalizeHost(Uri url) => url.IdnHost.TrimEnd('.');
+
+    /// <summary>A glob inside a non-ASCII label ("*münchen.de") can't be punycoded, so also try the Unicode host.</summary>
+    private static bool HostMatches(Regex host, Uri url) =>
+        host.IsMatch(NormalizeHost(url)) || (url.Host != url.IdnHost && host.IsMatch(url.Host.TrimEnd('.')));
 
     private static bool IsIpAddress(string host) => System.Net.IPAddress.TryParse(host.Trim('[', ']'), out _);
 

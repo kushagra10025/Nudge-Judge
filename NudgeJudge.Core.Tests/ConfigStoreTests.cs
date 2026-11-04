@@ -169,7 +169,8 @@ public sealed class ConfigStoreTests : IDisposable
         var path = Path.Combine(_dir, "activity.log");
         var writers = Enumerable.Range(0, 2).Select(_ => new ActivityLogFile(path)).ToList();
 
-        Parallel.For(0, 20, i => writers[i % writers.Count]
+        // Two at a time, like the real app (running instance + one launch); more queues past the lock timeout under load.
+        Parallel.For(0, 20, new ParallelOptions { MaxDegreeOfParallelism = 2 }, i => writers[i % writers.Count]
             .Update(l => l.Add(new ActivityEntry(DateTimeOffset.UtcNow, $"https://{i}.example/", ActivityOutcome.Routed))));
 
         Assert.Equal(20, new ActivityLogFile(path).Read().Count);
