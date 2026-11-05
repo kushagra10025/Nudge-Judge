@@ -112,8 +112,10 @@ public static class InstanceClient
 /// <summary>Outcome of <see cref="SingleInstance.Claim"/>.</summary>
 public sealed class InstanceClaim : IDisposable
 {
+    private readonly Lock _gate = new();
     private InstanceLock? _lock;
     private InstanceServer? _server;
+    private bool _stopped;
 
     internal InstanceClaim(InstanceEndpoint endpoint, InstanceLock? instanceLock, bool forwarded, string? note)
     {
@@ -137,7 +139,13 @@ public sealed class InstanceClaim : IDisposable
     /// <summary>Primary only: starts listening for later launches. Returns false if the endpoint couldn't be opened.</summary>
     public bool StartServer(Func<InstanceRequest, Task<InstanceReply>> handler)
     {
-        if (!IsPrimary || _server is not null) return false;
+        lock (_gate) return StartServerLocked(handler);
+    }
+
+    private bool StartServerLocked(Func<InstanceRequest, Task<InstanceReply>> handler)
+    {
+        // Stopped before it got going (a window process closing straight away): don't start listening after all.
+        if (!IsPrimary || _server is not null || _stopped) return false;
         var server = new InstanceServer(Endpoint.Transport, Endpoint.TokenFile, handler);
         try
         {
@@ -159,14 +167,18 @@ public sealed class InstanceClaim : IDisposable
     /// <summary>Stops taking new messages; the lock stays held until <see cref="Dispose"/>.</summary>
     public void StopServer()
     {
-        _server?.Dispose();
-        _server = null;
+        lock (_gate)
+        {
+            _stopped = true;
+            _server?.Dispose();
+            _server = null;
+        }
     }
 
     public void Dispose()
     {
         StopServer();
-        _lock?.Dispose();
+        lock (_gate) _lock?.Dispose();
     }
 }
 

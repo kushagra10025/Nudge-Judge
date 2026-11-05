@@ -94,6 +94,53 @@ public sealed class InstanceProtocolTests
     }
 
     [Fact]
+    public void A_first_order_round_trips_through_the_command_line()
+    {
+        var source = new NudgeJudge.Core.Models.SourceApp("slack", "/usr/bin/slack", "Slack");
+        var arg = InstanceProtocol.EncodeOrder(InstanceCommand.Choose, ["https://a.example/?q=1&x=\"y\""], source, null);
+
+        Assert.StartsWith(InstanceProtocol.OrderFlag, arg);
+        Assert.DoesNotContain(' ', arg);
+        var order = InstanceProtocol.DecodeOrder(["--ui", arg]);
+        Assert.NotNull(order);
+        Assert.Equal(InstanceCommand.Choose, order.Command);
+        Assert.Equal(["https://a.example/?q=1&x=\"y\""], order.Urls);
+        Assert.Equal(source, order.Source);
+
+        Assert.Equal("rules", InstanceProtocol.DecodeOrder([InstanceProtocol.EncodeOrder(InstanceCommand.Show, [], null, "rules")])?.Page);
+    }
+
+    [Theory]
+    [InlineData("--ui")]
+    [InlineData("--order=not base64!")]
+    [InlineData("--order=bm90IGpzb24=")] // "not json"
+    public void A_missing_or_broken_order_is_ignored(string arg) => Assert.Null(InstanceProtocol.DecodeOrder([arg]));
+
+    [Fact]
+    public void An_order_that_fails_the_usual_checks_is_ignored()
+    {
+        // Choose with no links, as a malformed or hand-made command line might carry.
+        Assert.Null(InstanceProtocol.DecodeOrder([InstanceProtocol.EncodeOrder(InstanceCommand.Choose, [], null, null)]));
+    }
+
+    [Fact]
+    public void Stopping_before_the_server_started_keeps_it_from_starting()
+    {
+        // A window process may close before its server, started in the background, got going.
+        var dir = Path.Combine(Path.GetTempPath(), "nj-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            using var claim = SingleInstance.ClaimExclusive(InstanceEndpoint.InDirectory(dir))!;
+            claim.StopServer();
+            Assert.False(claim.StartServer(_ => Task.FromResult(InstanceReply.Success)));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Tokens_are_random_and_compared_exactly()
     {
         var a = InstanceProtocol.NewToken();
@@ -309,7 +356,7 @@ public sealed class SingleInstanceTests : IDisposable
     }
 
     [Fact]
-    public void An_exclusive_claim_waits_for_the_holder_to_let_go()
+    public async Task An_exclusive_claim_waits_for_the_holder_to_let_go()
     {
         var first = SingleInstance.ClaimExclusive(_endpoint);
         Assert.NotNull(first);
@@ -317,9 +364,9 @@ public sealed class SingleInstanceTests : IDisposable
 
         // The tray handover: the launch lets go while the tray host is already waiting for it.
         var waiting = Task.Run(() => SingleInstance.ClaimExclusive(_endpoint, TimeSpan.FromSeconds(5)));
-        Thread.Sleep(200);
+        await Task.Delay(200);
         first.Dispose();
-        using var second = waiting.GetAwaiter().GetResult();
+        using var second = await waiting;
         Assert.NotNull(second);
         Assert.True(second.IsPrimary);
     }

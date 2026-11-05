@@ -98,8 +98,12 @@ public partial class App : Application
         });
 
         var launch = LaunchArguments.Parse(desktop.Args ?? []);
-        var serving = Instance?.StartServer(request =>
-            Dispatcher.UIThread.InvokeAsync(() => HandleRequest(request, router, windows, chooser, settings)).GetTask()) == true;
+        // Started off the UI thread: writing the session token (with fsync) and opening the socket mustn't hold up
+        // the first window. Launches arriving meanwhile retry until it's listening.
+        var serving = Instance?.IsPrimary == true;
+        if (serving)
+            _ = Task.Run(() => Instance!.StartServer(request =>
+                Dispatcher.UIThread.InvokeAsync(() => HandleRequest(request, router, windows, chooser, settings)).GetTask()));
 
         // This process exists to show windows: once the last one closes, it's done. Staying in the tray is the
         // resident host's job, which keeps none of this in memory.
@@ -130,8 +134,10 @@ public partial class App : Application
 
         if (launch.Ui)
         {
-            // Started by the tray host, which sends what to show as soon as our server is up. If that never
-            // comes (the host died in between), don't linger invisibly.
+            // Started by the tray host with its first order on the command line: act on it now, not after our
+            // server is up. Later orders come over the server. If nothing ever opens, don't linger invisibly.
+            if (InstanceProtocol.DecodeOrder(desktop.Args ?? []) is { } order)
+                HandleRequest(order, router, windows, chooser, settings);
             DispatcherTimer.RunOnce(ExitIfIdle, UiOrderTimeout);
             return;
         }

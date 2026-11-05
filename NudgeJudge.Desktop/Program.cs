@@ -141,7 +141,14 @@ internal sealed class Program
     {
         // Another UI process may still be closing; wait for it rather than run two.
         using var claim = SingleInstance.ClaimExclusive(InstanceEndpoint.ForUi());
-        if (claim is null) return 0;
+        if (claim is null)
+        {
+            // One is running and staying: give it our order rather than drop it.
+            if (InstanceProtocol.DecodeOrder(args) is { } order)
+                InstanceClient.SendAsync(InstanceEndpoint.ForUi(), order.Command, order.Urls, order.Source, page: order.Page)
+                    .GetAwaiter().GetResult();
+            return 0;
+        }
         return BuildAvaloniaApp(claim, null, null, []).StartWithClassicDesktopLifetime(args);
     }
 

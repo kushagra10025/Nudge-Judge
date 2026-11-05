@@ -114,15 +114,22 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
         // While the UI is open it routes, so its Activity page and chooser stay live, exactly as before.
         if (UiRunning && await DeliverAsync(InstanceCommand.Open, urls, source, startUi: false)) return;
 
-        IReadOnlyList<IncomingLink> pending;
+        // Start the chooser the moment a link needs it: the router asks before it writes the activity log.
+        void Ask(object? sender, IncomingLink link) => _ = ChooseAsync(link);
         lock (_routing)
         {
             // Rules may have been edited in the UI process since the last link.
             core.Config.Refresh();
-            pending = core.Route(urls, source);
+            core.Router.ChoiceRequested += Ask;
+            try
+            {
+                foreach (var url in urls) core.Router.Route(url, source);
+            }
+            finally
+            {
+                core.Router.ChoiceRequested -= Ask;
+            }
         }
-        // Routed and logged: answer now, and let the chooser come up in its own time.
-        foreach (var link in pending) _ = ChooseAsync(link);
     }
 
     private Task<bool> ChooseAsync(IncomingLink link) =>
@@ -156,7 +163,7 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
 
     /// <summary>
     /// Hands a request to the UI process, starting one if needed (and allowed). One at a time, so two links
-    /// arriving together don't start two UI processes. True when the UI process took it.
+    /// arriving together don't start two UI processes. True when the UI process took it (or was started with it).
     /// </summary>
     private async Task<bool> DeliverAsync(InstanceCommand command, IReadOnlyList<string> urls, SourceApp? source,
         bool startUi = true, string? page = null)
@@ -164,6 +171,10 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
         await _deliveries.WaitAsync();
         try
         {
+            // A new window process takes its first order on its command line, so it can show the chooser (or the
+            // main window) without first waiting for its own server, and without us polling for it.
+            if (!UiRunning) return startUi && StartUi(InstanceProtocol.EncodeOrder(command, urls, source, page));
+
             var deadline = DateTime.UtcNow + DeliveryBudget;
             string? lastError = null;
             while (!_quit.IsCancellationRequested)
@@ -173,10 +184,11 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
                 if (result != DeliveryResult.Unreachable) return true;
                 lastError = error;
 
+                // Unreachable while running: it's just starting (its server isn't up yet) or closing.
                 if (!startUi) return false;
-                if (!UiRunning && !StartUi()) return false;
+                if (!UiRunning) return StartUi(InstanceProtocol.EncodeOrder(command, urls, source, page));
                 if (DateTime.UtcNow >= deadline) break;
-                await Task.Delay(100);
+                await Task.Delay(20);
             }
             Trace.TraceWarning($"NudgeJudge: the window process didn't answer: {lastError}");
             return false;
@@ -188,9 +200,9 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
         }
     }
 
-    private bool StartUi()
+    private bool StartUi(string order)
     {
-        if (StartInfo("--ui") is not { } start) return false;
+        if (StartInfo("--ui", order) is not { } start) return false;
 
         Process? process;
         try

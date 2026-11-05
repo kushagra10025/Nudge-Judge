@@ -101,6 +101,32 @@ public static class InstanceProtocol
         }
     }
 
+    /// <summary>Command-line flag carrying a <c>--ui</c> process's first order, so it needn't wait for its server.</summary>
+    public const string OrderFlag = "--order=";
+
+    /// <summary>
+    /// A request as one command-line argument (base64 of its JSON, without a token): what a starting UI process
+    /// should do first. Its argv is no more private than the launch's own, which carried the same link.
+    /// </summary>
+    public static string EncodeOrder(InstanceCommand command, IReadOnlyList<string> urls, SourceApp? source, string? page) =>
+        OrderFlag + Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(
+            new InstanceRequest(Version, "", command, urls, source, page), InstanceJsonContext.Default.InstanceRequest));
+
+    /// <summary>The order in <paramref name="args"/>, or null when there's none or it doesn't pass <see cref="Check"/>.</summary>
+    public static InstanceRequest? DecodeOrder(IEnumerable<string> args)
+    {
+        if (args.FirstOrDefault(a => a.StartsWith(OrderFlag, StringComparison.Ordinal)) is not { } arg) return null;
+        try
+        {
+            var request = JsonSerializer.Deserialize(Convert.FromBase64String(arg[OrderFlag.Length..]), InstanceJsonContext.Default.InstanceRequest);
+            return request is { Urls: not null } && request.Urls.All(u => u is not null) && Check(request) is null ? request : null;
+        }
+        catch (Exception e) when (e is FormatException or JsonException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Checks everything about a request except the token. Returns an error, or null when it's acceptable.</summary>
     public static string? Check(InstanceRequest request)
     {
