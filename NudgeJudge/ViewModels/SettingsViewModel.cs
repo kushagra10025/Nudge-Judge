@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NudgeJudge.Core.Config;
+using NudgeJudge.Core.NativeMessaging;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Core.Routing;
 using NudgeJudge.Services;
@@ -15,6 +16,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IDefaultBrowserRegistrar _registrar;
     private readonly IThemeService _theme;
     private readonly ILaunchAtStartup _startup;
+    private readonly INativeHostRegistration _extension;
     private readonly IDialogService? _dialogs;
     private bool _loading;
     private readonly IUiDispatcher _dispatcher;
@@ -27,8 +29,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private bool _refreshAgain;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
-        ILaunchAtStartup startup, UpdatesViewModel? updates = null, IDialogService? dialogs = null)
+        ILaunchAtStartup startup, UpdatesViewModel? updates = null, IDialogService? dialogs = null,
+        INativeHostRegistration? extension = null)
     {
+        _extension = extension ?? new StubNativeHostRegistration();
         Updates = updates;
         _dialogs = dialogs;
         _config = config;
@@ -92,6 +96,24 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public bool HasStartupMessage => StartupMessage.Length > 0;
     public bool CanLaunchAtStartup => _startup.IsSupported;
+
+    /// <summary>Mirrors the extension's launcher on disk; changing it writes or removes the launcher and manifests.</summary>
+    [ObservableProperty] public partial bool ExtensionConnected { get; set; }
+
+    /// <summary>Why the last change to <see cref="ExtensionConnected"/> didn't take, or empty.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasExtensionMessage))]
+    public partial string ExtensionMessage { get; set; } = "";
+
+    public bool HasExtensionMessage => ExtensionMessage.Length > 0;
+    public bool CanConnectExtension => _extension.IsSupported;
+    public Uri ExtensionHelpUrl { get; } = new(AppInfo.RepositoryUrl + "/blob/main/docs/browser-extension.md");
+
+    /// <summary>What the extension's switch says about it, with the click that's the default on this platform.</summary>
+    public string ExtensionDetail { get; } =
+        "Lets the NudgeJudge extension send links you click inside Chrome, Edge, Brave, Vivaldi or Firefox here. " +
+        (OperatingSystem.IsMacOS() ? "⌥⇧-click" : OperatingSystem.IsWindows() ? "Alt+Shift+click" : "Ctrl+Alt+click") +
+        " a link, or right-click it and pick Open with NudgeJudge.";
 
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
 
@@ -274,6 +296,39 @@ public sealed partial class SettingsViewModel : ViewModelBase
         LoadStartup();
     }
 
+    partial void OnExtensionConnectedChanged(bool value)
+    {
+        if (_loading) return;
+        try
+        {
+            _extension.SetEnabled(value);
+            ExtensionMessage = "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            ExtensionMessage = (value ? "Couldn't connect the extension: " : "Couldn't disconnect the extension: ") + e.Message;
+        }
+        LoadExtension();
+    }
+
+    private void LoadExtension()
+    {
+        var was = _loading;
+        _loading = true;
+        try
+        {
+            ExtensionConnected = _extension.IsSupported && _extension.IsEnabled();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            ExtensionConnected = false;
+        }
+        finally
+        {
+            _loading = was;
+        }
+    }
+
     private void LoadStartup()
     {
         var was = _loading;
@@ -353,6 +408,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             Theme = ThemeOption.All.First(t => t.Value == s.Theme);
             _theme.Apply(s.Theme);
             LoadStartup();
+            LoadExtension();
         }
         finally
         {

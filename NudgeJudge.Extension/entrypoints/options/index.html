@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NudgeJudge</title>
+    <meta name="manifest.open_in_tab" content="true" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="/icon/48.png" alt="" width="32" height="32" />
+        <h1>NudgeJudge</h1>
+      </header>
+
+      <section class="card" aria-live="polite">
+        <div class="row">
+          <span class="lamp" id="lamp"></span>
+          <div class="text">
+            <p class="label" id="status-label">Checking for NudgeJudge…</p>
+            <p class="muted" id="status-detail"></p>
+          </div>
+          <button type="button" id="retry" hidden>Check again</button>
+        </div>
+      </section>
+
+      <section class="card notice" id="tied" hidden>
+        <div class="row">
+          <div class="text">
+            <p class="label">NudgeJudge is running inside this browser</p>
+            <p class="muted">
+              <span id="tied-when">Recently</span>, NudgeJudge wasn't running, so sending a link started it. This browser
+              wouldn't let it run separately, so it will close when the browser does, tray icon included. To avoid
+              that, start NudgeJudge yourself, or turn on <b>Launch at startup</b> in its Settings. Links it handled
+              are marked in its Activity.
+            </p>
+          </div>
+          <button type="button" id="tied-dismiss">Dismiss</button>
+        </div>
+      </section>
+
+      <h2>Send a link</h2>
+      <section class="card">
+        <div class="row">
+          <div class="text">
+            <p class="label">Right-click a link → Open with NudgeJudge</p>
+            <p class="muted">Always on. The toolbar button and <kbd id="shortcut">Alt+Shift+N</kbd> send the page you're on.</p>
+          </div>
+        </div>
+        <hr />
+        <div class="row">
+          <div class="text">
+            <label class="label" for="gesture">Click with</label>
+            <p class="muted">Hold these keys and click a link to send it. Every other click works as usual.</p>
+            <p class="muted" id="gesture-permission" hidden>
+              Needs access to all sites, so the click can be noticed on every page.
+              <button type="button" class="link" id="grant-gesture">Allow</button>
+            </p>
+            <p class="muted" id="gesture-reload" hidden>Reload tabs that were already open to use it there.</p>
+          </div>
+          <select id="gesture"></select>
+        </div>
+      </section>
+
+      <h2 class="with-action">
+        <span>Recent links</span>
+        <button type="button" class="link" id="recent-clear" hidden>Clear</button>
+      </h2>
+      <section class="card">
+        <p class="muted empty" id="recent-empty">
+          Nothing sent yet. Links you send show here with what happened to them: kept in this browser, handed to a
+          running NudgeJudge, or NudgeJudge started for them.
+        </p>
+        <ol class="recent" id="recent"></ol>
+      </section>
+
+      <h2>Automatic routing</h2>
+      <section class="card">
+        <div class="row">
+          <div class="text">
+            <label class="label" for="auto">Catch links for rules marked “Also catch in the browser”</label>
+            <p class="muted">
+              When a page in this browser goes to one of those sites, it's sent to NudgeJudge, and this tab goes back.
+              If the rule picks this browser, nothing happens.
+            </p>
+            <p class="muted" id="auto-hosts"></p>
+          </div>
+          <input type="checkbox" id="auto" role="switch" />
+        </div>
+      </section>
+
+      <p class="footer muted">
+        <a href="https://github.com/kushagra10025/Nudge-Judge/blob/main/docs/browser-extension.md" target="_blank" rel="noopener">How the extension works</a>
+      </p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

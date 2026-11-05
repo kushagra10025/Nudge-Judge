@@ -38,6 +38,7 @@ public sealed record InstanceReply(bool Ok, string? Error = null)
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(InstanceRequest))]
 [JsonSerializable(typeof(InstanceReply))]
+[JsonSerializable(typeof(SourceApp))]
 internal sealed partial class InstanceJsonContext : JsonSerializerContext;
 
 /// <summary>

@@ -45,6 +45,12 @@ public sealed class LinkRouter
         };
     }
 
+    /// <summary>
+    /// This process closes with the program that started it (<see cref="Platform.ProcessJob.ClosesWithLauncher"/>).
+    /// Every Activity entry it writes says so, so it's visible which links such a NudgeJudge handled.
+    /// </summary>
+    public bool TiedToLauncher { get; init; }
+
     /// <summary>Raised (on the caller's thread) when no rule matches and the user must choose.</summary>
     public event EventHandler<IncomingLink>? ChoiceRequested;
 
@@ -149,7 +155,7 @@ public sealed class LinkRouter
 
     private DateTimeOffset Now => _time.GetUtcNow();
 
-    private void Log(ActivityEntry entry) => activity.Add(entry);
+    private void Log(ActivityEntry entry) => activity.Add(TiedToLauncher ? entry with { TiedToLauncher = true } : entry);
 
     private static string Truncate(string? s) =>
         s is null ? "(empty)" : s.Length <= 200 ? s : s[..200] + "…";

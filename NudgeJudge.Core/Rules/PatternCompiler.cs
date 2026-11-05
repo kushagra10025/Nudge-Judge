@@ -209,6 +209,16 @@ public static class PatternCompiler
         return true;
     }
 
+    /// <summary>
+    /// The host part of a valid domain, wildcard or path-prefix pattern: lower case, punycode, and possibly with
+    /// <c>*</c> (where a leading <c>*.</c> also covers the bare domain). Null for regular expressions and invalid patterns.
+    /// </summary>
+    public static string? HostOf(MatchKind type, string? pattern)
+    {
+        if (type == MatchKind.Regex || !Compile(type, pattern).Success) return null;
+        return TrySplitHostAndPath(pattern!.Trim(), out var host, out _, out _) ? host : null;
+    }
+
     private static bool IsIpAddress(string host) => System.Net.IPAddress.TryParse(host.Trim('[', ']'), out _);
 
     private static PatternCompileResult Ok(Func<LinkInput, bool> predicate) => new(new CompiledPattern(predicate), null);

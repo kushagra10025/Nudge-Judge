@@ -30,12 +30,30 @@ public static class AppLaunchCommand
     /// </summary>
     public static IReadOnlyList<string>? Companion(string name, string? viaAppImage = null)
     {
-        var appImage = Environment.GetEnvironmentVariable("APPIMAGE");
+        var root = RuntimeRoot();
+        var muxer = root is null ? null : Path.Combine(root, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
+        return ResolveCompanion(AppContext.BaseDirectory, name, viaAppImage, Environment.GetEnvironmentVariable("APPIMAGE"),
+            muxer is not null && File.Exists(muxer) ? root : null, HostSearchedLocations(), File.Exists);
+    }
+
+    /// <summary>
+    /// A framework-dependent companion's native launcher has the same problem as ours (see <see cref="Resolve"/>): started
+    /// from a browser or the desktop, it doesn't see <c>DOTNET_ROOT</c> and can't find a per-user .NET such as
+    /// <c>~/.dotnet</c>. It then fails with "You must install .NET", and the tray host never appears. So when this
+    /// process runs on a .NET the launcher wouldn't find, run the companion's dll on this runtime's own host instead.
+    /// </summary>
+    internal static IReadOnlyList<string>? ResolveCompanion(string baseDirectory, string name, string? viaAppImage, string? appImage,
+        string? runtimeRoot, IReadOnlyList<string> hostSearched, Func<string, bool> exists)
+    {
         if (!string.IsNullOrEmpty(appImage) && Path.IsPathRooted(appImage))
             return viaAppImage is null ? [appImage] : [appImage, viaAppImage];
 
-        var path = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? name + ".exe" : name);
-        return File.Exists(path) ? [path] : null;
+        var launcher = Path.Combine(baseDirectory, OperatingSystem.IsWindows() ? name + ".exe" : name);
+        var dll = Path.Combine(baseDirectory, name + ".dll");
+        if (runtimeRoot is not null && exists(dll) &&
+            !IsUnder(runtimeRoot, baseDirectory) && !hostSearched.Any(l => SamePath(l, runtimeRoot)))
+            return [Path.Combine(runtimeRoot, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet"), dll];
+        return exists(launcher) ? [launcher] : null;
     }
 
     /// <param name="runtimeRoot">The .NET install this process runs on (the folder holding <c>shared/</c> and the <c>dotnet</c> host).</param>

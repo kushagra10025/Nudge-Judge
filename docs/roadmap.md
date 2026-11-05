@@ -20,7 +20,8 @@
 - [x] Single instance with secure local messaging (see [Security](security.md#single-instance-messaging))
 - [x] Launch at startup, switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings
 - [x] Update checks and one-click updates from GitHub Releases (Velopack), with a sidebar notice and Settings → Updates / About
-- [x] 788 core test cases and 48 headless UI tests
+- [x] Browser extension (Chrome, Edge, Brave, Vivaldi, Firefox): a modifier-click (Ctrl+Alt on Linux, Alt+Shift on Windows), right-click and toolbar send links to NudgeJudge over native messaging; links the rules keep in that browser just open there; opt-in automatic routing for rules marked "Also catch in the browser". See [Browser extension](browser-extension.md)
+- [x] 954 core test cases and 66 headless UI tests, plus the extension's unit tests
 
 ## Limitations right now
 
@@ -39,5 +40,6 @@ Roughly in order:
 
 1. **Windows save hardening.** Write-through renames, retries on transient sharing errors, and CI on Windows (see [Windows: known gaps](data-storage.md#windows-known-gaps-and-planned-fixes)).
 2. **More protocols.** Optional handlers beyond `http`/`https` (e.g. `mailto:`, custom schemes), off by default.
-3. **Packaging.** The Velopack release workflow (Windows `Setup.exe`, Linux AppImage) needs a first real run; then a Flatpak, and the Linux executable renamed to `nudgejudge`.
-4. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.
+3. **Browser extension in the stores.** First uploads to the Chrome Web Store, Edge Add-ons and Firefox Add-ons, then their IDs in the host manifest (see [Publishing](browser-extension.md#publishing)).
+4. **Packaging.** The Velopack release workflow (Windows `Setup.exe`, Linux AppImage) needs a first real run; then a Flatpak, and the Linux executable renamed to `nudgejudge`.
+5. **macOS.** Real implementations for the stubs (browser discovery via LaunchServices, default-browser registration via `LSSetDefaultHandlerForURLScheme`), a menu-bar icon, and testing.

@@ -16,10 +16,36 @@ public sealed record LaunchArguments(IReadOnlyList<string> Urls, bool Background
     /// <summary>The app that opened these links, detected at startup. Forwarded with them.</summary>
     public SourceApp? Source { get; init; }
 
+    /// <summary>
+    /// <c>--source=</c>: the app the links came from, when the launch was relayed by a process that knew it (the
+    /// browser extension's native host). Untrusted like the rest of argv: the router sanitizes it.
+    /// </summary>
+    public const string SourceFlag = "--source=";
+
     public static LaunchArguments Parse(IEnumerable<string> args)
     {
         var list = args.ToList();
-        return new(list.Where(a => !a.StartsWith('-')).ToList(), list.Contains("--background")) { Ui = list.Contains("--ui") };
+        return new(list.Where(a => !a.StartsWith('-')).ToList(), list.Contains("--background"))
+        {
+            Ui = list.Contains("--ui"),
+            Source = list.FirstOrDefault(a => a.StartsWith(SourceFlag, StringComparison.Ordinal)) is { } s ? DecodeSource(s[SourceFlag.Length..]) : null,
+        };
+    }
+
+    /// <summary>One <see cref="SourceFlag"/> argument for <paramref name="source"/>.</summary>
+    public static string EncodeSource(SourceApp source) =>
+        SourceFlag + Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(source, InstanceJsonContext.Default.SourceApp));
+
+    private static SourceApp? DecodeSource(string base64)
+    {
+        try
+        {
+            return SourceApp.Sanitize(System.Text.Json.JsonSerializer.Deserialize(Convert.FromBase64String(base64), InstanceJsonContext.Default.SourceApp));
+        }
+        catch (Exception e) when (e is FormatException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>What to ask an already-running instance to do, or null for nothing (a <c>--background</c> launch).</summary>

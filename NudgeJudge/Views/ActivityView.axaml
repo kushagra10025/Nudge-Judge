@@ -97,6 +97,9 @@
                     <TextBlock Classes="small muted" TextWrapping="Wrap">
                       <Run Text="{Binding RoutePrefix}" /><Run Text="{Binding RouteName}" Foreground="{DynamicResource InkBrush}" /><Run Text="{Binding RoutePattern}" FontFamily="{StaticResource MonoFont}" /><Run Text="{Binding RouteSuffix}" />
                     </TextBlock>
+                    <TextBlock Classes="small faint" TextWrapping="Wrap" IsVisible="{Binding TiedToLauncher}"
+                               Text="Handled by a NudgeJudge that closes with the program that started it"
+                               ToolTip.Tip="Usually your browser: its extension had to start NudgeJudge, and NudgeJudge couldn't run separately from it, so it closes when the browser does. Start NudgeJudge yourself, or turn on Launch at startup, so one runs on its own." />
                   </StackPanel>
                   <!-- Shown on hover and keyboard focus (Styles.axaml) -->
                   <!-- The fix for a link held back by an imported browser: shown at rest, like a row's error -->

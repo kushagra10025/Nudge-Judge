@@ -460,3 +460,7 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Browser extension (WXT) build output and generated types
+NudgeJudge.Extension/.output/
+NudgeJudge.Extension/.wxt/

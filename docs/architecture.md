@@ -25,6 +25,8 @@ NudgeJudge.Core/          Plain .NET library with no UI dependencies
                           Windows registry + Default Apps, macOS stub), AppLaunchCommand, ICommandRunner
   Routing/                LinkRouter (validate → pass through / match / ask), ActivityLog + its rolling file
   Ipc/                    Single instance: InstanceLock, InstanceServer/InstanceClient, wire protocol, Unix socket and named-pipe transports
+  NativeMessaging/        The browser extension's native host: framing and requests, the "stay" decision, launcher and
+                          manifest registration per browser (see browser-extension.md)
   CoreServices.cs         The routing half of the app (config, rules, activity log, router) without UI, built before the UI starts
 
 NudgeJudge/               Avalonia UI library
@@ -41,6 +43,7 @@ NudgeJudge.Tray/          Small native executable that stays in the tray: single
                           (Win32 Shell_NotifyIcon, or StatusNotifierItem + dbusmenu over D-Bus), no Avalonia
 NudgeJudge.Core.Tests/    xUnit tests for matching, validation, ReDoS safety, argument building, browser discovery and registration
 NudgeJudge.UI.Tests/      Avalonia headless tests (xunit v3) that drive real views, e.g. the default-browser setup in Settings
+NudgeJudge.Extension/     The companion browser extension (WXT, TypeScript); not part of the .NET solution
 ```
 
 ## Processes
@@ -54,9 +57,12 @@ The split keeps memory low while the app waits in the tray (about 3–5 MB priva
 
 Settings changed in the UI process reach the host through `config.json`. The host re-reads it (`JsonConfigStore.Refresh`) before routing each link, when the tray menu opens, and when the UI process exits. If "keep running in tray" was turned off by then, the host quits too. Inside an AppImage, the host is started as `$APPIMAGE --tray-host`, which replaces itself with the tray executable (`execv`), so the image stays mounted for as long as the host runs.
 
+A browser can also start `NudgeJudge.Desktop --native-host` for the extension. That process answers over stdin/stdout and hands links to the running instance (or starts the app with them); it never loads the UI. See [Browser extension](browser-extension.md).
+
 ## Related docs
 
 - [DESIGN.md](../DESIGN.md): the "Signal Box" design system
 - [PRODUCT.md](../PRODUCT.md): product context
 - [Performance](performance.md): how startup and matching are kept fast
+- [Browser extension](browser-extension.md): how links clicked inside browsers reach the app
 - [Security](security.md) and [How data is saved](data-storage.md)

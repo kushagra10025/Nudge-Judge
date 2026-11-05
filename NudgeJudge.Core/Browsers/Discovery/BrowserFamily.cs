@@ -31,7 +31,7 @@ internal sealed record BrowserFamily(
             ProfileStore.Chromium, "BraveSoftware/Brave-Browser", @"BraveSoftware\Brave-Browser\User Data", "com.brave.Browser"),
         new(["microsoft-edge", "microsoft-edge-stable", "msedge"], "--inprivate", "InPrivate",
             ProfileStore.Chromium, "microsoft-edge", @"Microsoft\Edge\User Data", "com.microsoft.Edge"),
-        new(["vivaldi", "vivaldi-stable"], "--incognito", "Private",
+        new(["vivaldi", "vivaldi-stable", "vivaldi-bin"], "--incognito", "Private",
             ProfileStore.Chromium, "vivaldi", @"Vivaldi\User Data", "com.vivaldi.Vivaldi"),
         new(["opera"], "--private", "Private", FlatpakId: "com.opera.Opera"),
     ];

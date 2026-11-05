@@ -123,6 +123,10 @@ From **Settings → Make default**:
 
 Status is checked whenever the main window comes forward, and catches a half registration (only HTTP or only HTTPS) and a stale one (the app moved since registering).
 
+## Browser extension
+
+Links you click *inside* a browser can go to NudgeJudge too, with the companion extension for Chrome, Edge, Brave, Vivaldi and Firefox. Turn on **Settings → Browser extension**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click a link (<kbd>Alt</kbd>+<kbd>Shift</kbd>+click on Windows), or right-click it and pick **Open with NudgeJudge**. The toolbar button sends the page you're on. If your rules pick the browser you're already in, the link just opens there. Rules marked **Also catch in the browser** are routed automatically, with no special keys, once automatic routing is on in the extension. It works even when NudgeJudge isn't running: the browser starts it. See [Browser extension](browser-extension.md).
+
 ## Launch at startup
 
 Switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings.

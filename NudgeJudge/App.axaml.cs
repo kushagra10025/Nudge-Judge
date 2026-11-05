@@ -9,6 +9,7 @@ using NudgeJudge.Core.Browsers;
 using NudgeJudge.Core.Browsers.Discovery;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Ipc;
+using NudgeJudge.Core.NativeMessaging;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Core.Routing;
 using NudgeJudge.Core.Rules;
@@ -73,8 +74,10 @@ public partial class App : Application
         var registrar = DefaultBrowserRegistration.ForCurrentPlatform(ReadAppIcon);
         var startup = LaunchAtStartup.ForCurrentPlatform();
         RefreshStartupEntry(startup);
+        var extension = NativeHostRegistration.ForCurrentPlatform();
+        RefreshExtensionConnection(extension);
         var updates = new UpdatesViewModel(config, new VelopackUpdateService(), dispatcher);
-        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup, updates, windows);
+        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup, updates, windows, extension);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),
@@ -235,6 +238,19 @@ public partial class App : Application
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             System.Diagnostics.Trace.TraceWarning($"NudgeJudge: couldn't update the startup entry: {e.Message}");
+        }
+    }
+
+    /// <summary>Keeps the browser extension's launcher and manifests pointing at this install, and adds browsers installed since.</summary>
+    private static void RefreshExtensionConnection(INativeHostRegistration extension)
+    {
+        try
+        {
+            extension.Refresh();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            System.Diagnostics.Trace.TraceWarning($"NudgeJudge: couldn't update the browser extension's connection: {e.Message}");
         }
     }
 

@@ -206,6 +206,12 @@ public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityV
         _ => entry.Detail ?? "",
     };
 
+    /// <summary>
+    /// Handled by a NudgeJudge that closes with the program that started it, usually a browser whose extension had to
+    /// start NudgeJudge inside its job (see ProcessJob).
+    /// </summary>
+    public bool TiedToLauncher { get; } = entry.TiedToLauncher;
+
     // One lamp per outcome: amber only when a rule set the route.
     public bool IsRouted => Outcome is ActivityOutcome.Routed;
     public bool IsChosen => Outcome is ActivityOutcome.Chosen;
