@@ -78,6 +78,24 @@
         </StackPanel>
       </Border>
 
+      <TextBlock Classes="section" Text="Browser extension" />
+      <Border Classes="surface">
+        <Grid Classes="setting" ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="label" Text="Take links from the browser extension" />
+            <TextBlock Classes="body muted" TextWrapping="Wrap" IsVisible="{Binding CanConnectExtension}"
+                       Text="Lets the NudgeJudge extension send links you click inside Chrome, Edge, Brave, Vivaldi or Firefox here. Alt+Shift+click a link, or right-click it and pick Open with NudgeJudge." />
+            <TextBlock Classes="body muted" Text="The browser extension isn't available on this system yet."
+                       IsVisible="{Binding !CanConnectExtension}" />
+            <TextBlock Classes="body" Foreground="{DynamicResource StopBrush}" Text="{Binding ExtensionMessage}"
+                       TextWrapping="Wrap" IsVisible="{Binding HasExtensionMessage}" />
+            <HyperlinkButton Content="About the extension" NavigateUri="{Binding ExtensionHelpUrl}" Padding="0" Margin="0,4,0,0" />
+          </StackPanel>
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding ExtensionConnected}" OnContent="On" OffContent="Off"
+                        IsEnabled="{Binding CanConnectExtension}" AutomationProperties.Name="Take links from the browser extension" />
+        </Grid>
+      </Border>
+
       <TextBlock Classes="section" Text="Chooser" />
       <Border Classes="surface">
         <StackPanel>

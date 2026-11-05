@@ -9,6 +9,7 @@ using Avalonia;
 using Velopack;
 using NudgeJudge.Core;
 using NudgeJudge.Core.Ipc;
+using NudgeJudge.Core.NativeMessaging;
 using NudgeJudge.Core.Platform;
 using NudgeJudge.Core.Routing;
 
@@ -20,6 +21,9 @@ internal sealed class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Started by a browser for the extension. Before Velopack, which may log: stdout belongs to the browser now.
+        if (args.Length > 0 && args[0] == NativeHost.Flag) return RunNativeHost();
+
         // Must run first: the installer and updater start the app with hook arguments, handled here and then exited.
         var velopack = VelopackApp.Build();
         // Only the Windows installer runs uninstall hooks (Linux ships as a single AppImage file).
@@ -33,7 +37,8 @@ internal sealed class Program
         if (launch.Ui) return RunUiProcess(args);
 
         // First thing, while the app that opened the link is still our parent (helpers like xdg-open exit quickly).
-        if (launch.Urls.Count > 0) launch = launch with { Source = SourceAppDetector.ForCurrentPlatform().Detect() };
+        // A launch relayed by the extension's host already says which browser it came from.
+        if (launch.Urls.Count > 0 && launch.Source is null) launch = launch with { Source = SourceAppDetector.ForCurrentPlatform().Detect() };
 
         // Decided before Avalonia starts, so a launch that hands its links to the running instance exits at once.
         using var claim = ClaimInstance(launch);
@@ -126,6 +131,71 @@ internal sealed class Program
         return 1;
     }
 
+    /// <summary>
+    /// <c>--native-host</c>: started by a browser for the extension, through the launcher NudgeJudge registered.
+    /// Answers the extension over stdin/stdout, then exits. Links go to the running instance, or to a fresh launch
+    /// of the app; this process never opens a browser itself, since a browser started from here would inherit the
+    /// extension's pipes.
+    /// </summary>
+    private static int RunNativeHost()
+    {
+        // stdout carries the protocol: keep anything else from writing to it.
+        Trace.Listeners.Clear();
+        using var stdout = Console.OpenStandardOutput();
+        using var stdin = Console.OpenStandardInput();
+        Console.SetOut(TextWriter.Null);
+
+        // The browser is our parent (through cmd.exe or sh, which the detector skips).
+        var caller = SourceAppDetector.ForCurrentPlatform().Detect();
+        var core = CoreServices.Load();
+        var backend = new NativeHostBackend(core.Config, core.Engine, core.Activity, caller,
+            NudgeJudge.Services.AppInfo.BuildVersion, DeliverFromExtension);
+        NativeHost.Serve(stdin, stdout, backend);
+        return 0;
+    }
+
+    private static void DeliverFromExtension(Uri url, NudgeJudge.Core.Models.SourceApp? source)
+    {
+        var (result, error) = InstanceClient.SendAsync(InstanceEndpoint.ForCurrentUser(), InstanceCommand.Open, [url.AbsoluteUri], source)
+            .GetAwaiter().GetResult();
+        if (result == DeliveryResult.Delivered) return;
+        if (result == DeliveryResult.Refused) throw new IOException(error ?? "NudgeJudge didn't take the link.");
+
+        // Nothing running: start the app with the link, as if the OS had opened it, on its own stdio.
+        if (AppLaunchCommand.Current() is not { Count: > 0 } command)
+            throw new IOException("NudgeJudge can't tell how it was started, so it can't start itself.");
+        var start = new ProcessStartInfo(command[0])
+        {
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in command.Skip(1)) start.ArgumentList.Add(arg);
+        if (source is not null) start.ArgumentList.Add(LaunchArguments.EncodeSource(source));
+        start.ArgumentList.Add(url.AbsoluteUri);
+
+        // Windows hands every inheritable handle to a child: keep the browser's pipes from leaking into the app.
+        if (OperatingSystem.IsWindows())
+            foreach (var std in new[] { -10, -11, -12 }) SetHandleInformation(GetStdHandle(std), 1 /* HANDLE_FLAG_INHERIT */, 0);
+        try
+        {
+            using var started = Process.Start(start) ?? throw new IOException("NudgeJudge didn't start.");
+            started.StandardInput.Close();
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            throw new IOException($"Couldn't start NudgeJudge: {e.Message}", e);
+        }
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern nint GetStdHandle(int stdHandle);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetHandleInformation(nint handle, uint mask, uint flags);
+
     [DllImport("libc", SetLastError = true)]
     private static extern int execv(nint path, nint[] argv);
 
@@ -176,6 +246,16 @@ internal sealed class Program
         catch (Exception e)
         {
             Trace.TraceWarning($"NudgeJudge: couldn't remove the browser registration on uninstall: {e.Message}");
+        }
+
+        try
+        {
+            var extension = NativeHostRegistration.ForCurrentPlatform();
+            if (extension.IsEnabled()) extension.SetEnabled(false);
+        }
+        catch (Exception e)
+        {
+            Trace.TraceWarning($"NudgeJudge: couldn't remove the browser extension's connection on uninstall: {e.Message}");
         }
     }
 

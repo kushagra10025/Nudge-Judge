@@ -1,0 +1,84 @@
+/* Tokens from DESIGN.md ("Signal Box"). */
+:root {
+  color-scheme: light dark;
+  --ground: #edf1ee;
+  --surface: #ffffff;
+  --ink: #13201a;
+  --muted: #4b5b52;
+  --faint: #66766d;
+  --track: #b4c1b9;
+  --proceed: #1b7f4d;
+  --stop: #bf2f35;
+  --route: #c97c06;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0d1411;
+    --surface: #141e19;
+    --ink: #e3ebe6;
+    --muted: #a2b3a9;
+    --faint: #84978c;
+    --track: #3a4c42;
+    --proceed: #45c486;
+    --stop: #ea5a5f;
+    --route: #f2b33d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 14px/1.45 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+main { max-width: 640px; margin: 0 auto; padding: 28px 16px 32px; }
+
+header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.3px; margin: 0; }
+h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 28px 4px 8px; }
+
+.card { background: var(--surface); border-radius: 8px; border: 1px solid var(--track); }
+.row { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+.text { flex: 1; min-width: 0; }
+hr { border: 0; border-top: 1px solid var(--track); margin: 0; }
+
+p { margin: 0; }
+.label { display: block; font-weight: 600; }
+.muted { color: var(--muted); margin-top: 2px; }
+.footer { margin: 20px 4px 0; }
+a { color: inherit; }
+
+kbd {
+  font: 12px 'Cascadia Mono', 'JetBrains Mono', 'DejaVu Sans Mono', Consolas, monospace;
+  border: 1px solid var(--track);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.lamp { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; align-self: flex-start; margin-top: 5px; }
+.lamp.on { background: var(--proceed); border-color: var(--proceed); }
+.lamp.off { background: var(--stop); border-color: var(--stop); }
+
+button, select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--track);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+button { cursor: pointer; }
+button.link { border: 0; padding: 0; background: none; text-decoration: underline; font-weight: 600; }
+select { min-width: 160px; }
+
+/* "On" is ink, not amber (DESIGN.md). */
+input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--ink); flex: none; }
+
+@media (max-width: 480px) {
+  .row { flex-wrap: wrap; }
+  select { width: 100%; }
+}

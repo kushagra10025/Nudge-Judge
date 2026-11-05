@@ -125,6 +125,13 @@ public sealed class Rule
     public Guid BrowserId { get; set; }
     public bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// The browser extension also sends links on this rule's hosts to NudgeJudge when they open inside a browser
+    /// (automatic routing). Only rules with a host-based link condition can be caught this way.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CatchInBrowser { get; set; }
+
     /// <summary>Temporary rule: stops matching after this instant.</summary>
     public DateTimeOffset? ExpiresAt { get; set; }
 

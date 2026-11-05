@@ -655,6 +655,15 @@
                      Text="No browsers yet. Add or scan for them on the Browsers page." />
         </StackPanel>
 
+        <StackPanel Spacing="4">
+          <CheckBox Content="Also catch in the browser" IsChecked="{Binding CatchInBrowser}"
+                    ToolTip.Tip="With the NudgeJudge browser extension, these sites are sent here even when you open them inside a browser." />
+          <TextBlock Classes="body faint small" TextWrapping="Wrap" IsVisible="{Binding !ShowCatchWarning}"
+                     Text="Needs the browser extension, with automatic routing on." />
+          <TextBlock Classes="body small" Foreground="{DynamicResource StopBrush}" TextWrapping="Wrap" IsVisible="{Binding ShowCatchWarning}"
+                     Text="Only works with domain, wildcard or path-prefix links: the extension watches for their sites." />
+        </StackPanel>
+
         <Border Classes="badge route" Padding="10,8" CornerRadius="6" IsVisible="{Binding IsTemporary}">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Text="{Binding ExpiryText, StringFormat='Temporary rule · {0}'}" VerticalAlignment="Center" FontSize="12" />

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Models;
+using NudgeJudge.Core.NativeMessaging;
 using NudgeJudge.Core.Rules;
 
 namespace NudgeJudge.ViewModels;
@@ -79,6 +80,18 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
 
     [ObservableProperty] public partial bool IsEnabled { get; set; } = true;
 
+    /// <summary>The browser extension also catches this rule's links inside browsers (automatic routing).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCatchWarning))]
+    public partial bool CatchInBrowser { get; set; }
+
+    /// <summary>The conditions can be narrowed to sites, which automatic routing needs.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCatchWarning))]
+    public partial bool CanCatchInBrowser { get; set; }
+
+    public bool ShowCatchWarning => CatchInBrowser && !CanCatchInBrowser;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     [NotifyPropertyChangedFor(nameof(HasRuleError))]
@@ -125,6 +138,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         Root.Load(RuleJoin.All, [RuleCondition.Link(MatchKind.Wildcard, pattern)]);
         Browser = Browsers.FirstOrDefault(b => b.Id == browserId) ?? Browsers.FirstOrDefault();
         IsEnabled = true;
+        CatchInBrowser = false;
         _expiresAt = null;
         _expiresAfterBootId = null;
         ExpiryText = null;
@@ -162,6 +176,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         Root.Load(rule.Join, rule.Conditions);
         Browser = Browsers.FirstOrDefault(b => b.Id == rule.BrowserId);
         IsEnabled = rule.Enabled;
+        CatchInBrowser = rule.CatchInBrowser;
         _expiresAt = rule.ExpiresAt;
         _expiresAfterBootId = rule.ExpiresAfterBootId;
         ExpiryText = RulesViewModel.ExpiryText(rule, DateTimeOffset.UtcNow);
@@ -231,6 +246,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
             rule.Conditions = conditions;
             rule.BrowserId = Browser!.Id;
             rule.Enabled = IsEnabled;
+            rule.CatchInBrowser = CatchInBrowser;
             rule.ExpiresAt = _expiresAt;
             rule.ExpiresAfterBootId = _expiresAfterBootId;
             // Saving a sample makes it the user's own, so cleaning up samples leaves it alone.
@@ -290,6 +306,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         var draft = Draft();
         var compiled = _engine.Compile(draft);
         _compiles = compiled.Success;
+        CanCatchInBrowser = compiled.Success && NativeHostBackend.HostsOf(draft).Count > 0;
 
         for (var i = 0; i < Root.Items.Count && i < compiled.Conditions.Count; i++)
             Root.Items[i].ApplyErrors(compiled.Conditions[i]);

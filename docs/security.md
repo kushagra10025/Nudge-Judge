@@ -13,6 +13,15 @@ NudgeJudge receives URLs from any app on the machine, so every URL is treated as
 | **Import** | An import file is untrusted. It's refused unless it's a valid export within size and count limits, with no control characters in programs or arguments. Names are stripped of control and text-direction characters. Nothing is applied before the user reviews it. A browser's program or arguments never change without an explicit tick, and an imported browser that isn't a recognised browser, is a script, isn't installed, or has risky flags is marked *needs review*: no link is opened in it until the user saves it in the browser editor. See [Export and import](features.md#export-and-import). |
 | **Handler registration** | The OS tools are run with explicit argument lists, never a shell. The Linux `Exec` line follows the Desktop Entry quoting rules, and a test checks that it parses back to the same argv. Launch paths containing control characters are refused. Every argument the OS passes in is validated as a URL like any other link. |
 
+## Browser extension
+
+The [browser extension](browser-extension.md) reaches the app through native messaging, not a port or URL scheme.
+
+- **Who can connect:** the browser only starts the host for the extension IDs listed in its manifest. The manifest and launcher are written per user (no admin), and the launcher quotes every argument.
+- **What the host accepts:** every URL is validated like any other link, and requests are capped at 64 KB. A malformed frame ends the session.
+- **Where links go:** the host never opens a browser itself. Links go to the running instance over the single-instance channel below, or to a fresh launch of the app with its own stdio, so the browser's pipe never leaks into another browser.
+- **In the page:** the extension only acts on trusted clicks (`event.isTrusted`), so a page can't script fake gestures. Its content script and navigation access are optional permissions, off until the user grants them.
+
 ## Single-instance messaging
 
 The first launch holds a per-user lock and runs a server; later launches forward their links (or "show the window") and exit within a fraction of a second.

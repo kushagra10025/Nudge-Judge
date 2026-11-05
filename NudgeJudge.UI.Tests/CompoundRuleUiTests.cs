@@ -334,6 +334,40 @@ public sealed class CompoundRuleUiTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Also_catch_in_the_browser_is_saved_and_warns_when_the_rule_has_no_sites()
+    {
+        var app = new Harness();
+        var window = Show(app, AppPage.Rules);
+        Click(window, Find<Button>(window, "Add rule", byContent: true));
+        Settle(window);
+        var editor = app.Main.Rules.Editor;
+
+        Type(window, Finds<TextBox>(window, "Pattern")[0], "*.zoom.us");
+        var box = Find<CheckBox>(window, "Also catch in the browser", byContent: true);
+        Click(window, box);
+        Settle(window);
+        Assert.True(editor.CatchInBrowser);
+        Assert.False(editor.ShowCatchWarning);
+
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+        var rule = Assert.Single(app.Config.Current.Rules);
+        Assert.True(rule.CatchInBrowser);
+
+        // Reopened, it's still ticked; a regex can't be narrowed to sites, so it says so.
+        editor.OpenExisting(rule);
+        Settle(window);
+        Assert.True(editor.CatchInBrowser);
+        rule.Conditions[0].MatchKind = MatchKind.Regex;
+        rule.Conditions[0].Values = ["^https://zoom"];
+        editor.OpenExisting(rule);
+        Settle(window);
+        editor.RefreshTestVerdict();
+        Assert.True(editor.ShowCatchWarning);
+        Assert.Contains(VisibleTextBlocks(window), t => t.Text?.StartsWith("Only works with domain") == true);
+    }
+
+    [AvaloniaFact]
     public void Conditions_and_groups_reorder_with_arrows_shown_on_hover()
     {
         var app = new Harness();
