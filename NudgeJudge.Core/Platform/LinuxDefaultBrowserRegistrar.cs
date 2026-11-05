@@ -138,20 +138,8 @@ public sealed class LinuxDefaultBrowserRegistrar(
 
     private static void WriteAtomic(string path, string text) => WriteAtomic(path, new UTF8Encoding(false).GetBytes(text));
 
-    private static void WriteAtomic(string path, byte[] bytes)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
-        try
-        {
-            File.WriteAllBytes(temp, bytes);
-            File.Move(temp, path, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temp)) File.Delete(temp);
-        }
-    }
+    private static void WriteAtomic(string path, byte[] bytes) =>
+        Config.AppPaths.WritePrivateFileAtomic(path, bytes, privateDirectory: false);
 
     private static string EscapeValue(string value) => value.Replace("\\", @"\\");
 

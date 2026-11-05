@@ -40,7 +40,7 @@ The steps above run on Windows too, but the test suite hasn't run there yet, and
 
 **2. Antivirus and indexers can make a save fail.** Defender, Windows Search and sync clients (OneDrive, Dropbox) often open a freshly written file for a few milliseconds without allowing it to be deleted. A rename that lands in that window fails with "access denied" or a sharing violation. Today:
 
-- **Config:** the change stays in memory with a warning, and the next change retries. It's lost only if the app quits before another change is made.
+- **Config:** the change stays in memory with a warning, and the next change retries. It's lost if the app quits before another change is made, or if another NudgeJudge process (the tray host or the window) saves the file first. Its version then wins, so one failed save can never overwrite rules edited elsewhere.
 - **Activity log:** that entry stays in memory but is never written to disk.
 
 Older Windows 10 builds may also refuse a rename over a file another process has open, even when that process allows deletion.

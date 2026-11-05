@@ -86,8 +86,9 @@ public sealed class LinkRouter
             }
         }
 
-        Log(new(Now, url.AbsoluteUri, ActivityOutcome.Asked, Source: source));
+        // Ask first: writing the log takes tens of ms (fsync), and the chooser may have a process to start.
         ChoiceRequested?.Invoke(this, new IncomingLink(url, source));
+        Log(new(Now, url.AbsoluteUri, ActivityOutcome.Asked, Source: source));
         return new RouteDecision(RouteKind.NeedsChoice, url);
     }
 

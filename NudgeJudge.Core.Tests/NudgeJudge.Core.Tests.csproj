@@ -13,5 +13,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\NudgeJudge.Core\NudgeJudge.Core.csproj" />
+    <!-- The tray host's icon reader: a re-saved icon must fail here, not as a missing tray icon. -->
+    <ProjectReference Include="..\NudgeJudge.Tray\NudgeJudge.Tray.csproj" />
   </ItemGroup>
 </Project>

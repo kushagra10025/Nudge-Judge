@@ -7,13 +7,19 @@ namespace NudgeJudge.Core.Ipc;
 /// <summary>The command line, split into links and flags, plus the app that launched us (when there are links).</summary>
 public sealed record LaunchArguments(IReadOnlyList<string> Urls, bool Background)
 {
+    /// <summary>
+    /// <c>--ui</c>: started by the resident (tray) host to show windows. Such a process takes its orders over
+    /// <see cref="InstanceEndpoint.ForUi"/> and exits when its windows close.
+    /// </summary>
+    public bool Ui { get; init; }
+
     /// <summary>The app that opened these links, detected at startup. Forwarded with them.</summary>
     public SourceApp? Source { get; init; }
 
     public static LaunchArguments Parse(IEnumerable<string> args)
     {
         var list = args.ToList();
-        return new(list.Where(a => !a.StartsWith('-')).ToList(), list.Contains("--background"));
+        return new(list.Where(a => !a.StartsWith('-')).ToList(), list.Contains("--background")) { Ui = list.Contains("--ui") };
     }
 
     /// <summary>What to ask an already-running instance to do, or null for nothing (a <c>--background</c> launch).</summary>
@@ -26,10 +32,13 @@ public sealed record InstanceEndpoint(string LockFile, string TokenFile, IIpcTra
 {
     public static InstanceEndpoint ForCurrentUser() => InDirectory(AppPaths.RuntimeDirectory);
 
-    public static InstanceEndpoint InDirectory(string directory) => new(
-        Path.Combine(directory, "instance.lock"),
-        Path.Combine(directory, "instance.token"),
-        IpcTransport.ForCurrentPlatform(directory));
+    /// <summary>Where the resident host reaches the UI process it started (a separate lock, token and socket).</summary>
+    public static InstanceEndpoint ForUi() => InDirectory(AppPaths.RuntimeDirectory, "ui");
+
+    public static InstanceEndpoint InDirectory(string directory, string? role = null) => new(
+        Path.Combine(directory, role is null ? "instance.lock" : $"{role}.lock"),
+        Path.Combine(directory, role is null ? "instance.token" : $"{role}.token"),
+        IpcTransport.ForCurrentPlatform(directory, role));
 }
 
 public enum DeliveryResult
@@ -47,7 +56,8 @@ public static class InstanceClient
     public static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(15);
 
     public static async Task<(DeliveryResult Result, string? Error)> SendAsync(
-        InstanceEndpoint endpoint, InstanceCommand command, IReadOnlyList<string> urls, SourceApp? source = null, CancellationToken ct = default)
+        InstanceEndpoint endpoint, InstanceCommand command, IReadOnlyList<string> urls, SourceApp? source = null, CancellationToken ct = default,
+        string? page = null)
     {
         string token;
         try
@@ -73,7 +83,7 @@ public static class InstanceClient
         {
             try
             {
-                await InstanceProtocol.WriteRequestAsync(stream, new InstanceRequest(InstanceProtocol.Version, token, command, urls, source), ct);
+                await InstanceProtocol.WriteRequestAsync(stream, new InstanceRequest(InstanceProtocol.Version, token, command, urls, source, page), ct);
                 using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 wait.CancelAfter(ReplyTimeout);
                 var reply = await InstanceProtocol.ReadReplyAsync(stream, wait.Token);
@@ -102,8 +112,10 @@ public static class InstanceClient
 /// <summary>Outcome of <see cref="SingleInstance.Claim"/>.</summary>
 public sealed class InstanceClaim : IDisposable
 {
+    private readonly Lock _gate = new();
     private InstanceLock? _lock;
     private InstanceServer? _server;
+    private bool _stopped;
 
     internal InstanceClaim(InstanceEndpoint endpoint, InstanceLock? instanceLock, bool forwarded, string? note)
     {
@@ -127,7 +139,13 @@ public sealed class InstanceClaim : IDisposable
     /// <summary>Primary only: starts listening for later launches. Returns false if the endpoint couldn't be opened.</summary>
     public bool StartServer(Func<InstanceRequest, Task<InstanceReply>> handler)
     {
-        if (!IsPrimary || _server is not null) return false;
+        lock (_gate) return StartServerLocked(handler);
+    }
+
+    private bool StartServerLocked(Func<InstanceRequest, Task<InstanceReply>> handler)
+    {
+        // Stopped before it got going (a window process closing straight away): don't start listening after all.
+        if (!IsPrimary || _server is not null || _stopped) return false;
         var server = new InstanceServer(Endpoint.Transport, Endpoint.TokenFile, handler);
         try
         {
@@ -149,14 +167,18 @@ public sealed class InstanceClaim : IDisposable
     /// <summary>Stops taking new messages; the lock stays held until <see cref="Dispose"/>.</summary>
     public void StopServer()
     {
-        _server?.Dispose();
-        _server = null;
+        lock (_gate)
+        {
+            _stopped = true;
+            _server?.Dispose();
+            _server = null;
+        }
     }
 
     public void Dispose()
     {
         StopServer();
-        _lock?.Dispose();
+        lock (_gate) _lock?.Dispose();
     }
 }
 
@@ -164,6 +186,21 @@ public static class SingleInstance
 {
     public static readonly TimeSpan DefaultBudget = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// Takes the endpoint's lock without forwarding anything, waiting up to <paramref name="budget"/> for a holder
+    /// that's on its way out. Returns null if it's still held after that.
+    /// </summary>
+    public static InstanceClaim? ClaimExclusive(InstanceEndpoint endpoint, TimeSpan? budget = null)
+    {
+        var deadline = DateTime.UtcNow + (budget ?? DefaultBudget);
+        while (true)
+        {
+            if (InstanceLock.TryAcquire(endpoint.LockFile) is { } held) return new InstanceClaim(endpoint, held, forwarded: false, null);
+            if (DateTime.UtcNow >= deadline) return null;
+            Thread.Sleep(RetryDelay);
+        }
+    }
 
     /// <summary>
     /// Becomes the primary instance, or hands <paramref name="launch"/> to the one already running.

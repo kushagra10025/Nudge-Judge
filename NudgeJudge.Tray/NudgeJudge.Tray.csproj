@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The resident tray host: single-instance server, link routing and a native tray icon, with no UI toolkit.
+    Its own small executable because a native binary keeps type data for everything compiled into it in memory;
+    sharing the UI's executable would cost ~9 MB of Avalonia's for nothing. NudgeJudge.Desktop starts it and
+    publishes it next to itself.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Win32 tray: function pointers and source-generated P/Invoke. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyTitle>NudgeJudge tray</AssemblyTitle>
+    <ApplicationIcon>..\NudgeJudge\Assets\nudgejudge.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <!-- Idle almost always: no background GC thread, and favour a small image over peak speed. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <CppCompilerAndLinker Condition="'$(OS)' != 'Windows_NT' And !Exists('/usr/bin/clang')">gcc</CppCompilerAndLinker>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The Linux tray talks to the session bus directly (the same library Avalonia uses). -->
+    <PackageReference Include="Tmds.DBus.Protocol" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tray icon's image, decoded without Avalonia's asset system. -->
+    <EmbeddedResource Include="..\NudgeJudge\Assets\nudgejudge.ico" LogicalName="nudgejudge.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NudgeJudge.Core\NudgeJudge.Core.csproj" />
+    <InternalsVisibleTo Include="NudgeJudge.Core.Tests" />
+  </ItemGroup>
+</Project>

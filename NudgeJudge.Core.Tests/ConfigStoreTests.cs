@@ -59,7 +59,48 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Equal(20, new JsonConfigStore(ConfigPath).Current.Rules.Count);
     }
 
+    [Fact]
+    public void Refresh_picks_up_another_process_and_says_so_only_when_something_changed()
+    {
+        // The tray host only reads; the UI process writes.
+        var host = new JsonConfigStore(ConfigPath);
+        var changes = 0;
+        host.Changed += (_, _) => changes++;
+
+        Assert.False(host.Refresh());
+        new JsonConfigStore(ConfigPath).Update(c => c.Rules.Add(NamedRule("from-ui")));
+
+        Assert.True(host.Refresh());
+        Assert.Equal(["from-ui"], host.Current.Rules.Select(r => r.Name));
+        Assert.False(host.Refresh());
+        Assert.Equal(1, changes);
+    }
+
     // ---- Failures ----
+
+    [Fact]
+    public void A_failed_save_never_overwrites_what_another_process_saved_later()
+    {
+        // The tray host's toggle fails to save (file locked by a backup tool, say), then the window saves rules.
+        var host = new JsonConfigStore(ConfigPath);
+        var window = new JsonConfigStore(ConfigPath);
+        File.Delete(ConfigPath);
+        Directory.CreateDirectory(ConfigPath);
+        host.Update(c => c.Settings.RoutingEnabled = false);
+        Assert.NotNull(host.SaveError);
+        Directory.Delete(ConfigPath);
+        window.Update(c => c.Rules.Add(NamedRule("edited-in-window")));
+
+        // The host routes with the window's rules, and its next save keeps them.
+        Assert.True(host.Refresh());
+        Assert.Equal(["edited-in-window"], host.Current.Rules.Select(r => r.Name));
+        Assert.Null(host.SaveError);
+        host.Update(c => c.Settings.TemporaryRuleHours = 4);
+
+        var onDisk = new JsonConfigStore(ConfigPath).Current;
+        Assert.Equal(["edited-in-window"], onDisk.Rules.Select(r => r.Name));
+        Assert.Equal(4, onDisk.Settings.TemporaryRuleHours);
+    }
 
     [Fact]
     public void A_failed_save_keeps_the_change_reports_it_and_retries()

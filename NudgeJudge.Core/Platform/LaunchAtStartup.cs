@@ -96,20 +96,8 @@ public sealed class LinuxLaunchAtStartup(string configHome, IReadOnlyList<string
 
     private static bool IsTrue(string? value) => string.Equals(value?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
 
-    private static void WriteAtomic(string path, string text)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
-        try
-        {
-            File.WriteAllBytes(temp, new UTF8Encoding(false).GetBytes(text));
-            File.Move(temp, path, overwrite: true);
-        }
-        finally
-        {
-            if (File.Exists(temp)) File.Delete(temp);
-        }
-    }
+    private static void WriteAtomic(string path, string text) =>
+        Config.AppPaths.WritePrivateFileAtomic(path, new UTF8Encoding(false).GetBytes(text), privateDirectory: false);
 }
 
 /// <summary>Per-user <c>HKCU\…\CurrentVersion\Run</c> value; no admin needed.</summary>

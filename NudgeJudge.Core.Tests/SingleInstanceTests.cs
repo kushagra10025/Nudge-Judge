@@ -70,6 +70,77 @@ public sealed class InstanceProtocolTests
     }
 
     [Fact]
+    public void Check_allows_links_and_pages_only_where_they_mean_something()
+    {
+        InstanceRequest R(InstanceCommand c, string[] urls, string? page = null) => new(InstanceProtocol.Version, "t", c, urls, null, page);
+
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Choose, ["https://a.example/"])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Choose, [])));
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Quit, [])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Quit, ["https://a.example/"])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.ToggleRouting, ["https://a.example/"])));
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Show, [], "rules")));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Open, ["https://a.example/"], "rules")));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Show, [], new string('x', InstanceProtocol.MaxPageLength + 1))));
+    }
+
+    [Fact]
+    public async Task Page_round_trips()
+    {
+        using var stream = new MemoryStream();
+        await InstanceProtocol.WriteRequestAsync(stream, new(InstanceProtocol.Version, "t", InstanceCommand.Show, [], null, "activity"), default);
+        stream.Position = 0;
+        Assert.Equal("activity", (await InstanceProtocol.ReadRequestAsync(stream, default))?.Page);
+    }
+
+    [Fact]
+    public void A_first_order_round_trips_through_the_command_line()
+    {
+        var source = new NudgeJudge.Core.Models.SourceApp("slack", "/usr/bin/slack", "Slack");
+        var arg = InstanceProtocol.EncodeOrder(InstanceCommand.Choose, ["https://a.example/?q=1&x=\"y\""], source, null);
+
+        Assert.StartsWith(InstanceProtocol.OrderFlag, arg);
+        Assert.DoesNotContain(' ', arg);
+        var order = InstanceProtocol.DecodeOrder(["--ui", arg]);
+        Assert.NotNull(order);
+        Assert.Equal(InstanceCommand.Choose, order.Command);
+        Assert.Equal(["https://a.example/?q=1&x=\"y\""], order.Urls);
+        Assert.Equal(source, order.Source);
+
+        Assert.Equal("rules", InstanceProtocol.DecodeOrder([InstanceProtocol.EncodeOrder(InstanceCommand.Show, [], null, "rules")])?.Page);
+    }
+
+    [Theory]
+    [InlineData("--ui")]
+    [InlineData("--order=not base64!")]
+    [InlineData("--order=bm90IGpzb24=")] // "not json"
+    public void A_missing_or_broken_order_is_ignored(string arg) => Assert.Null(InstanceProtocol.DecodeOrder([arg]));
+
+    [Fact]
+    public void An_order_that_fails_the_usual_checks_is_ignored()
+    {
+        // Choose with no links, as a malformed or hand-made command line might carry.
+        Assert.Null(InstanceProtocol.DecodeOrder([InstanceProtocol.EncodeOrder(InstanceCommand.Choose, [], null, null)]));
+    }
+
+    [Fact]
+    public void Stopping_before_the_server_started_keeps_it_from_starting()
+    {
+        // A window process may close before its server, started in the background, got going.
+        var dir = Path.Combine(Path.GetTempPath(), "nj-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            using var claim = SingleInstance.ClaimExclusive(InstanceEndpoint.InDirectory(dir))!;
+            claim.StopServer();
+            Assert.False(claim.StartServer(_ => Task.FromResult(InstanceReply.Success)));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Tokens_are_random_and_compared_exactly()
     {
         var a = InstanceProtocol.NewToken();
@@ -89,6 +160,15 @@ public sealed class InstanceProtocolTests
         var launch = LaunchArguments.Parse(args);
         Assert.Equal(url is null ? [] : [url], launch.Urls);
         Assert.Equal(command, launch.ForwardCommand);
+    }
+
+    [Fact]
+    public void The_ui_flag_marks_a_window_process_and_is_not_a_link()
+    {
+        var launch = LaunchArguments.Parse(["--ui"]);
+        Assert.True(launch.Ui);
+        Assert.Empty(launch.Urls);
+        Assert.False(LaunchArguments.Parse([]).Ui);
     }
 }
 
@@ -273,6 +353,43 @@ public sealed class SingleInstanceTests : IDisposable
         Assert.Collection(_handled,
             r => Assert.Equal((InstanceCommand.Open, 2), (r.Command, r.Urls.Count)),
             r => Assert.Equal(InstanceCommand.Show, r.Command));
+    }
+
+    [Fact]
+    public async Task An_exclusive_claim_waits_for_the_holder_to_let_go()
+    {
+        var first = SingleInstance.ClaimExclusive(_endpoint);
+        Assert.NotNull(first);
+        Assert.Null(SingleInstance.ClaimExclusive(_endpoint, TimeSpan.FromMilliseconds(150)));
+
+        // The tray handover: the launch lets go while the tray host is already waiting for it.
+        var waiting = Task.Run(() => SingleInstance.ClaimExclusive(_endpoint, TimeSpan.FromSeconds(5)));
+        await Task.Delay(200);
+        first.Dispose();
+        using var second = await waiting;
+        Assert.NotNull(second);
+        Assert.True(second.IsPrimary);
+    }
+
+    [Fact]
+    public async Task The_ui_channel_is_separate_from_the_main_one()
+    {
+        if (OperatingSystem.IsWindows()) return; // Pipe names are per user, not per directory: covered by the Unix case.
+        var ui = InstanceEndpoint.InDirectory(_dir, "ui");
+        Assert.NotEqual(_endpoint.LockFile, ui.LockFile);
+
+        using var main = SingleInstance.ClaimExclusive(_endpoint)!;
+        using var window = SingleInstance.ClaimExclusive(ui)!;
+        Assert.True(main.StartServer(_ => Task.FromResult(new InstanceReply(false, "main"))));
+        Assert.True(window.StartServer(request =>
+        {
+            _handled.Enqueue(request);
+            return Task.FromResult(InstanceReply.Success);
+        }));
+
+        var (result, _) = await InstanceClient.SendAsync(ui, InstanceCommand.Choose, ["https://a.example/"], page: null);
+        Assert.Equal(DeliveryResult.Delivered, result);
+        Assert.Equal(InstanceCommand.Choose, Assert.Single(_handled).Command);
     }
 
     [Fact]

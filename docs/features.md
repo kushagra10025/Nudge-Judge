@@ -99,7 +99,7 @@ Either way:
 
 ## Tray menu
 
-Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit.
+Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit. The tray icon belongs to a small background program that holds a few MB. The window is a separate program that closes completely when you close it, giving its memory back.
 
 ## Themes
 

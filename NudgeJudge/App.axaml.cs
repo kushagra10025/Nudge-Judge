@@ -25,12 +25,9 @@ public partial class App : Application
     /// </summary>
     public InstanceClaim? Instance { get; init; }
 
-    /// <summary>The app that opened the links on this launch's command line, when the entry point could tell.</summary>
-    public NudgeJudge.Core.Models.SourceApp? LaunchSource { get; init; }
-
     /// <summary>
-    /// Config, rules and router, when the entry point already built them to route this launch's links before
-    /// the UI started. Null means the links (if any) haven't been routed yet, and the app builds its own.
+    /// Config, rules and router, built by the entry point (which already routed this launch's links). Null for a
+    /// <c>--ui</c> process, the designer and tests, which have no links of their own; the app then builds its own.
     /// </summary>
     public CoreServices? Core { get; init; }
 
@@ -90,8 +87,6 @@ public partial class App : Application
 
         windows.Main = main;
         windows.Chooser = chooser;
-        windows.KeepRunningInBackground = () => config.Current.Settings.RunInBackground;
-        DataContext = new AppViewModel(settings, windows);
 
         router.ChoiceRequested += (_, link) => dispatcher.Post(() =>
         {
@@ -100,16 +95,18 @@ public partial class App : Application
         });
 
         var launch = LaunchArguments.Parse(desktop.Args ?? []);
-        var serving = Instance?.StartServer(request =>
-            Dispatcher.UIThread.InvokeAsync(() => HandleForwarded(request, router, windows)).GetTask()) == true;
+        // Started off the UI thread: writing the session token (with fsync) and opening the socket mustn't hold up
+        // the first window. Launches arriving meanwhile retry until it's listening.
+        var serving = Instance?.IsPrimary == true;
+        if (serving)
+            _ = Task.Run(() => Instance!.StartServer(request =>
+                Dispatcher.UIThread.InvokeAsync(() => HandleRequest(request, router, windows, chooser, settings)).GetTask()));
 
-        // Stay in the tray when the user wants that. A launch that only came to open links stays only if it's
-        // the server (so the next links are handled instantly) or the user opened the main window meanwhile.
-        bool StayResident() => config.Current.Settings.RunInBackground
-                               && (serving || launch.Urls.Count == 0 || windows.MainWindowShown);
+        // This process exists to show windows: once the last one closes, it's done. Staying in the tray is the
+        // resident host's job, which keeps none of this in memory.
         void ExitIfIdle()
         {
-            if (StayResident() || windows.AnyWindowOpen) return;
+            if (windows.AnyWindowOpen) return;
             // Later launches now find no server and take over, rather than queueing behind a closing process.
             Instance?.StopServer();
             desktop.Shutdown();
@@ -119,63 +116,114 @@ public partial class App : Application
         // Installing an update closes this process: save what's pending and let the next launch take over the server.
         updates.PreparingToRestart = () =>
         {
+            RestartingForUpdate = true;
             settings.FlushPendingSaves();
             Instance?.StopServer();
+            // The tray host would otherwise keep running the old version (and start old windows) after the update.
+            if (launch.Ui) TellResidentHostToQuit();
         };
-        // Only a process that sticks around checks; one that just routes a link and exits never touches the network.
-        if (launch.Urls.Count == 0 || serving)
+
+        // Started by the tray host with its first order on the command line.
+        var order = launch.Ui ? InstanceProtocol.DecodeOrder(desktop.Args ?? []) : null;
+
+        // Only a process that opens the main window looks for updates (that's where they're shown). Each chooser is
+        // a short-lived process of its own; checking from every one would ask GitHub on most link clicks.
+        if (launch.Ui ? order?.Command == InstanceCommand.Show : launch.Urls.Count == 0)
         {
             var schedule = new CancellationTokenSource();
             desktop.Exit += (_, _) => schedule.Cancel();
             _ = updates.RunScheduleAsync(schedule.Token);
         }
 
-        if (launch.Urls.Count == 0)
+        if (launch.Ui)
         {
-            if (!launch.Background) windows.ShowMainWindow();
+            // Act on the first order now, not after our server is up. Later orders come over the server.
+            // If nothing ever opens, don't linger invisibly.
+            if (order is not null) HandleRequest(order, router, windows, chooser, settings);
+            DispatcherTimer.RunOnce(ExitIfIdle, UiOrderTimeout);
             return;
         }
 
-        // Launched with links (as the default browser is). Links forwarded by later launches join the same chooser.
-        if (Core is null)
+        if (launch.Urls.Count == 0)
         {
-            foreach (var url in launch.Urls)
-                router.Route(url, LaunchSource);
+            windows.ShowMainWindow();
+            return;
         }
-        else
-        {
-            // Routed by the entry point before the UI started; only the ones no rule took are left.
-            foreach (var link in PendingLinks)
-                dispatcher.Post(() =>
-                {
-                    chooser.Enqueue(link.Url, link.Source);
-                    windows.ShowChooser();
-                });
-        }
+
+        // Launched with links (as the default browser is), already routed by the entry point before the UI started:
+        // only the ones no rule took are left. Links forwarded by later launches join the same chooser.
+        foreach (var link in PendingLinks)
+            dispatcher.Post(() =>
+            {
+                chooser.Enqueue(link.Url, link.Source);
+                windows.ShowChooser();
+            });
 
         // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
         Dispatcher.UIThread.Post(ExitIfIdle);
     }
 
+    /// <summary>How long a <c>--ui</c> process waits for its first order before giving up.</summary>
+    private static readonly TimeSpan UiOrderTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>Set while closing to install an update, so the entry point doesn't start the tray host again.</summary>
+    public static bool RestartingForUpdate { get; private set; }
+
+    private static void TellResidentHostToQuit()
+    {
+        try
+        {
+            InstanceClient.SendAsync(InstanceEndpoint.ForCurrentUser(), InstanceCommand.Quit, []).Wait(TimeSpan.FromSeconds(3));
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Trace.TraceWarning($"NudgeJudge: couldn't ask the tray host to quit: {e.Message}");
+        }
+    }
+
     /// <summary>
-    /// The primary instance's side of the single-instance channel. The request is already authenticated;
-    /// each URL is still validated by <see cref="LinkRouter.Route"/>, as any other incoming link is.
+    /// Requests from later launches (when this is the primary instance) or from the tray host (when this is its
+    /// <c>--ui</c> process). The request is already authenticated; each URL is still validated, as any other
+    /// incoming link is.
     /// </summary>
-    private static InstanceReply HandleForwarded(InstanceRequest request, LinkRouter router, DesktopWindowService windows)
+    private static InstanceReply HandleRequest(InstanceRequest request, LinkRouter router, DesktopWindowService windows,
+        ChooserViewModel chooser, SettingsViewModel settings)
     {
         switch (request.Command)
         {
             case InstanceCommand.Show:
-                windows.ShowMainWindow();
+                windows.ShowMainWindow(ParsePage(request.Page));
                 break;
             case InstanceCommand.Open:
                 // The source is the sender's say-so; Route sanitizes it like any other input.
                 foreach (var url in request.Urls)
                     router.Route(url, request.Source);
                 break;
+            case InstanceCommand.Choose:
+                // Already routed and logged by the tray host; only the chooser is left.
+                var source = NudgeJudge.Core.Models.SourceApp.Sanitize(request.Source);
+                foreach (var url in request.Urls)
+                    if (NudgeJudge.Core.Security.UrlValidator.Validate(url) is { IsValid: true, Url: { } valid })
+                        chooser.Enqueue(valid, source);
+                if (chooser.Tabs.Count > 0) windows.ShowChooser();
+                break;
+            case InstanceCommand.ToggleRouting:
+                settings.ToggleRoutingCommand.Execute(null);
+                break;
+            case InstanceCommand.Quit:
+                // After this reply goes out, so the sender hears back before the channel closes.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    settings.FlushPendingSaves();
+                    windows.Quit();
+                });
+                break;
         }
         return InstanceReply.Success;
     }
+
+    private static AppPage? ParsePage(string? page) =>
+        Enum.TryParse<AppPage>(page, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed) ? parsed : null;
 
     /// <summary>Keeps an existing startup entry pointing at this install, in case the app moved since it was added.</summary>
     private static void RefreshStartupEntry(ILaunchAtStartup startup)
