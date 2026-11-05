@@ -2,6 +2,10 @@
   "name": "nudgejudge-extension",
   "description": "Send links you click in the browser to NudgeJudge, which opens them where your rules say.",
   "private": true,
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  },
   "version": "0.1.0",
   "type": "module",
   "scripts": {

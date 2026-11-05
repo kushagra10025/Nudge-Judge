@@ -83,7 +83,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24 ships npm 11, which wrote package-lock.json. npm 10 (Node 22) reads its optional per-platform
+          # packages (lightningcss, an optional peer of Vite) as required and fails with EBADPLATFORM.
+          node-version: 24
           cache: npm
           cache-dependency-path: NudgeJudge.Extension/package-lock.json
       # Same version as the app, so every release can be signed (AMO never signs one version twice).
