@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 270" width="880" height="270" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How NudgeJudge routes a link</title>
+  <style>
+    .bg { fill: #EDF1EE; }
+    .card { fill: #FFFFFF; stroke: #B4C1B9; }
+    .ink { fill: #13201A; }
+    .muted { fill: #4B5B52; }
+    .faint { fill: #66766D; }
+    .mono { font-family: 'Cascadia Mono', 'JetBrains Mono', 'DejaVu Sans Mono', Consolas, monospace; }
+    .track { stroke: #B4C1B9; }
+    .route { stroke: #C97C06; }
+    .routeFill { fill: #C97C06; }
+    .ring { fill: #FFFFFF; stroke: #B4C1B9; }
+    .ringLit { fill: #FFFFFF; stroke: #C97C06; }
+    .panel { fill: #0F1F18; }
+    .onPanel { fill: #E3EBE6; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0D1411; }
+      .card { fill: #141E19; stroke: #3A4C42; }
+      .ink { fill: #E3EBE6; }
+      .muted { fill: #A2B3A9; }
+      .faint { fill: #84978C; }
+      .track { stroke: #3A4C42; }
+      .route { stroke: #F2B33D; }
+      .routeFill { fill: #F2B33D; }
+      .ring { fill: #141E19; stroke: #3A4C42; }
+      .ringLit { fill: #141E19; stroke: #F2B33D; }
+    }
+  </style>
+
+  <rect class="bg" width="880" height="270" rx="16"/>
+
+  <!-- Source app -->
+  <rect class="card" x="24" y="96" width="150" height="76" rx="10" stroke-width="1.5"/>
+  <text class="faint" x="40" y="122" font-size="12">Clicked in</text>
+  <text class="ink" x="40" y="144" font-size="16" font-weight="600">Microsoft Teams</text>
+  <text class="muted mono" x="40" y="162" font-size="11">youtube.com/watch…</text>
+
+  <!-- NudgeJudge panel -->
+  <rect class="panel" x="200" y="28" width="96" height="30" rx="8" stroke="#3A4C42" stroke-width="1"/>
+  <text class="onPanel" x="248" y="48" font-size="13" font-weight="600" text-anchor="middle">NudgeJudge</text>
+  <text class="faint" x="306" y="48" font-size="12">checks your rules top to bottom</text>
+
+  <!-- Main line -->
+  <line class="route" x1="174" y1="134" x2="520" y2="134" stroke-width="4" stroke-linecap="round"/>
+  <line class="track" x1="520" y1="134" x2="760" y2="134" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Junctions -->
+  <g font-size="12" text-anchor="middle">
+    <circle class="ringLit" cx="250" cy="134" r="9" stroke-width="3"/>
+    <text class="muted" x="250" y="112">1</text>
+    <text class="faint" x="250" y="166" font-size="11">Work tracker</text>
+
+    <circle class="ringLit" cx="340" cy="134" r="9" stroke-width="3"/>
+    <text class="muted" x="340" y="112">2</text>
+    <text class="faint" x="340" y="166" font-size="11">Company repos</text>
+
+    <circle class="ringLit" cx="430" cy="134" r="9" stroke-width="3"/>
+    <text class="muted" x="430" y="112">3</text>
+    <text class="faint" x="430" y="166" font-size="11">Banking</text>
+
+    <rect class="routeFill" x="510" y="124" width="20" height="20" transform="rotate(45 520 134)"/>
+    <text class="ink" x="520" y="108" font-weight="700">4</text>
+
+    <circle class="ring" cx="610" cy="134" r="9" stroke-width="3"/>
+    <text class="faint" x="610" y="112">5</text>
+  </g>
+
+  <!-- Diverted route -->
+  <path class="route" d="M520 134 L 560 214 L 760 214" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="ink" x="580" y="204" font-size="12" font-weight="600">Rule 4 · Video from Teams</text>
+  <text class="faint" x="580" y="236" font-size="11">youtube.com, opened from Teams</text>
+
+  <!-- Terminals -->
+  <rect class="card" x="770" y="114" width="90" height="40" rx="8" stroke-width="1.5"/>
+  <text class="muted" x="815" y="139" font-size="13" text-anchor="middle">Ask me</text>
+
+  <rect class="card" x="770" y="190" width="90" height="48" rx="8" stroke-width="2"/>
+  <rect x="770" y="190" width="90" height="48" rx="8" fill="none" class="route" stroke-width="2"/>
+  <rect class="routeFill" x="770" y="190" width="5" height="48" rx="2"/>
+  <text class="ink" x="818" y="211" font-size="13" font-weight="600" text-anchor="middle">Chrome</text>
+  <text class="muted" x="818" y="228" font-size="11" text-anchor="middle">Work profile</text>
+
+  <text class="faint" x="815" y="94" font-size="11" text-anchor="middle">no match</text>
+</svg>
