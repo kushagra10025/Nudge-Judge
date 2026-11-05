@@ -12,7 +12,15 @@ It's built to stay out of the way. Ordinary clicks are never touched; only an ex
 
 1. In NudgeJudge, open **Settings → Browser extension** and turn on **Take links from the browser extension**. This
    tells your browsers where to find NudgeJudge.
-2. Install the extension in each browser you use: Chrome, Edge, Brave, Vivaldi, Chromium or Firefox.
+2. Install the extension in each browser you use, from the files on the same
+   [GitHub release](https://github.com/kushagra10025/Nudge-Judge/releases) as your NudgeJudge:
+   - **Firefox:** open `nudgejudge-extension-<version>-firefox.xpi` with Firefox (drag it into a window, or
+     *Add-ons → ⚙ → Install Add-on From File*). It's signed by Mozilla, so it stays installed.
+   - **Chrome, Edge, Brave, Vivaldi, Chromium:** unzip `nudgejudge-extension-<version>-chromium.zip` into a folder you
+     keep. Open the extensions page (`chrome://extensions`, `edge://extensions`, …), turn on *Developer mode*, click
+     *Load unpacked* and pick that folder. The browser may remind you about developer-mode extensions.
+
+   Store listings will replace these steps once they're published.
 3. Open the extension's options page. It should say **Connected to NudgeJudge**. To use the modifier-click, click
    **Allow** under *Click with* to give it access to all sites, then reload tabs that were already open.
 
@@ -314,22 +322,42 @@ The host manifests list the IDs that may connect. They're kept in `NativeHostReg
 
 ## Publishing
 
-`.github/workflows/extension.yml` runs on every change under `NudgeJudge.Extension/`. It type-checks and tests the
-extension, then keeps `nudgejudge-extension-<version>-{chrome,firefox,sources}.zip` as the run's artifact. It
-deliberately doesn't create a GitHub release: the app's updater reads this repository's releases, and a release
-without Velopack's feed mustn't become the latest.
+### On GitHub, with every app release
 
-To publish a version:
+The release workflow (`.github/workflows/release.yml`) has an `extension` job. It runs after the app is published
+and attaches these files to the same release:
 
-1. Bump `version` in `NudgeJudge.Extension/package.json`, then merge.
-2. Download the artifact from that workflow run.
-3. Upload it to each store:
+| File | For |
+|---|---|
+| `nudgejudge-extension-<version>-chromium.zip` | Chromium browsers, via *Load unpacked*. It carries the development key, so its ID is the one the app allows. |
+| `nudgejudge-extension-<version>-firefox.xpi` | Firefox, signed by Mozilla as an *unlisted* add-on: not shown on addons.mozilla.org, but installable in regular Firefox. Only when the AMO secrets are set (below). |
+| `nudgejudge-extension-<version>-firefox-unsigned.zip` | Instead of the `.xpi` when the secrets aren't set. Firefox only loads it as a temporary add-on. |
+
+The extension takes the app's version from the tag. AMO never signs the same version twice, so every release can be
+signed. There's never a separate extension release, because the app's updater reads this repository's releases and
+expects Velopack's feed in each.
+
+To get signed Firefox builds, create an API key once at addons.mozilla.org (*Tools → Manage API Keys*). Add it to the
+repository as the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. Signing an unlisted add-on is automatic and takes a
+few minutes. A prerelease tag (`v0.3.0-beta.1`) signs as `0.3.0`, so two prereleases of the same version can't
+both be signed.
+
+`.github/workflows/extension.yml` checks every change under `NudgeJudge.Extension/` (type check, tests, store
+packages as a downloadable artifact).
+
+### In the stores, later
+
+1. Download the store packages from the extension workflow's artifact (`npm run zip` builds the Chromium one without
+   the key).
+2. Upload them:
    - **Chrome Web Store** ([dashboard](https://chrome.google.com/webstore/devconsole)): the `chrome` zip. On first
-     upload, copy the item ID into `ChromiumExtensionIds`.
+     upload, copy the item ID into `NativeHostRegistration.ChromiumExtensionIds`.
    - **Edge Add-ons** ([Partner Center](https://partner.microsoft.com/dashboard/microsoftedge)): the same `chrome`
      zip. Add its item ID too.
-   - **Firefox Add-ons** ([AMO](https://addons.mozilla.org/developers/)): the `firefox` zip, plus the `sources` zip
-     when AMO asks for source code (build with `npm ci && npm run build:firefox`).
+   - **Firefox Add-ons** ([AMO](https://addons.mozilla.org/developers/)): the same add-on ID (`extension@nudgejudge`)
+     can get listed versions next to the unlisted ones. Upload the `firefox` zip, plus the `sources` zip.
+3. Ship an app release with the new IDs before (or with) the store listings. Otherwise store installs get "NudgeJudge
+   doesn't recognise this copy of the extension".
 
 For reviewers, explain `nativeMessaging` as: "Sends the link the user chose to the NudgeJudge desktop app, which opens
 it in the browser the user's rules pick." The optional `<all_urls>` and `webNavigation` permissions are only
@@ -342,5 +370,5 @@ requested for the modifier-click and automatic routing.
 | 1. **App: native host.** Host mode, framing, the "stay" decision, registrar, Settings switch | ✅ Done |
 | 2. **Extension, first version.** Context menu, toolbar button and shortcut, options page with connection status | ✅ Done |
 | 3. **Modifier-click** behind the optional permission, with "stay" handling in the page | ✅ Done |
-| 4. **Store submissions.** CI builds the packages; the uploads are manual (above). Waiting on store accounts and IDs | ⏳ To do |
+| 4. **Distribution.** Attached to every GitHub release (signed for Firefox once the AMO secrets are set) ✅. Store listings later | ⏳ Stores to do |
 | 5. **Automatic routing.** Rules marked *Also catch in the browser* | ✅ Done |

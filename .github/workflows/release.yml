@@ -1,5 +1,6 @@
 # Push a tag like v0.2.0 to build the native app for Windows and Linux, pack it with Velopack
 # and publish both to one GitHub Release. Installed copies find it from Settings → Updates.
+# The browser extension is built with the same version and attached to that release too.
 name: Release
 
 on:
@@ -63,3 +64,56 @@ jobs:
       - run: >
           vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
           --tag ${{ github.ref_name }} --releaseName "NudgeJudge ${{ env.VERSION }}" --merge --publish
+
+  # The browser extension ships with the app it talks to, as files on the same release. Never as a release of its
+  # own: the app's updater reads this repository's releases and expects each to carry Velopack's feed.
+  extension:
+    needs: linux
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: NudgeJudge.Extension
+    env:
+      # Optional. With these repository secrets (an AMO API key: addons.mozilla.org → Tools → Manage API Keys),
+      # the Firefox build is signed by Mozilla as an unlisted add-on, which regular Firefox installs. Without them,
+      # only an unsigned build is attached, which Firefox loads as a temporary add-on only.
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: NudgeJudge.Extension/package-lock.json
+      # Same version as the app, so every release can be signed (AMO never signs one version twice).
+      - name: Version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+      - run: npm run compile
+      - run: npm test
+      # Chromium: an unpacked build with the development key, so its ID is the one the app allows
+      # (store builds get a store-assigned ID instead). Installed with "Load unpacked".
+      - run: npm run build
+      - run: cd .output/chrome-mv3 && zip -qr "../nudgejudge-extension-$VERSION-chromium.zip" .
+      # Firefox: builds .output/firefox-mv3 and the sources zip AMO asks for.
+      - run: npm run zip:firefox
+      - name: Sign for Firefox (unlisted)
+        if: env.AMO_JWT_ISSUER != ''
+        run: >
+          npx --yes web-ext@10 sign --channel unlisted
+          --source-dir .output/firefox-mv3 --artifacts-dir .output/signed
+          --upload-source-code ".output/nudgejudge-extension-$VERSION-sources.zip"
+          --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+          && mv .output/signed/*.xpi ".output/nudgejudge-extension-$VERSION-firefox.xpi"
+      - name: Keep the unsigned Firefox build when it wasn't signed
+        if: env.AMO_JWT_ISSUER == ''
+        run: mv ".output/nudgejudge-extension-$VERSION-firefox.zip" ".output/nudgejudge-extension-$VERSION-firefox-unsigned.zip"
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber
+          ".output/nudgejudge-extension-$VERSION-chromium.zip"
+          $(ls .output/nudgejudge-extension-$VERSION-firefox.xpi .output/nudgejudge-extension-$VERSION-firefox-unsigned.zip 2>/dev/null)

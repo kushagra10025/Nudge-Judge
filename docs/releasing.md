@@ -10,6 +10,8 @@ git tag v0.2.0 && git push origin v0.2.0
 
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) then builds the native app for `win-x64` and `linux-x64` with that version, packs it with `vpk` (a `Setup.exe` for Windows and an AppImage for Linux, plus delta packages against the previous release) and uploads both to one release. Installed copies pick it up on their next check.
 
+The same run builds the [browser extension](browser-extension.md#on-github-with-every-app-release) with the app's version and attaches it to that release. Firefox builds are signed when the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` secrets are set.
+
 ## Testing the update flow locally
 
 Install the `vpk` tool (same version as the `Velopack` package), then pack two versions into the same folder and install the older one:
