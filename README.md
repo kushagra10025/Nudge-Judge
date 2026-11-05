@@ -93,12 +93,53 @@ dotnet publish NudgeJudge.Desktop -c Release -r linux-x64        # native build 
 
 Then open **Settings → Make default**. Full instructions, including the native build's toolchain and first-run samples, are in [Getting started](docs/getting-started.md).
 
+## Installing the browser extension
+
+The extension sends links you click *inside* a browser to NudgeJudge. Until it's in the browser stores, install it by hand from the [latest release](https://github.com/kushagra10025/Nudge-Judge/releases/latest). Use the release that matches your NudgeJudge version.
+
+**First, in NudgeJudge:** open **Settings → Browser extension** and turn on **Take links from the browser extension**.
+
+### Firefox
+
+1. On the release page, right-click **`nudgejudge-extension-<version>-firefox.xpi`** and choose **Save Link As…**.
+2. In Firefox, open `about:addons`, click the ⚙ menu and choose **Install Add-on From File…**.
+3. Pick the `.xpi` you saved and click **Add**.
+
+The `.xpi` is signed by Mozilla, so it stays installed after a restart. To update, install the newer `.xpi` the same way.
+
+A release with only **`…-firefox-unsigned.zip`** has no signed build. Regular Firefox won't install it permanently. You can try it until Firefox restarts: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and pick the zip.
+
+### Chrome, Edge, Brave, Vivaldi and other Chromium browsers
+
+1. Download **`nudgejudge-extension-<version>-chromium.zip`** from the release page.
+2. Unzip it into a folder you'll keep, e.g. `~/NudgeJudge-extension`. The browser loads the extension from that folder every time, so don't delete or move it.
+3. Open the browser's extensions page: `chrome://extensions`, `edge://extensions`, `brave://extensions` or `vivaldi://extensions`.
+4. Turn on **Developer mode** (top right).
+5. Click **Load unpacked** and pick the folder from step 2: the one with `manifest.json` directly in it.
+
+To update, unzip the newer release into the same folder, replacing its contents. Then click the reload button ⟳ on the extension's card.
+
+> [!NOTE]
+> Use the `chromium.zip` from the release, not a store package or your own `npm run zip`. Its built-in key gives the extension the ID NudgeJudge accepts. Any other build gets a different ID, and the options page says "NudgeJudge doesn't recognise this copy of the extension".
+
+### Check that it works
+
+Open the extension's options page (right-click its toolbar icon → **Options** in Chromium browsers; **Manage Extension → Options** in Firefox). It should say **Connected to NudgeJudge**.
+
+To send a link:
+- **Right-click it → Open with NudgeJudge.** Always available.
+- **Modifier-click:** <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click on Linux, <kbd>Alt</kbd>+<kbd>Shift</kbd>+click on Windows. Click **Allow** under *Click with* on the options page first, then reload tabs that were already open.
+- **The current page:** the toolbar button or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>.
+
+More, including automatic routing, in [Browser extension](docs/browser-extension.md).
+
 ## Documentation
 
 | Doc | What's in it |
 |---|---|
 | [Features](docs/features.md) | Rules, match types, source-app detection, chooser, activity, updates, default-browser setup |
 | [Getting started](docs/getting-started.md) | Build, run, test and first-run setup |
+| [Browser extension](docs/browser-extension.md) | Gestures, automatic routing, how it reaches the app, publishing |
 | [Security](docs/security.md) | How untrusted URLs and local messaging are handled |
 | [How data is saved](docs/data-storage.md) | Config paths, atomic writes, recovery, Windows gaps |
 | [Performance](docs/performance.md) | Benchmarks and how startup and matching stay fast |
