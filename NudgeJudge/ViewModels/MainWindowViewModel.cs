@@ -34,6 +34,18 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             Navigate(AppPage.Rules);
             rules.NewRuleFrom(source);
         };
+        activity.BrowserNeedsReview = id => config.Current.FindBrowser(id)?.NeedsReview == true;
+        activity.ReviewBrowserRequested += (_, id) =>
+        {
+            Navigate(AppPage.Browsers);
+            browsers.Edit(id);
+        };
+        // Reviewing (or importing) a browser changes which failed links can offer "Review browser".
+        config.Changed += (_, _) =>
+        {
+            if (dispatcher is null) activity.RefreshReviewState();
+            else dispatcher.Post(activity.RefreshReviewState);
+        };
     }
 
     public RulesViewModel Rules { get; }

@@ -49,6 +49,9 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
 
     public Guid? EditingId { get; private set; }
 
+    /// <summary>Set while the editor holds an unsaved clone: the rule it copies, which it's saved below.</summary>
+    public Guid? CloneOfId { get; private set; }
+
     /// <summary>Where the editor gets known apps from (Activity). Set by the Rules page.</summary>
     public Func<IEnumerable<SourceApp>>? KnownSources { get; set; }
 
@@ -88,7 +91,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsTemporary))]
     public partial string? ExpiryText { get; set; }
 
-    public string Title => IsNew ? "New rule" : "Edit rule";
+    public string Title => CloneOfId is not null ? "Clone rule" : IsNew ? "New rule" : "Edit rule";
     public bool HasNameError => NameError is not null;
     public bool HasRuleError => RuleError is not null;
     public bool IsTemporary => ExpiryText is not null;
@@ -117,6 +120,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     {
         _loading = true;
         EditingId = null;
+        CloneOfId = null;
         IsNew = true;
         Root.Load(RuleJoin.All, [RuleCondition.Link(MatchKind.Wildcard, pattern)]);
         Browser = Browsers.FirstOrDefault(b => b.Id == browserId) ?? Browsers.FirstOrDefault();
@@ -132,9 +136,26 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         IsOpen = true;
     }
 
+    /// <summary>
+    /// Opens an unsaved copy of <paramref name="original"/>. Nothing is added until Save, which puts the copy
+    /// just below the original; Cancel leaves no trace.
+    /// </summary>
+    public void OpenClone(Rule original, IEnumerable<string> takenNames)
+    {
+        var copy = original.CloneAsNew(takenNames);
+        copy.ExpiresAt = null;
+        copy.ExpiresAfterBootId = null;
+        OpenExisting(copy);
+        EditingId = null;
+        CloneOfId = original.Id;
+        IsNew = true;
+        OnPropertyChanged(nameof(Title));
+    }
+
     public void OpenExisting(Rule rule)
     {
         _loading = true;
+        CloneOfId = null;
         EditingId = rule.Id;
         IsNew = false;
         Name = rule.Name;
@@ -156,6 +177,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
     {
         IsOpen = false;
         EditingId = null;
+        CloneOfId = null;
         SuggestedSource = null;
     }
 
@@ -186,6 +208,7 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
         if (!CanSave()) return;
 
         var id = EditingId;
+        var cloneOf = CloneOfId;
         var join = Root.Join.Join;
         var conditions = Root.Items.Select(c => c.ToModel()).ToList();
         _config.Update(c =>
@@ -194,7 +217,14 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
             if (rule is null)
             {
                 rule = new Rule();
-                c.Rules.Add(rule);
+                // A clone goes just below its original (or last, if the original went meanwhile).
+                var at = cloneOf is { } o ? c.Rules.FindIndex(r => r.Id == o) : -1;
+                if (at >= 0)
+                {
+                    rule.ClonedFromId = cloneOf;
+                    c.Rules.Insert(at + 1, rule);
+                }
+                else c.Rules.Add(rule);
             }
             rule.Name = Name.Trim();
             rule.Join = join;
@@ -648,6 +678,7 @@ public sealed partial class ConditionValueViewModel : ViewModelBase
     {
         _owner = owner;
         Text = text;
+        UpdateReading();
     }
 
     public ConditionEditorViewModel Condition => _owner;
@@ -667,7 +698,26 @@ public sealed partial class ConditionValueViewModel : ViewModelBase
     public bool HasError => Error is not null;
     public bool ShowOr => !IsFirst;
 
-    partial void OnTextChanged(string value) => _owner.ValueChanged();
+    /// <summary>
+    /// Time values only: how the value was read ("Weekdays, 09:00 to 17:00"), so "9-5" shows up as overnight
+    /// before it routes anything. Hidden while there's an error, which says what's wrong instead.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowReading))]
+    public partial string? Reading { get; private set; }
+
+    public bool ShowReading => Reading is not null && !HasError;
+
+    partial void OnErrorChanged(string? value) => OnPropertyChanged(nameof(ShowReading));
+
+    partial void OnTextChanged(string value)
+    {
+        UpdateReading();
+        _owner.ValueChanged();
+    }
+
+    // _owner is unset while the generated property runs from the constructor's first assignment.
+    private void UpdateReading() => Reading = _owner?.IsTime == true ? TimeWindow.Describe(Text) : null;
 
     [RelayCommand]
     private void Remove() => _owner.RemoveValue(this);

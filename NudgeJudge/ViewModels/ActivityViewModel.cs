@@ -47,6 +47,25 @@ public sealed partial class ActivityViewModel : ViewModelBase
     /// <summary>Raised when the user asks for a rule built from an entry. The main window takes it to the Rules page.</summary>
     public event EventHandler<RuleFromActivity>? CreateRuleRequested;
 
+    /// <summary>Raised from a link that couldn't open because its browser awaits review. The main window opens that browser.</summary>
+    public event EventHandler<Guid>? ReviewBrowserRequested;
+
+    /// <summary>Whether a browser is waiting for review. Set by the main window, which knows the config.</summary>
+    public Func<Guid, bool>? BrowserNeedsReview { get; set; }
+
+    /// <summary>A browser's review state changed: entries re-ask whether to offer "Review browser".</summary>
+    public void RefreshReviewState()
+    {
+        foreach (var item in _all) item.RefreshReview();
+    }
+
+    internal bool NeedsReview(Guid browserId) => BrowserNeedsReview?.Invoke(browserId) == true;
+
+    internal void ReviewBrowser(ActivityItemViewModel item)
+    {
+        if (item.BrowserId is { } id) ReviewBrowserRequested?.Invoke(this, id);
+    }
+
     [ObservableProperty] public partial string Filter { get; set; } = "";
 
     public bool IsEmpty => _all.Count == 0;
@@ -204,6 +223,22 @@ public sealed partial class ActivityItemViewModel(ActivityEntry entry, ActivityV
 
     [RelayCommand(CanExecute = nameof(CanCreateRule))]
     private void CreateRule() => owner?.CreateRule(this);
+
+    /// <summary>The link failed because its browser came from an import and still needs review: offer the fix.</summary>
+    public bool CanReviewBrowser =>
+        Outcome is ActivityOutcome.Failed && BrowserId is { } id && owner?.NeedsReview(id) == true;
+
+    /// <summary>"Create rule" steps aside while the fix is on offer: one action per row.</summary>
+    public bool ShowCreateRule => CanCreateRule && !CanReviewBrowser;
+
+    [RelayCommand]
+    private void ReviewBrowser() => owner?.ReviewBrowser(this);
+
+    internal void RefreshReview()
+    {
+        OnPropertyChanged(nameof(CanReviewBrowser));
+        OnPropertyChanged(nameof(ShowCreateRule));
+    }
 
     internal bool Matches(string filter) =>
         string.IsNullOrWhiteSpace(filter) ||

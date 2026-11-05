@@ -57,6 +57,10 @@ The editor's **When** section lays conditions on a track like junctions on the l
 
 The rule name is suggested from the first link pattern and app ("acme.io from Microsoft Teams") until the user types their own, so the required field never starts empty. Clearing it disables Save and says why.
 
+**Clone** opens an unsaved copy in the editor (title "Clone rule"); it's added below its original only on Save. A saved copy that still routes like its original carries a neutral **Duplicate of n ↑** badge (`Icon.Up`, since the original is always above). Clicking it outlines the original in ink (`Border.row.highlight`: 1.5 px InkMuted border, hover surface) for two seconds. Not amber: nothing is being routed.
+
+Time values are free text, so each one is read back under its field in small muted text once it parses ("Weekdays, 09:00 to 17:00"; overnight windows say so). It hides while the field shows an error. This is feedback, not a hint, so it doesn't break the tooltip rule.
+
 ## Source app
 
 Where a link came from is shown as "from ▤ Microsoft Teams" (faint "from", muted name, path in the tooltip) beside the host in Activity, and in the chooser's eyebrow line ("No rule matched this link from Microsoft Teams"). The chooser's footer offers "Only links from …" when saving a rule. The tester takes an optional app beside the link.
@@ -82,6 +86,8 @@ Stroke icons drawn by [Controls/Icon.cs](NudgeJudge/Controls/Icon.cs) from `Icon
 - **Badges:** neutral by default (Sample, Private, profile, time left). Only "Primary" (proceed) and "Not secure" (stop) carry colour.
 - **Undo toast** (`UndoToast`, `UndoBar`): deleting a rule or browser and clearing Activity happen at once and offer **Undo** for 8 s in a panel-coloured slip at the page foot. No confirmation dialogs.
 - **Activity outcomes:** a lamp and a word. Amber = a rule routed it, ink = you chose, hollow = the chooser asked, stop = failed or rejected.
+- **Needs review** (an imported browser that looked suspicious): a stop badge on the browser row with one trimmed line under the program ("Needs review: runs a script · risky arguments", full reasons in the tooltip). The editor opens with a `notice stop` listing one reason per line, risky arguments in mono, and the save button reads **Save as reviewed**. Activity rows held back by one show **Review browser** at rest, and the chooser notes how many it left out.
+- **Import review** (Settings): a counted `notice stop` ("1 browser would run a different program · 1 rule will open somewhere else"), then per section the items needing a look in full, then one ghost toggle ("7 rules more, nothing to check"). Rule lines reuse `ConditionSummary`; destinations that need review get a stop badge, not parentheses. Rows update in place when a choice changes, so nothing moves under the pointer. Radios, like checkboxes, are ink when on.
 - **Setup checklist:** with no rules, the Rules page shows three numbered junction steps (find browsers, first rule, default browser). Done steps show a proceed check in the junction; the next step's button is the accent.
 
 ## Chooser

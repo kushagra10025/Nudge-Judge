@@ -53,6 +53,13 @@ public sealed partial class ChooserViewModel : ViewModelBase
     public bool SavesRule => Remember.SavesRule;
     public bool HasMultipleTabs => Tabs.Count > 1;
     public bool HasBrowsers => Browsers.Count > 0;
+
+    /// <summary>Imported browsers left out until reviewed on the Browsers page.</summary>
+    public int HiddenForReview { get; private set; }
+    public bool HasHiddenForReview => HiddenForReview > 0;
+    public string HiddenForReviewText => HiddenForReview == 1
+        ? "1 imported browser is hidden until you review it on the Browsers page."
+        : $"{HiddenForReview} imported browsers are hidden until you review them on the Browsers page.";
     public string WaitingText => Tabs.Count switch { 0 => "", 1 => "1 link waiting", var n => $"{n} links waiting" };
 
     /// <summary>Adds an unmatched link. Links arriving in a burst queue behind the current tab instead of stealing focus.</summary>
@@ -165,6 +172,9 @@ public sealed partial class ChooserViewModel : ViewModelBase
         for (var i = 0; i < usable.Count; i++)
             Browsers.Add(new BrowserChoiceViewModel(usable[i], i + 1));
         OnPropertyChanged(nameof(HasBrowsers));
+        HiddenForReview = cfg.Browsers.Count - usable.Count;
+        OnPropertyChanged(nameof(HasHiddenForReview));
+        OnPropertyChanged(nameof(HiddenForReviewText));
 
         var kind = Remember?.Kind ?? RememberKind.Once;
         RememberOptions.Clear();

@@ -204,23 +204,12 @@ public sealed partial class RulesViewModel : ViewModelBase
         SyncEditingFlags();
     }
 
-    /// <summary>Copies a rule to just below it and opens the copy in the editor.</summary>
+    /// <summary>Opens an unsaved copy of a rule in the editor. Saving puts it just below the original.</summary>
     internal void Clone(RuleItemViewModel item)
     {
         if (_config.Current.Rules.Find(r => r.Id == item.Id) is not { } original) return;
-        var copy = original.CloneAsNew();
-        // By id: the update may first pick up another process's changes and shift the list.
-        _config.Update(c =>
-        {
-            var at = c.Rules.FindIndex(r => r.Id == original.Id);
-            c.Rules.Insert(at < 0 ? c.Rules.Count : at + 1, copy);
-        });
-        Reload();
-        if (_config.Current.Rules.Find(r => r.Id == copy.Id) is { } saved)
-        {
-            Editor.OpenExisting(saved);
-            SyncEditingFlags();
-        }
+        Editor.OpenClone(original, _config.Current.Rules.Select(r => r.Name));
+        SyncEditingFlags();
     }
 
     /// <summary>Raised with the row to scroll to when a duplicate badge points at its original.</summary>

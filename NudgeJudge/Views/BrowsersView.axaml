@@ -107,7 +107,8 @@
                       <TextBlock Classes="mono faint small" TextTrimming="CharacterEllipsis">
                         <Run Text="{Binding ExecutablePath}" /><Run Text="{Binding ArgumentsSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
                       </TextBlock>
-                      <TextBlock Classes="error" Text="{Binding ReviewHint}" TextWrapping="Wrap" IsVisible="{Binding NeedsReview}" />
+                      <TextBlock Classes="error" Text="{Binding ReviewSummary}" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding ReviewHint}" IsVisible="{Binding NeedsReview}" />
                     </StackPanel>
 
                     <TextBlock Grid.Column="1" Classes="small muted" Text="{Binding UsageText}" VerticalAlignment="Center" Margin="16,0" />
@@ -157,7 +158,28 @@
           </Button>
         </Grid>
 
-        <TextBlock Classes="error" Text="{Binding ReviewWarning}" TextWrapping="Wrap" IsVisible="{Binding HasReviewWarning}" />
+        <!-- An imported browser waiting for review: why, one reason a line, then what saving does -->
+        <Border Classes="notice stop" IsVisible="{Binding HasReviewWarning}" Padding="12,10">
+          <Grid ColumnDefinitions="Auto,*">
+            <Ellipse Classes="lamp" VerticalAlignment="Top" Margin="0,6,10,0" />
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Classes="text" FontWeight="SemiBold" Text="Imported, needs review" />
+              <ItemsControl ItemsSource="{Binding ReviewWarning}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="text" Text="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <StackPanel Spacing="2" IsVisible="{Binding HasRiskyArguments}">
+                <TextBlock Classes="text" Text="Risky arguments:" />
+                <TextBlock Classes="mono small" Text="{Binding RiskyArguments}" TextWrapping="Wrap" />
+              </StackPanel>
+              <TextBlock Classes="small muted" TextWrapping="Wrap"
+                         Text="Links won't open in it until you check the program and arguments below and save." />
+            </StackPanel>
+          </Grid>
+        </Border>
 
         <StackPanel Spacing="6">
           <TextBlock Classes="label" Text="Name" />
@@ -203,7 +225,7 @@
 
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
           <Button Content="Cancel" Command="{Binding CancelCommand}" />
-          <Button Classes="accent" Content="Save browser" Command="{Binding SaveCommand}" IsDefault="True" />
+          <Button Classes="accent" Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" IsDefault="True" />
         </StackPanel>
       </StackPanel>
     </Border>

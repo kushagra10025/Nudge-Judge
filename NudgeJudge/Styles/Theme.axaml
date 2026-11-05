@@ -63,6 +63,16 @@
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FFFFFF" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FFFFFF" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FFFFFF" />
+      <!-- Radios follow the checkboxes: "on" is ink, never the amber route accent -->
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#13201A" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#13201A" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#2B3B33" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#3A4C42" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#FFFFFF" />
 
       <!-- Text fields: focus is an ink edge on the surface, never a fill change -->
       <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#13201A" />
@@ -121,6 +131,16 @@
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#141E19" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#141E19" />
       <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#141E19" />
+      <!-- Radios follow the checkboxes: "on" is ink, never the amber route accent -->
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#E3EBE6" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#F4F8F6" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#C9D6CF" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#141E19" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#141E19" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#141E19" />
 
       <!-- Text fields: focus is an ink edge on the surface, never a fill change -->
       <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#E3EBE6" />

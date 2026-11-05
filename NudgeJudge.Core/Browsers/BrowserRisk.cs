@@ -23,6 +23,21 @@ public sealed record BrowserAssessment(IReadOnlyList<BrowserWarning> Warnings, I
 {
     public bool IsClean => Warnings.Count == 0;
 
+    /// <summary>A few words per warning, for one-line places like a list row: "runs a script · risky arguments".</summary>
+    public string Short => Warnings.Count == 0
+        ? "imported"
+        : string.Join(" · ", Warnings.Select(w => w switch
+        {
+            BrowserWarning.Unrecognised => "unknown program",
+            BrowserWarning.Script => "runs a script",
+            BrowserWarning.NotFound => "not installed",
+            BrowserWarning.RiskyArguments => "risky arguments",
+            _ => w.ToString(),
+        }));
+
+    /// <summary>The program-related reasons as sentences, without the risky arguments (shown on their own, in mono).</summary>
+    public IEnumerable<string> ProgramReasons => Describe().Take(Warnings.Count(w => w != BrowserWarning.RiskyArguments));
+
     /// <summary>One line per warning, to show next to the browser.</summary>
     public IEnumerable<string> Describe() => Warnings.Select(w => w switch
     {

@@ -149,6 +149,8 @@
                     </Button>
                   </Grid>
                   <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding HasError}" TextWrapping="Wrap" />
+                  <!-- Time values: how it was read, so an overnight "9-5" can't pass for office hours -->
+                  <TextBlock Classes="small muted" Text="{Binding Reading}" IsVisible="{Binding ShowReading}" TextWrapping="Wrap" />
                 </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -422,8 +424,11 @@
                         </Border>
                         <Button Classes="badge-button" Command="{Binding ShowOriginalCommand}" IsVisible="{Binding IsDuplicate}"
                                 ToolTip.Tip="{Binding DuplicateTip}" AutomationProperties.Name="Show original rule">
-                          <Border Classes="badge route">
-                            <TextBlock Text="{Binding DuplicateOfNumber, StringFormat='Duplicate of {0}'}" />
+                          <Border Classes="badge">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <TextBlock Text="{Binding DuplicateOfNumber, StringFormat='Duplicate of {0}'}" />
+                              <c:Icon Data="{StaticResource Icon.Up}" />
+                            </StackPanel>
                           </Border>
                         </Button>
                       </WrapPanel>

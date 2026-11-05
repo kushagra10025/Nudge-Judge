@@ -176,16 +176,32 @@ public sealed class Rule
         Join == other.Join && BrowserId == other.BrowserId && Rules.RuleEngine.SameConditions(Conditions, other.Conditions);
 
     /// <summary>A copy with a new id, placed and named as a separate rule, remembering where it came from.</summary>
-    public Rule CloneAsNew()
+    /// <param name="takenNames">Names already in use, so the copy gets the first free "(copy)", "(copy 2)", ….</param>
+    public Rule CloneAsNew(IEnumerable<string>? takenNames = null)
     {
         var copy = Clone();
         copy.Id = Guid.NewGuid();
-        copy.Name = $"{Name} (copy)";
+        copy.Name = CopyName(Name, takenNames ?? []);
         copy.CreatedAt = DateTimeOffset.UtcNow;
         copy.IsSample = false;
         copy.ClonedFromId = Id;
         copy.Compiled = null;
         return copy;
+    }
+
+    /// <summary>
+    /// "GitHub" → "GitHub (copy)", then "GitHub (copy 2)" and so on. A copy of a copy counts from the original
+    /// name instead of stacking: "GitHub (copy)" → "GitHub (copy 2)", never "GitHub (copy) (copy)".
+    /// </summary>
+    public static string CopyName(string name, IEnumerable<string> taken)
+    {
+        var trimmed = name.Trim();
+        var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"^(.*) \(copy(?: (\d+))?\)$");
+        var stem = match.Success ? match.Groups[1].Value : trimmed;
+        var used = new HashSet<string>(taken.Select(t => t.Trim()), StringComparer.OrdinalIgnoreCase);
+        var candidate = $"{stem} (copy)";
+        for (var n = 2; used.Contains(candidate); n++) candidate = $"{stem} (copy {n})";
+        return candidate;
     }
 
     public bool IsExpired(DateTimeOffset now, ISystemBoot boot) =>

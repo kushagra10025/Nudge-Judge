@@ -82,6 +82,9 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      <!-- A browser held back for review isn't missing: say so, or a rule that uses it looks broken -->
+      <TextBlock Classes="small faint" Text="{Binding HiddenForReviewText}" IsVisible="{Binding HasHiddenForReview}"
+                 TextWrapping="Wrap" Margin="0,-2,0,0" />
       <StackPanel IsVisible="{Binding !HasBrowsers}" Spacing="8">
         <TextBlock Classes="body muted" Text="No browsers are set up yet, so there's nowhere to send this link." />
         <Button Content="Add a browser…" Command="{Binding OpenBrowserSettingsCommand}" />

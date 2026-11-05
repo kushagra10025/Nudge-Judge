@@ -247,10 +247,64 @@
           </Grid>
           <TextBlock Classes="body" Margin="20,0,20,16" TextWrapping="Wrap" Text="{Binding TransferMessage}"
                      IsVisible="{Binding HasTransferMessage}" Classes.error="{Binding TransferFailed}" />
-          <!-- Import review: nothing changes until Import is pressed -->
+          <!-- Import review: nothing changes until Import is pressed. What needs a look comes first and in
+               full; everything else folds into one line, so a risky entry can't hide among harmless ones. -->
           <Border IsVisible="{Binding IsReviewingImport}" Margin="20,0,20,20" Padding="16" CornerRadius="6"
                   Background="{DynamicResource SurfaceSunkenBrush}">
-            <StackPanel DataContext="{Binding ImportReview}" x:DataType="vm:ImportReviewViewModel" Spacing="14">
+            <StackPanel DataContext="{Binding ImportReview}" x:DataType="vm:ImportReviewViewModel" Spacing="16">
+              <StackPanel.Resources>
+                <DataTemplate x:Key="BrowserReview" DataType="vm:BrowserReviewRow">
+                  <StackPanel Spacing="3" Margin="0,0,0,12">
+                    <WrapPanel ItemSpacing="8" LineSpacing="4">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
+                      <Border Classes="badge stop" IsVisible="{Binding WillNeedReview}"><TextBlock Text="Needs review" /></Border>
+                    </WrapPanel>
+                    <TextBlock Classes="mono small" TextWrapping="Wrap" Text="{Binding Program}" />
+                    <TextBlock Classes="small muted" TextWrapping="Wrap" IsVisible="{Binding ChangesProgram}">
+                      <Run Text="Yours runs now: " /><Run Text="{Binding CurrentProgram}" FontFamily="{StaticResource MonoFont}" />
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Warnings}" IsVisible="{Binding HasWarnings}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                          <TextBlock Classes="error" Text="{Binding}" TextWrapping="Wrap" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="error" TextWrapping="Wrap" IsVisible="{Binding HasRiskyArguments}">
+                      <Run Text="Risky arguments: " /><Run Text="{Binding RiskyArguments}" FontFamily="{StaticResource MonoFont}" />
+                    </TextBlock>
+                    <CheckBox IsVisible="{Binding ChangesProgram}" IsChecked="{Binding AllowProgramChange}"
+                              AutomationProperties.Name="Allow program change">
+                      <TextBlock Text="{Binding AllowLabel}" TextWrapping="Wrap" />
+                    </CheckBox>
+                    <TextBlock Classes="small muted" Text="{Binding ReviewNote}" TextWrapping="Wrap" IsVisible="{Binding HasReviewNote}" />
+                  </StackPanel>
+                </DataTemplate>
+                <DataTemplate x:Key="RuleReview" DataType="vm:RuleReviewRow">
+                  <StackPanel Spacing="3" Margin="0,0,0,10">
+                    <WrapPanel ItemSpacing="8" LineSpacing="4">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
+                    </WrapPanel>
+                    <!-- The same line as the Rules page: glyphs, patterns in mono, then where it goes -->
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto">
+                      <c:ConditionSummary Parts="{Binding Parts}" FontSize="12" Foreground="{DynamicResource InkFaintBrush}"
+                                          GlyphBrush="{DynamicResource InkMutedBrush}" ValueBrush="{DynamicResource InkMutedBrush}"
+                                          TextTrimming="CharacterEllipsis" MaxWidth="460" ToolTip.Tip="{Binding Summary}" />
+                      <c:Icon Grid.Column="1" Data="{StaticResource Icon.Arrow}" Width="12" Height="12" Margin="10,0,8,0"
+                              Foreground="{DynamicResource InkFaintBrush}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="small" FontWeight="SemiBold" Text="{Binding Destination}"
+                                 Classes.error="{Binding HasNoBrowser}" VerticalAlignment="Center" />
+                      <Border Grid.Column="3" Classes="badge stop" Margin="8,0,0,0" IsVisible="{Binding DestinationNeedsReview}">
+                        <TextBlock Text="Needs review" />
+                      </Border>
+                    </Grid>
+                    <TextBlock Classes="error" Text="{Binding Redirect}" TextWrapping="Wrap" IsVisible="{Binding IsRedirect}" />
+                  </StackPanel>
+                </DataTemplate>
+              </StackPanel.Resources>
+
               <StackPanel Spacing="2">
                 <TextBlock Classes="label" Text="{Binding FileName, StringFormat='Review {0}'}" />
                 <TextBlock Classes="body muted" TextWrapping="Wrap">
@@ -269,71 +323,52 @@
                 <TextBlock Classes="small muted" Text="{Binding ModeHint}" TextWrapping="Wrap" />
               </StackPanel>
 
-              <TextBlock Classes="error" TextWrapping="Wrap" IsVisible="{Binding HasAttention}"
-                         Text="Some items below need a careful look. Check the programs are what you expect." />
+              <!-- Counted, so "a careful look" says at what -->
+              <Border Classes="notice stop" IsVisible="{Binding HasAttention}">
+                <Grid ColumnDefinitions="Auto,*">
+                  <Ellipse Classes="lamp" />
+                  <TextBlock Grid.Column="1" Classes="text" Text="{Binding AttentionText}" />
+                </Grid>
+              </Border>
 
-              <StackPanel Spacing="8" IsVisible="{Binding HasBrowsers}">
-                <TextBlock Classes="label" Text="Browsers" />
-                <!-- Long files scroll here, so the panel stays a manageable size -->
-                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Imported browsers">
-                  <ItemsControl ItemsSource="{Binding Browsers}" Margin="0,0,14,0">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="vm:BrowserReviewRow">
-                        <StackPanel Spacing="3">
-                          <WrapPanel ItemSpacing="8" LineSpacing="4">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
-                            <Border Classes="badge stop" IsVisible="{Binding WillNeedReview}"><TextBlock Text="Needs review" /></Border>
-                          </WrapPanel>
-                          <TextBlock Classes="mono small" TextWrapping="Wrap" Text="{Binding Program}" />
-                          <TextBlock Classes="small muted" TextWrapping="Wrap" IsVisible="{Binding ChangesProgram}">
-                            <Run Text="Yours runs now: " /><Run Text="{Binding CurrentProgram}" FontFamily="{DynamicResource MonoFont}" />
-                          </TextBlock>
-                          <ItemsControl ItemsSource="{Binding Warnings}" IsVisible="{Binding HasWarnings}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="x:String">
-                                <TextBlock Classes="error" Text="{Binding}" TextWrapping="Wrap" />
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <CheckBox IsVisible="{Binding ChangesProgram}" IsChecked="{Binding AllowProgramChange}"
-                                    AutomationProperties.Name="Allow program change">
-                            <TextBlock Text="{Binding AllowLabel}" TextWrapping="Wrap" />
-                          </CheckBox>
-                          <TextBlock Classes="small muted" Text="{Binding ReviewNote}" TextWrapping="Wrap" IsVisible="{Binding HasReviewNote}" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+              <StackPanel IsVisible="{Binding HasBrowsers}">
+                <TextBlock Classes="label" Text="Browsers" Margin="0,0,0,8" />
+                <!-- Scrolls only for an unusually long list of flagged entries -->
+                <ScrollViewer MaxHeight="480" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Browsers to check">
+                  <ItemsControl ItemsSource="{Binding AttentionBrowsers}" ItemTemplate="{StaticResource BrowserReview}" />
+                </ScrollViewer>
+                <Button Classes="ghost" Padding="6,2" Margin="-6,0,0,0" HorizontalAlignment="Left" FontSize="12"
+                        Command="{Binding ToggleOtherBrowsersCommand}" IsVisible="{Binding HasOtherBrowsers}"
+                        AutomationProperties.Name="Show other browsers">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Data="{StaticResource Icon.Down}" Width="12" Height="12" IsVisible="{Binding !ShowOtherBrowsers}" />
+                    <c:Icon Data="{StaticResource Icon.Up}" Width="12" Height="12" IsVisible="{Binding ShowOtherBrowsers}" />
+                    <TextBlock Text="{Binding OtherBrowsersLabel}" />
+                  </StackPanel>
+                </Button>
+                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0"
+                              IsVisible="{Binding ShowOtherBrowsers}" AutomationProperties.Name="Other browsers">
+                  <ItemsControl ItemsSource="{Binding OtherBrowsers}" ItemTemplate="{StaticResource BrowserReview}" />
                 </ScrollViewer>
               </StackPanel>
 
-              <StackPanel Spacing="8" IsVisible="{Binding HasRules}">
-                <TextBlock Classes="label" Text="Rules" />
-                <!-- Long files scroll here, so the panel stays a manageable size -->
-                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Imported rules">
-                  <ItemsControl ItemsSource="{Binding Rules}" Margin="0,0,14,0">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="vm:RuleReviewRow">
-                        <StackPanel Spacing="2">
-                          <WrapPanel ItemSpacing="8" LineSpacing="4">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
-                          </WrapPanel>
-                          <TextBlock Classes="small muted" TextWrapping="Wrap">
-                            <Run Text="{Binding Summary}" /><Run Text="  →  " /><Run Text="{Binding Destination}" FontWeight="SemiBold" />
-                          </TextBlock>
-                          <TextBlock Classes="error" Text="{Binding Redirect}" TextWrapping="Wrap" IsVisible="{Binding IsRedirect}" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+              <StackPanel IsVisible="{Binding HasRules}">
+                <TextBlock Classes="label" Text="Rules" Margin="0,0,0,8" />
+                <ScrollViewer MaxHeight="480" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Rules to check">
+                  <ItemsControl ItemsSource="{Binding AttentionRules}" ItemTemplate="{StaticResource RuleReview}" />
+                </ScrollViewer>
+                <Button Classes="ghost" Padding="6,2" Margin="-6,0,0,0" HorizontalAlignment="Left" FontSize="12"
+                        Command="{Binding ToggleOtherRulesCommand}" IsVisible="{Binding HasOtherRules}"
+                        AutomationProperties.Name="Show other rules">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Data="{StaticResource Icon.Down}" Width="12" Height="12" IsVisible="{Binding !ShowOtherRules}" />
+                    <c:Icon Data="{StaticResource Icon.Up}" Width="12" Height="12" IsVisible="{Binding ShowOtherRules}" />
+                    <TextBlock Text="{Binding OtherRulesLabel}" />
+                  </StackPanel>
+                </Button>
+                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0"
+                              IsVisible="{Binding ShowOtherRules}" AutomationProperties.Name="Other rules">
+                  <ItemsControl ItemsSource="{Binding OtherRules}" ItemTemplate="{StaticResource RuleReview}" />
                 </ScrollViewer>
               </StackPanel>
 

@@ -74,13 +74,23 @@ public sealed class CompoundRuleUiTests : IDisposable
         var window = Show(app, AppPage.Rules);
         var rules = app.Main.Rules;
 
+        // Cancel leaves no trace: the copy only exists once saved.
         Click(window, Finds<Button>(window, "Clone rule")[0]);
         Settle(window);
-
-        // The copy sits right below its original and opens in the editor.
-        Assert.Equal(["YouTube from Teams", "YouTube from Teams (copy)", "YouTube"], app.Config.Current.Rules.Select(r => r.Name));
         Assert.True(rules.Editor.IsOpen);
-        Assert.Equal(app.Config.Current.Rules[1].Id, rules.Editor.EditingId);
+        Assert.Equal("Clone rule", rules.Editor.Title);
+        Assert.Equal("YouTube from Teams (copy)", rules.Editor.Name);
+        Assert.Equal(2, app.Config.Current.Rules.Count);
+        Click(window, Find<Button>(window, "Cancel", byContent: true));
+        Settle(window);
+        Assert.Equal(2, app.Config.Current.Rules.Count);
+
+        // Saved, it sits right below its original.
+        Click(window, Finds<Button>(window, "Clone rule")[0]);
+        Settle(window);
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+        Assert.Equal(["YouTube from Teams", "YouTube from Teams (copy)", "YouTube"], app.Config.Current.Rules.Select(r => r.Name));
 
         // Unchanged: a badge on the copy, and only on the copy.
         Assert.Equal([false, true, false], rules.Rules.Select(r => r.IsDuplicate));
@@ -93,6 +103,8 @@ public sealed class CompoundRuleUiTests : IDisposable
         Assert.False(rules.Rules[1].IsHighlighted);
 
         // Renaming alone doesn't make it different...
+        Click(window, Finds<Button>(window, "Edit rule")[1]);
+        Settle(window);
         Type(window, Find<TextBox>(window, "Rule name"), "Teams YouTube, again");
         Click(window, Find<Button>(window, "Save rule", byContent: true));
         Settle(window);
@@ -107,6 +119,65 @@ public sealed class CompoundRuleUiTests : IDisposable
         Assert.False(rules.Rules[1].IsDuplicate);
         Assert.Null(app.Config.Current.Rules[1].ClonedFromId);
         Assert.DoesNotContain(VisibleTextBlocks(window), t => t.Text?.StartsWith("Duplicate of") == true);
+    }
+
+    [AvaloniaFact]
+    public void A_browser_awaiting_review_is_explained_everywhere_and_fixed_from_activity()
+    {
+        var app = new Harness();
+        var imported = new BrowserProfile { Name = "Work tools", ExecutablePath = "/home/me/open.sh", Arguments = "--no-sandbox", NeedsReview = true };
+        app.Config.Update(c =>
+        {
+            c.Browsers.Add(imported);
+            c.Rules.Add(new Rule { Name = "Tools", Conditions = [RuleCondition.Link(MatchKind.Domain, "tools.io")], BrowserId = imported.Id });
+        });
+
+        // The chooser says one is held back instead of silently leaving it out.
+        Assert.Equal(2, app.Chooser.Browsers.Count);
+        Assert.Equal("1 imported browser is hidden until you review it on the Browsers page.", app.Chooser.HiddenForReviewText);
+
+        // Its link fails over to asking, and Activity offers the fix.
+        app.Router.Route("https://tools.io/x");
+        var window = Show(app, AppPage.Activity);
+        var entry = app.Main.Activity.Entries.First(e => e.Outcome == ActivityOutcome.Failed);
+        Assert.True(entry.CanReviewBrowser);
+        Assert.False(entry.ShowCreateRule);
+        Click(window, Find<Button>(window, "Review browser"));
+        Settle(window);
+
+        // The browser opens in its editor with the reasons listed and a save that says what it does.
+        Assert.Equal(1, app.Main.SelectedPageIndex);
+        var editor = app.Main.Browsers.Editor;
+        Assert.Equal(imported.Id, editor.EditingId);
+        Assert.Equal("Save as reviewed", editor.SaveLabel);
+        Assert.Contains("--no-sandbox", editor.RiskyArguments);
+        Assert.Contains(editor.ReviewWarning!, r => r.Contains("script"));
+        Assert.Equal("Needs review: runs a script · not installed · risky arguments",
+            app.Main.Browsers.Browsers.Single(b => b.Id == imported.Id).ReviewSummary);
+
+        Click(window, Find<Button>(window, "Save as reviewed", byContent: true));
+        Settle(window);
+        Assert.False(app.Config.Current.FindBrowser(imported.Id)!.NeedsReview);
+        Assert.False(entry.CanReviewBrowser);
+        Assert.Equal(3, app.Chooser.Browsers.Count);
+        Assert.False(app.Chooser.HasHiddenForReview);
+    }
+
+    [AvaloniaFact]
+    public void A_time_value_is_read_back_so_an_overnight_9_to_5_shows()
+    {
+        var app = new Harness();
+        var window = Show(app, AppPage.Rules);
+        Click(window, Find<Button>(window, "Add rule", byContent: true));
+        Settle(window);
+        Click(window, Find<Button>(window, "Add time condition"));
+        Settle(window);
+        Type(window, Finds<TextBox>(window, "Pattern")[1], "9-5");
+
+        Assert.Contains(VisibleTextBlocks(window), t => t.Text == "Every day, 09:00 to 05:00 the next day (overnight)");
+        Type(window, Finds<TextBox>(window, "Pattern")[1], "Funday 9-17");
+        Assert.DoesNotContain(VisibleTextBlocks(window), t => t.Text?.StartsWith("Every day") == true);
+        Assert.Contains(VisibleTextBlocks(window), t => t.Text?.StartsWith("Couldn't read the days") == true);
     }
 
     [AvaloniaFact]

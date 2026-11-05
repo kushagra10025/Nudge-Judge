@@ -78,9 +78,24 @@ public sealed class DataTransferUiTests : IDisposable
         Assert.True(row.ChangesProgram);
         Assert.Equal("/usr/bin/google-chrome", row.CurrentProgram);
         Assert.Contains("script", row.Warnings[0]);
-        Assert.Equal("Added separately, yours unchanged", row.ActionText);
-        Assert.Contains("Chrome (imported) (needs review)", Assert.Single(review.Rules).Destination);
-        Assert.NotNull(review.Rules[0].Redirect);
+        Assert.Equal("Added beside yours, yours unchanged", row.ActionText);
+        var rule = Assert.Single(review.Rules);
+        Assert.Equal("Chrome (imported)", rule.Destination);
+        Assert.True(rule.DestinationNeedsReview);
+        Assert.NotNull(rule.Redirect);
+        Assert.Equal("Opens somewhere else", rule.ActionText);
+        // Counted, so the notice says what to look at.
+        Assert.Equal("1 browser would run a different program · 1 browser needs review · 1 rule will open somewhere else", review.AttentionText);
+        Assert.Same(row, Assert.Single(review.AttentionBrowsers));
+
+        // Allowing the change updates the rows in place; nothing moves.
+        row.AllowProgramChange = true;
+        Assert.Same(rule, review.Rules[0]);
+        Assert.Equal("Chrome", rule.Destination);
+        Assert.Null(rule.Redirect);
+        Assert.Equal("Unchanged", rule.ActionText);
+        Assert.Equal("1 browser needs review", review.AttentionText);
+        row.AllowProgramChange = false;
 
         review.ConfirmCommand.Execute(null);
 
@@ -112,12 +127,19 @@ public sealed class DataTransferUiTests : IDisposable
 
         try
         {
-            foreach (var name in new[] { "Imported browsers", "Imported rules" })
-            {
-                var list = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => AutomationProperties.GetName(s) == name);
-                Assert.True(list.Bounds.Height <= 320, $"{name} is {list.Bounds.Height}px tall");
-                Assert.True(list.Extent.Height > list.Viewport.Height, $"{name} should scroll");
-            }
+            // Nothing here needs a look, so it all folds away: the panel stays short.
+            var review = vm.ImportReview!;
+            Assert.Empty(review.AttentionRules);
+            Assert.Equal("300 rules, nothing to check", review.OtherRulesLabel);
+            var folded = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => AutomationProperties.GetName(s) == "Other rules");
+            Assert.False(folded.IsVisible);
+
+            // Opened, the long list scrolls inside the review instead of stretching the page.
+            review.ToggleOtherRulesCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.True(folded.Bounds.Height <= 320, $"Other rules is {folded.Bounds.Height}px tall");
+            Assert.True(folded.Extent.Height > folded.Viewport.Height, "Other rules should scroll");
         }
         finally
         {

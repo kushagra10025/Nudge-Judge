@@ -104,3 +104,35 @@ public class TimeConditionTests
         Assert.Contains("Enter a time", result.Error);
     }
 }
+
+public class TimeWindowDescribeTests
+{
+    [Theory]
+    [InlineData("Mon-Fri 09:00-17:00", "Weekdays, 09:00 to 17:00")]
+    [InlineData("9-5", "Every day, 09:00 to 05:00 the next day (overnight)")]
+    [InlineData("9am-5pm", "Every day, 09:00 to 17:00")]
+    [InlineData("weekends", "Weekends, all day")]
+    [InlineData("Fri 22:00-02:00", "Fri, 22:00 to 02:00 the next day (overnight)")]
+    [InlineData("Mon,Wed,Fri 18-24", "Mon, Wed, Fri, 18:00 to midnight")]
+    [InlineData("Mon-Thu 8-12", "Mon to Thu, 08:00 to 12:00")]
+    [InlineData("Sat,Sun,Mon", "Mon, Sat, Sun, all day")]
+    public void Valid_windows_are_read_back_in_words(string value, string expected) =>
+        Assert.Equal(expected, TimeWindow.Describe(value));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Funday")]
+    [InlineData("25-26")]
+    public void Invalid_windows_have_no_reading(string value) => Assert.Null(TimeWindow.Describe(value));
+}
+
+public class CopyNameTests
+{
+    [Theory]
+    [InlineData("GitHub", new string[0], "GitHub (copy)")]
+    [InlineData("GitHub", new[] { "GitHub (copy)" }, "GitHub (copy 2)")]
+    [InlineData("GitHub (copy)", new[] { "GitHub", "GitHub (copy)" }, "GitHub (copy 2)")]
+    [InlineData("GitHub (copy 2)", new[] { "GitHub (copy)", "GitHub (copy 2)" }, "GitHub (copy 3)")]
+    public void Copies_count_up_instead_of_stacking(string name, string[] taken, string expected) =>
+        Assert.Equal(expected, Rule.CopyName(name, taken));
+}

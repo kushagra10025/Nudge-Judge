@@ -128,9 +128,12 @@ public sealed partial class BrowsersViewModel : ViewModelBase
 
     private bool CanScan() => !IsScanning;
 
-    internal void Edit(BrowserItemViewModel item)
+    internal void Edit(BrowserItemViewModel item) => Edit(item.Id);
+
+    /// <summary>Opens a browser in the editor by id (from an Activity entry, for instance).</summary>
+    public void Edit(Guid id)
     {
-        if (_config.Current.FindBrowser(item.Id) is not { } b) return;
+        if (_config.Current.FindBrowser(id) is not { } b) return;
         Editor.OpenExisting(b);
         SyncEditingFlags();
     }
@@ -214,6 +217,9 @@ public sealed partial class BrowserItemViewModel(BrowsersViewModel owner, Browse
         ? string.Join(" ", Core.Browsers.BrowserRisk.Assess(browser).Describe()) +
           " Links won't open in it until you check its program and arguments, then save it."
         : "";
+
+    /// <summary>The row's one line: "Needs review: runs a script · risky arguments". The full reasons are its tooltip.</summary>
+    public string ReviewSummary { get; } = browser.NeedsReview ? "Needs review: " + Core.Browsers.BrowserRisk.Assess(browser).Short : "";
     public bool IsDiscovered { get; } = browser.Source == BrowserSource.Discovered;
     public bool IsPrimary { get; } = isPrimary;
     public bool IsNotPrimary => !IsPrimary;
@@ -262,12 +268,21 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
 
     public string Title => IsNew ? "Add browser" : "Edit browser";
 
-    /// <summary>Set while editing an imported browser that needs review: why, and that saving is the review.</summary>
+    /// <summary>Set while editing an imported browser that needs review: why, one reason per line.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasReviewWarning))]
-    public partial string? ReviewWarning { get; set; }
+    [NotifyPropertyChangedFor(nameof(HasReviewWarning), nameof(SaveLabel))]
+    public partial IReadOnlyList<string>? ReviewWarning { get; set; }
+
+    /// <summary>The flagged arguments, shown in mono under the reasons.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRiskyArguments))]
+    public partial string? RiskyArguments { get; set; }
 
     public bool HasReviewWarning => ReviewWarning is not null;
+    public bool HasRiskyArguments => !string.IsNullOrEmpty(RiskyArguments);
+
+    /// <summary>Saving an imported browser is what marks it reviewed, so the button says so.</summary>
+    public string SaveLabel => HasReviewWarning ? "Save as reviewed" : "Save browser";
 
     /// <summary>How the command will actually be run, so flags and quoting can be checked.</summary>
     public string Preview
@@ -299,6 +314,7 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
         IsPrivate = false;
         _source = BrowserSource.Manual;
         ReviewWarning = null;
+        RiskyArguments = null;
         IsOpen = true;
     }
 
@@ -312,10 +328,9 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
         IsPrivate = b.IsPrivate;
         ProfileLabel = b.ProfileLabel ?? "";
         _source = b.Source;
-        ReviewWarning = b.NeedsReview
-            ? "This browser was imported and needs review. " + string.Join(" ", Core.Browsers.BrowserRisk.Assess(b).Describe()) +
-              " Check the program and arguments are what you expect; saving marks it as reviewed."
-            : null;
+        var risk = Core.Browsers.BrowserRisk.Assess(b);
+        ReviewWarning = b.NeedsReview ? (risk.ProgramReasons.Any() ? [.. risk.ProgramReasons] : ["It came from an import."]) : null;
+        RiskyArguments = b.NeedsReview && risk.RiskyArguments.Count > 0 ? string.Join("  ", risk.RiskyArguments) : null;
         IsOpen = true;
     }
 

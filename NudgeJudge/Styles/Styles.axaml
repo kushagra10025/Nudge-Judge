@@ -258,8 +258,13 @@
   <Style Selector="Border.row.editing">
     <Setter Property="Background" Value="{DynamicResource SurfaceSunkenBrush}" />
   </Style>
+  <!-- "Show original": an ink outline, not amber. Amber means a route is set, and this isn't one.
+       The padding gives back the border's width so the row doesn't shift. -->
   <Style Selector="Border.row.highlight">
-    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkMutedBrush}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="Padding" Value="10.5,8.5" />
   </Style>
   <Style Selector="Border.row :is(Control).actions">
     <Setter Property="Opacity" Value="0" />

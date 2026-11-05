@@ -99,7 +99,16 @@
                     </TextBlock>
                   </StackPanel>
                   <!-- Shown on hover and keyboard focus (Styles.axaml) -->
-                  <Button Grid.Column="3" Classes="ghost actions" Command="{Binding CreateRuleCommand}" IsVisible="{Binding CanCreateRule}"
+                  <!-- The fix for a link held back by an imported browser: shown at rest, like a row's error -->
+                  <Button Grid.Column="3" Classes="ghost" Command="{Binding ReviewBrowserCommand}" IsVisible="{Binding CanReviewBrowser}"
+                          VerticalAlignment="Top" Margin="12,0,0,0" ToolTip.Tip="Open this browser to check its program and arguments"
+                          AutomationProperties.Name="Review browser">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:Icon Data="{StaticResource Icon.Edit}" />
+                      <TextBlock Text="Review browser" />
+                    </StackPanel>
+                  </Button>
+                  <Button Grid.Column="3" Classes="ghost actions" Command="{Binding CreateRuleCommand}" IsVisible="{Binding ShowCreateRule}"
                           VerticalAlignment="Top" Margin="12,0,0,0" ToolTip.Tip="Start a rule for links like this one"
                           AutomationProperties.Name="Create rule from this link">
                     <StackPanel Orientation="Horizontal" Spacing="6">
