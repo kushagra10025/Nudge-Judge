@@ -92,12 +92,18 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
             try
             {
                 using var signal = new AutoResetEvent(false);
+                using var key = Registry.CurrentUser.CreateSubKey(AssociationsKey, writable: false);
+                bool Arm() => RegNotifyChangeKeyValue(key.Handle.DangerousGetHandle(), 1,
+                    RegNotifyChangeName | RegNotifyChangeLastSet, signal.SafeWaitHandle.DangerousGetHandle(), 1) == 0;
+
+                if (!Arm()) return;
                 while (true)
                 {
-                    using var key = Registry.CurrentUser.CreateSubKey(AssociationsKey, writable: false);
-                    if (RegNotifyChangeKeyValue(key.Handle.DangerousGetHandle(), 1, RegNotifyChangeName | RegNotifyChangeLastSet,
-                            signal.SafeWaitHandle.DangerousGetHandle(), 1) != 0) return;
                     signal.WaitOne();
+                    // Re-arm before reporting so a write landing meanwhile (https after http) signals again, and let
+                    // Default Apps finish its delete-and-recreate burst so the check doesn't read it half-done.
+                    if (!Arm()) return;
+                    Thread.Sleep(SettleDelay);
                     changed();
                 }
             }
@@ -128,10 +134,17 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
 
     private static string? UserChoice(string scheme)
     {
-        // Recent Windows 11 builds record the choice under UserChoiceLatest and keep UserChoice for older readers.
-        foreach (var name in new[] { "UserChoiceLatest", "UserChoice" })
+        // Ask the shell first: it resolves the handler Windows will actually use, whatever registry layout this
+        // build keeps (UserChoiceLatest's isn't documented, and the old UserChoice key can lag behind it).
+        var buffer = new System.Text.StringBuilder(256);
+        var size = (uint)buffer.Capacity;
+        if (AssocQueryString(AssocfIsProtocol, AssocstrProgId, scheme, null, buffer, ref size) == 0 && buffer.Length > 0)
+            return buffer.ToString();
+
+        // Fallback: read the registry. UserChoiceLatest has held the ProgId both as a value and in a ProgId subkey.
+        foreach (var path in new[] { "UserChoiceLatest", @"UserChoiceLatest\ProgId", "UserChoice" })
         {
-            using var key = Registry.CurrentUser.OpenSubKey($@"{AssociationsKey}\{scheme}\{name}");
+            using var key = Registry.CurrentUser.OpenSubKey($@"{AssociationsKey}\{scheme}\{path}");
             if (key?.GetValue("ProgId") is string { Length: > 0 } progId) return progId;
         }
         return null;
@@ -143,12 +156,21 @@ public sealed class WindowsDefaultBrowserRegistrar(IReadOnlyList<string>? launch
     private const uint ShcneAssocChanged = 0x08000000;
     private const uint ShcnfIdList = 0x0000;
 
+    private static readonly TimeSpan SettleDelay = TimeSpan.FromMilliseconds(300);
+
     private const uint RegNotifyChangeName = 0x1;
     private const uint RegNotifyChangeLastSet = 0x4;
 
     [DllImport("advapi32.dll")]
     private static extern int RegNotifyChangeKeyValue(IntPtr key, int watchSubtree, uint filter, IntPtr eventHandle,
         int asynchronous);
+
+    private const uint AssocfIsProtocol = 0x00001000;
+    private const int AssocstrProgId = 20;
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+    private static extern int AssocQueryString(uint flags, int str, string assoc, string? extra,
+        System.Text.StringBuilder? output, ref uint outputLength);
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
