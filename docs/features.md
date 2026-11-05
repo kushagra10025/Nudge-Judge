@@ -80,6 +80,14 @@ Shows every link handled, the app it was opened from, and the rule or choice tha
 - **Settings → Activity** sets how many entries to keep (100 by default; the oldest are deleted past that) or turns logging off.
 - **Create rule** on an entry opens the rule editor with a pattern suggested from the link and the browser it went to; "Opened from" then starts with that entry's app.
 
+## Export and import
+
+**Settings → Backup and sharing** saves your rules and browsers to a JSON file (**Export…**) and loads them back (**Import…**). App settings and temporary rules from the chooser aren't included.
+
+Importing merges by id. A rule or browser with the same id as one you have replaces it, so importing your own backup restores it in place. Anything new is added at the end of the list, so someone else's rules go below yours. Files from newer versions of NudgeJudge, and files that aren't exports, are refused without changing anything.
+
+Only import files you trust: each browser entry is a program and its arguments, and NudgeJudge runs it when a link is routed there.
+
 ## Tray menu
 
 Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit.

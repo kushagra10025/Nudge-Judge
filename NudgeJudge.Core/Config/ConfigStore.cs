@@ -24,6 +24,7 @@ public interface IConfigStore
 
 [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AppConfig))]
+[JsonSerializable(typeof(ConfigExport))]
 internal sealed partial class ConfigJsonContext : JsonSerializerContext;
 
 /// <summary>

@@ -97,6 +97,38 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    private static readonly FilePickerFileType JsonFiles = new("NudgeJudge export (JSON)")
+    {
+        Patterns = ["*.json"],
+        MimeTypes = ["application/json"],
+    };
+
+    public async Task<string?> PickSaveJsonAsync(string title, string suggestedName)
+    {
+        if (_main is not { } owner) return null;
+        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "json",
+            FileTypeChoices = [JsonFiles],
+            ShowOverwritePrompt = true,
+        });
+        return file?.TryGetLocalPath();
+    }
+
+    public async Task<string?> PickOpenJsonAsync(string title)
+    {
+        if (_main is not { } owner) return null;
+        var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [JsonFiles, FilePickerFileTypes.All],
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
     private void OnMainClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_quitting || !KeepRunningInBackground()) return;

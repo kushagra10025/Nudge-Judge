@@ -22,6 +22,12 @@ public interface IDialogService
 {
     /// <summary>Lets the user pick an executable. Returns its full path, or null if cancelled.</summary>
     Task<string?> PickExecutableAsync();
+
+    /// <summary>Asks where to save a JSON file. Returns a local path, or null if cancelled.</summary>
+    Task<string?> PickSaveJsonAsync(string title, string suggestedName) => Task.FromResult<string?>(null);
+
+    /// <summary>Lets the user pick a JSON file to open. Returns a local path, or null if cancelled.</summary>
+    Task<string?> PickOpenJsonAsync(string title) => Task.FromResult<string?>(null);
 }
 
 /// <summary>Marshals work onto the UI thread (core events may arrive from other threads).</summary>

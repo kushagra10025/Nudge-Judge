@@ -15,6 +15,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IDefaultBrowserRegistrar _registrar;
     private readonly IThemeService _theme;
     private readonly ILaunchAtStartup _startup;
+    private readonly IDialogService? _dialogs;
     private bool _loading;
     private readonly IUiDispatcher _dispatcher;
     private readonly Dictionary<string, Action<Core.Models.AppConfig>> _pending = [];
@@ -26,9 +27,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private bool _refreshAgain;
 
     public SettingsViewModel(IConfigStore config, IDefaultBrowserRegistrar registrar, IThemeService theme, IUiDispatcher dispatcher,
-        ILaunchAtStartup startup, UpdatesViewModel? updates = null)
+        ILaunchAtStartup startup, UpdatesViewModel? updates = null, IDialogService? dialogs = null)
     {
         Updates = updates;
+        _dialogs = dialogs;
         _config = config;
         _startup = startup;
         _registrar = registrar;
@@ -123,6 +125,59 @@ public sealed partial class SettingsViewModel : ViewModelBase
         : PrimaryBrowser is { } b ? $"Everything opens in {b.Name}" : "Everything goes to the chooser";
 
     [RelayCommand] private void ToggleRouting() => RoutingEnabled = !RoutingEnabled;
+
+    /// <summary>The outcome of the last export or import, shown under the buttons.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasTransferMessage))]
+    public partial string? TransferMessage { get; set; }
+
+    [ObservableProperty] public partial bool TransferFailed { get; set; }
+    public bool HasTransferMessage => TransferMessage is not null;
+
+    [RelayCommand]
+    private async Task ExportDataAsync()
+    {
+        if (_dialogs is null) return;
+        var path = await _dialogs.PickSaveJsonAsync("Export rules and browsers", $"nudgejudge-{DateTime.Now:yyyy-MM-dd}.json");
+        if (path is null) return;
+        try
+        {
+            await File.WriteAllBytesAsync(path, ConfigTransfer.Export(_config.Current));
+            var c = _config.Current;
+            ShowTransfer($"Exported {ImportResult.Count(c.Rules.Count(r => !r.IsTemporary), "rule")} and {ImportResult.Count(c.Browsers.Count, "browser")} to {Path.GetFileName(path)}.", failed: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            ShowTransfer("Couldn't export: " + e.Message, failed: true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportDataAsync()
+    {
+        if (_dialogs is null) return;
+        var path = await _dialogs.PickOpenJsonAsync("Import rules and browsers");
+        if (path is null) return;
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.Length > ConfigTransfer.MaxFileBytes) throw new InvalidDataException("That file is too big to be a NudgeJudge export.");
+            var export = ConfigTransfer.Read(await File.ReadAllBytesAsync(path));
+            ImportResult? result = null;
+            _config.Update(c => result = ConfigTransfer.Apply(c, export));
+            ShowTransfer(result!.Describe(), failed: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            ShowTransfer(e is InvalidDataException ? e.Message : "Couldn't import: " + e.Message, failed: true);
+        }
+    }
+
+    private void ShowTransfer(string message, bool failed)
+    {
+        TransferFailed = failed;
+        TransferMessage = message;
+    }
 
     [RelayCommand]
     private async Task RegisterAsync()

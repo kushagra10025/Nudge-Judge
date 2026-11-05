@@ -77,7 +77,7 @@ public partial class App : Application
         var startup = LaunchAtStartup.ForCurrentPlatform();
         RefreshStartupEntry(startup);
         var updates = new UpdatesViewModel(config, new VelopackUpdateService(), dispatcher);
-        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup, updates);
+        var settings = new SettingsViewModel(config, registrar, new AvaloniaThemeService(), dispatcher, startup, updates, windows);
         var main = new MainWindowViewModel(
             new RulesViewModel(config, engine, boot, chooser, windows, dispatcher, settings),
             new BrowsersViewModel(config, BrowserDiscovery.ForCurrentPlatform(), router, windows, dispatcher),

@@ -213,6 +213,43 @@
         </StackPanel>
       </Border>
 
+      <TextBlock Classes="section" Text="Backup and sharing" />
+      <Border Classes="surface">
+        <StackPanel>
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Export rules and browsers" />
+              <TextBlock Classes="body muted" TextWrapping="Wrap"
+                         Text="Saves them to a JSON file, to back up or share. Settings and temporary rules aren't included." />
+            </StackPanel>
+            <Button Grid.Column="1" Command="{Binding ExportDataCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
+                    AutomationProperties.Name="Export rules and browsers">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Up}" />
+                <TextBlock Text="Export…" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <Rectangle Classes="divider" />
+          <Grid Classes="setting" ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="label" Text="Import rules and browsers" />
+              <TextBlock Classes="body muted" TextWrapping="Wrap"
+                         Text="Adds them from an export. Ones with the same id as yours replace them, so a backup restores in place. Only import files you trust: a browser entry runs a program." />
+            </StackPanel>
+            <Button Grid.Column="1" Command="{Binding ImportDataCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
+                    AutomationProperties.Name="Import rules and browsers">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Data="{StaticResource Icon.Down}" />
+                <TextBlock Text="Import…" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <TextBlock Classes="body" Margin="20,0,20,16" TextWrapping="Wrap" Text="{Binding TransferMessage}"
+                     IsVisible="{Binding HasTransferMessage}" Classes.error="{Binding TransferFailed}" />
+        </StackPanel>
+      </Border>
+
       <TextBlock Classes="section" Text="Files" />
       <Border Classes="surface">
         <StackPanel>

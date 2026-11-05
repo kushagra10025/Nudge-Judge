@@ -115,6 +115,12 @@ internal sealed class FakeWindows : IWindowService, IDialogService
     public void HideChooser() { }
     public void Quit() { }
     public Task<string?> PickExecutableAsync() => Task.FromResult<string?>(null);
+
+    /// <summary>What the save and open pickers "choose"; null acts as cancel.</summary>
+    public string? SavePath { get; set; }
+    public string? OpenPath { get; set; }
+    public Task<string?> PickSaveJsonAsync(string title, string suggestedName) => Task.FromResult(SavePath);
+    public Task<string?> PickOpenJsonAsync(string title) => Task.FromResult(OpenPath);
 }
 
 internal sealed class FakeStartup : ILaunchAtStartup
