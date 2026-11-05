@@ -28,6 +28,12 @@ Each link condition uses one of four match types:
 
 These match the app the link was clicked in: a program name with or without `.exe` (`ms-teams`, `slack`), its title (`Microsoft Teams`), a pattern (`*teams*`) or a full path. Program names you've seen in Activity are suggested as you type.
 
+### Time conditions
+
+These match the local time a link is opened: hours (`09:00-17:00`, `9am-5pm`), days (`Mon-Fri`, `Sat,Sun`, `weekdays`, `weekends`), or both (`Mon-Fri 09:00-17:00`). The end time is exclusive, and overnight windows work: `Fri 22:00-02:00` covers Friday night into early Saturday. Use "is outside" to match the rest of the time.
+
+For example, *GitHub at work*: link is `github.com` **and** time is within `Mon-Fri 09:00-17:00`, opens in Chrome. A plain *GitHub* rule below it sends GitHub links to Firefox the rest of the time. The tester checks time conditions against the current time.
+
 ## Source app detection
 
 When an app opens a link, NudgeJudge walks up its own process tree past openers and shells (`xdg-open`, `gio`, `sh`, `OpenWith.exe`, …) to the app that started it. If that chain is broken (the opener exited first), it falls back to the app that owns the foreground window (Windows), then to the `CHROME_DESKTOP` hint Electron apps leave in the environment (Linux).

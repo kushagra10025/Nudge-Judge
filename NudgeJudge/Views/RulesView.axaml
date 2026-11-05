@@ -78,6 +78,8 @@
                             IsVisible="{Binding IsLink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
           <c:Icon Data="{StaticResource Icon.App}" Width="14" Height="14" StrokeThickness="2"
                   Foreground="{DynamicResource InkMutedBrush}" IsVisible="{Binding IsSource}" />
+          <c:Icon Data="{StaticResource Icon.Clock}" Width="14" Height="14" StrokeThickness="2"
+                  Foreground="{DynamicResource InkMutedBrush}" IsVisible="{Binding IsTime}" />
         </Panel>
         <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="6" Classes="condition" Background="Transparent">
           <!-- The spacer column, not the operator, gives way when the move arrows appear in a narrow group -->
@@ -123,7 +125,7 @@
               <DataTemplate DataType="vm:ConditionValueViewModel">
                 <StackPanel Spacing="4">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.IsLink}"
+                    <TextBox Classes="mono" Text="{Binding Text}" IsVisible="{Binding Condition.UsesTextBox}"
                              PlaceholderText="{Binding Condition.Placeholder}" AutomationProperties.Name="Pattern"
                          ToolTip.Tip="{Binding Condition.Hint}">
                       <TextBox.InnerLeftContent>
@@ -224,6 +226,13 @@
                   <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
                     <TextBlock Text="Opened from" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddTimeConditionCommand}"
+                        ToolTip.Tip="Add a time-of-day or day-of-week condition to this group" AutomationProperties.Name="{Binding AddTimeName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Time" />
                   </StackPanel>
                 </Button>
                 <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"
@@ -581,6 +590,14 @@
                   <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
                     <TextBlock Text="Opened from" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddTimeConditionCommand}"
+                        ToolTip.Tip="Add a condition on the time of day or day of the week, e.g. Mon-Fri 09:00-17:00"
+                        AutomationProperties.Name="{Binding AddTimeName}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:Icon Data="{StaticResource Icon.Plus}" Width="12" Height="12" />
+                    <TextBlock Text="Time" />
                   </StackPanel>
                 </Button>
                 <Button Classes="ghost" Padding="6,2" FontSize="12" Command="{Binding AddGroupCommand}"

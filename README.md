@@ -34,7 +34,7 @@ You set NudgeJudge as your system's default browser. When an app opens a link, N
 
 | | |
 |---|---|
-| 🚦 **Rules, top to bottom** | Named rules with compound conditions (all/any, negation, alternatives). Match by wildcard, exact domain, path prefix or regex. |
+| 🚦 **Rules, top to bottom** | Named rules with compound conditions (all/any, negation, alternatives). Match by wildcard, exact domain, path prefix or regex, and by time of day or day of week. |
 | 🪟 **Knows where a link came from** | "Opened from" conditions match the app you clicked in, e.g. *YouTube from Teams → Chrome Work*. |
 | 🧪 **Live rule tester** | Paste a link (<kbd>Ctrl</kbd>+<kbd>T</kbd>) and watch it run past each rule on a route diagram. |
 | 🗂️ **Chooser for the rest** | Unmatched links queue as tabs. Press <kbd>1</kbd>–<kbd>9</kbd> to pick, and save the choice for N hours, until restart, or for good. |

@@ -24,8 +24,8 @@ public sealed record MatchResult(Uri Url, SourceApp? Source, Rule? Rule, int Rul
     public bool IsMatch => Rule is not null;
 }
 
-/// <summary>What a rule is tested against: the link, and the app it came from when known.</summary>
-public readonly record struct LinkContext(Uri Url, SourceApp? Source);
+/// <summary>What a rule is tested against: the link, the app it came from when known, and the local time (now when null).</summary>
+public readonly record struct LinkContext(Uri Url, SourceApp? Source, DateTime? LocalTime = null);
 
 /// <summary>A rule's conditions, compiled into one predicate.</summary>
 public sealed class CompiledRule
@@ -34,7 +34,7 @@ public sealed class CompiledRule
     internal CompiledRule(Func<LinkInput, bool> predicate) => _predicate = predicate;
 
     /// <exception cref="RegexMatchTimeoutException">A pattern exceeded its time budget.</exception>
-    public bool IsMatch(LinkContext link) => _predicate(new LinkInput(link.Url, link.Source));
+    public bool IsMatch(LinkContext link) => _predicate(new LinkInput(link.Url, link.Source, link.LocalTime));
 
     internal bool IsMatch(LinkInput link) => _predicate(link);
 }
@@ -127,6 +127,12 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
                 }
                 errors[i] = compiled.Error;
             }
+            else if (condition.Field == ConditionField.Time)
+            {
+                var (p, error) = TimeWindow.Compile(value);
+                if (p is not null) tests.Add(link => p(link.LocalTime));
+                errors[i] = error;
+            }
             else
             {
                 var compiled = Compile(condition.MatchKind, value, condition.CaseSensitive);
@@ -141,7 +147,12 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         }
 
         if (first is null && tests.Count == 0)
-            first = condition.Field == ConditionField.SourceApp ? "Enter an app, e.g. ms-teams.exe." : "Enter a pattern.";
+            first = condition.Field switch
+            {
+                ConditionField.SourceApp => "Enter an app, e.g. ms-teams.exe.",
+                ConditionField.Time => $"Enter a time, e.g. {TimeWindow.Example}.",
+                _ => "Enter a pattern.",
+            };
         if (first is not null) return (null, new ConditionCompileResult(first, errors));
 
         var any = AnyOf(tests);
@@ -274,7 +285,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     {
         var started = Stopwatch.GetTimestamp();
         var evaluations = new RuleEvaluation[rules.Count];
-        var index = Evaluate(new LinkInput(url, source), rules, evaluations, null);
+        var index = Evaluate(Input(url, source), rules, evaluations, null);
         for (var i = index + 1; index >= 0 && i < rules.Count; i++)
             evaluations[i] = new(rules[i], RuleEvaluationState.NotReached);
         return new MatchResult(url, source, index >= 0 ? rules[index] : null, index, evaluations, Stopwatch.GetElapsedTime(started));
@@ -283,7 +294,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     /// <summary>The first matching rule and its index, without the per-rule report <see cref="Match"/> builds.</summary>
     public (Rule? Rule, int Index) FindMatch(Uri url, IReadOnlyList<Rule> rules, SourceApp? source = null)
     {
-        var index = Evaluate(new LinkInput(url, source), rules, null, null);
+        var index = Evaluate(Input(url, source), rules, null, null);
         return index >= 0 ? (rules[index], index) : (null, -1);
     }
 
@@ -293,7 +304,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     /// <inheritdoc cref="FindMatch(Uri, IReadOnlyList{Rule}, SourceApp?)"/>
     public (Rule? Rule, int Index) FindMatch(Uri url, PreparedRules rules, SourceApp? source = null)
     {
-        var index = Evaluate(new LinkInput(url, source), rules.Rules, null, rules.Compiled);
+        var index = Evaluate(Input(url, source), rules.Rules, null, rules.Compiled);
         return index >= 0 ? (rules.Rules[index], index) : (null, -1);
     }
 
@@ -337,6 +348,8 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
         }
         return -1;
     }
+
+    private LinkInput Input(Uri url, SourceApp? source) => new(url, source, _time.GetLocalNow().DateTime);
 
     private static int Count(RuleCondition c) => c.Values.Count(v => !string.IsNullOrWhiteSpace(v));
 }

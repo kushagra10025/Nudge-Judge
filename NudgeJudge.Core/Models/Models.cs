@@ -29,6 +29,9 @@ public enum ConditionField
     /// <summary>The app the link was opened from, e.g. <c>ms-teams.exe</c>.</summary>
     SourceApp,
 
+    /// <summary>The local time the link is opened, e.g. <c>Mon-Fri 09:00-17:00</c>. See <see cref="Rules.TimeWindow"/>.</summary>
+    Time,
+
     /// <summary>A nested group: its own <see cref="RuleCondition.Conditions"/>, combined with <see cref="RuleCondition.Join"/>.</summary>
     Group,
 }
@@ -88,10 +91,13 @@ public sealed class RuleCondition
     public static RuleCondition Source(params string[] apps) =>
         new() { Field = ConditionField.SourceApp, Values = [.. apps] };
 
+    public static RuleCondition Time(params string[] windows) =>
+        new() { Field = ConditionField.Time, Values = [.. windows] };
+
     public static RuleCondition Group(RuleJoin join, params RuleCondition[] conditions) =>
         new() { Field = ConditionField.Group, Join = join, Conditions = [.. conditions] };
 
-    /// <summary>This condition, or every link and app condition inside the group, depth first.</summary>
+    /// <summary>This condition, or every link, app and time condition inside the group, depth first.</summary>
     public IEnumerable<RuleCondition> Leaves() =>
         IsGroup ? (Conditions ?? []).SelectMany(c => c.Leaves()) : [this];
 

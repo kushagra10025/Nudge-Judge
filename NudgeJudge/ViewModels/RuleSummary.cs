@@ -12,6 +12,8 @@ public enum SummaryPartKind
     LinkGlyph,
     /// <summary>The source-app icon.</summary>
     AppGlyph,
+    /// <summary>The clock icon of a time condition.</summary>
+    TimeGlyph,
 }
 
 public sealed record SummaryPart(string Text, SummaryPartKind Kind, MatchKind Glyph = MatchKind.Wildcard);
@@ -68,6 +70,11 @@ public static class RuleSummary
         {
             parts.Add(new("", SummaryPartKind.AppGlyph));
             parts.Add(new(condition.Negate ? "not from " : "from ", SummaryPartKind.Text));
+        }
+        else if (condition.Field == ConditionField.Time)
+        {
+            parts.Add(new("", SummaryPartKind.TimeGlyph));
+            parts.Add(new(condition.Negate ? "outside " : "during ", SummaryPartKind.Text));
         }
         else
         {

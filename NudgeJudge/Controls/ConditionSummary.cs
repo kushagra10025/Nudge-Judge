@@ -46,6 +46,7 @@ public sealed class ConditionSummary : TextBlock
         var inlines = new InlineCollection();
         var mono = this.TryFindResource("MonoFont", out var font) && font is FontFamily f ? f : FontFamily.Default;
         var appIcon = this.TryFindResource("Icon.App", out var g) ? g as Geometry : null;
+        var clockIcon = this.TryFindResource("Icon.Clock", out var c) ? c as Geometry : null;
 
         foreach (var part in Parts ?? [])
         {
@@ -62,10 +63,10 @@ public sealed class ConditionSummary : TextBlock
                         VerticalAlignment = VerticalAlignment.Center,
                     }));
                     break;
-                case SummaryPartKind.AppGlyph:
+                case SummaryPartKind.AppGlyph or SummaryPartKind.TimeGlyph:
                     inlines.Add(new InlineUIContainer(new Icon
                     {
-                        Data = appIcon,
+                        Data = part.Kind == SummaryPartKind.AppGlyph ? appIcon : clockIcon,
                         Width = 12,
                         Height = 12,
                         StrokeThickness = 2,

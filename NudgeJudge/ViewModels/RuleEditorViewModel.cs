@@ -405,6 +405,7 @@ public sealed partial class ConditionGroupViewModel : ConditionNodeViewModel
 
     public string AddLinkName => IsRoot ? "Add link condition" : "Add link condition to this group";
     public string AddSourceName => IsRoot ? "Add source app condition" : "Add source app condition to this group";
+    public string AddTimeName => IsRoot ? "Add time condition" : "Add time condition to this group";
     public string AddGroupName => IsRoot ? "Add condition group" : "Add condition group inside this group";
 
     public override bool IsComplete => Items.Count > 0 && Items.All(i => i.IsComplete);
@@ -423,6 +424,14 @@ public sealed partial class ConditionGroupViewModel : ConditionNodeViewModel
     {
         var condition = new ConditionEditorViewModel(Owner, ConditionField.SourceApp);
         condition.Values.Add(new ConditionValueViewModel(condition, Owner.SuggestedAppName()));
+        Items.Add(condition);
+    }
+
+    [RelayCommand]
+    private void AddTimeCondition()
+    {
+        var condition = new ConditionEditorViewModel(Owner, ConditionField.Time);
+        condition.Values.Add(new ConditionValueViewModel(condition, ""));
         Items.Add(condition);
     }
 
@@ -492,7 +501,12 @@ public sealed partial class ConditionEditorViewModel : ConditionNodeViewModel
     {
         Field = field;
         Kind = MatchKindOption.All[0];
-        Operators = field == ConditionField.SourceApp ? OperatorOption.Source : OperatorOption.Link;
+        Operators = field switch
+        {
+            ConditionField.SourceApp => OperatorOption.Source,
+            ConditionField.Time => OperatorOption.Time,
+            _ => OperatorOption.Link,
+        };
         Operator = Operators[0];
         Values.CollectionChanged += (_, _) =>
         {
@@ -528,7 +542,17 @@ public sealed partial class ConditionEditorViewModel : ConditionNodeViewModel
     public override bool IsGroup => false;
     public bool IsLink => Field == ConditionField.Link;
     public bool IsSource => Field == ConditionField.SourceApp;
-    public string Heading => IsLink ? "Link" : "Opened from";
+    public bool IsTime => Field == ConditionField.Time;
+
+    /// <summary>Link and time values are typed into a plain box; apps get suggestions.</summary>
+    public bool UsesTextBox => !IsSource;
+
+    public string Heading => Field switch
+    {
+        ConditionField.Link => "Link",
+        ConditionField.Time => "Time",
+        _ => "Opened from",
+    };
     public IReadOnlyList<MatchKindOption> Kinds => MatchKindOption.All;
     public IReadOnlyList<OperatorOption> Operators { get; }
     public ObservableCollection<ConditionValueViewModel> Values { get; } = [];
@@ -556,14 +580,27 @@ public sealed partial class ConditionEditorViewModel : ConditionNodeViewModel
     public string? FirstValue => Values.Select(v => v.Text.Trim()).FirstOrDefault(t => t.Length > 0);
     public override bool IsComplete => HasAnyValue && !HasValueErrors;
 
-    public string Placeholder => IsLink ? Kind.Example : "ms-teams.exe";
+    public string Placeholder => Field switch
+    {
+        ConditionField.Link => Kind.Example,
+        ConditionField.Time => TimeWindow.Example,
+        _ => "ms-teams.exe",
+    };
 
-    public string Hint => IsLink
-        ? Kind.Hint
-        : "The program's name, with or without .exe, its title, a pattern like *teams*, or a full path.";
+    public string Hint => Field switch
+    {
+        ConditionField.Link => Kind.Hint,
+        ConditionField.Time => "Local time. Hours (09:00-17:00, 9am-5pm), days (Mon-Fri, Sat,Sun, weekdays), or both. Overnight works: 22:00-06:00.",
+        _ => "The program's name, with or without .exe, its title, a pattern like *teams*, or a full path.",
+    };
 
     /// <summary>"or…" adds another alternative.</summary>
-    public string AddValueLabel => IsLink ? "Or another pattern" : "Or another app";
+    public string AddValueLabel => Field switch
+    {
+        ConditionField.Link => "Or another pattern",
+        ConditionField.Time => "Or another time",
+        _ => "Or another app",
+    };
 
     partial void OnKindChanged(MatchKindOption value) => Owner.ConditionChanged();
     partial void OnOperatorChanged(OperatorOption value) => Owner.ConditionChanged();

@@ -28,6 +28,7 @@ public sealed record OperatorOption(bool Negate, string Label)
 {
     public static IReadOnlyList<OperatorOption> Link { get; } = [new(false, "matches"), new(true, "doesn't match")];
     public static IReadOnlyList<OperatorOption> Source { get; } = [new(false, "is"), new(true, "is not")];
+    public static IReadOnlyList<OperatorOption> Time { get; } = [new(false, "is within"), new(true, "is outside")];
     public override string ToString() => Label;
 }
 

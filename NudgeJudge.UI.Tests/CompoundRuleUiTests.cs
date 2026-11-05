@@ -68,6 +68,33 @@ public sealed class CompoundRuleUiTests : IDisposable
     // ---- The editor ----
 
     [AvaloniaFact]
+    public void Building_a_time_condition_in_the_editor()
+    {
+        var app = new Harness();
+        var window = Show(app, AppPage.Rules);
+        Click(window, Find<Button>(window, "Add rule", byContent: true));
+        Settle(window);
+
+        Type(window, Find<TextBox>(window, "Rule name"), "GitHub at work");
+        Type(window, Finds<TextBox>(window, "Pattern")[0], "github.com");
+        Click(window, Find<Button>(window, "Add time condition"));
+        Settle(window);
+        var patterns = Finds<TextBox>(window, "Pattern");
+        Assert.Equal(2, patterns.Count); // the time is typed into a plain box
+        Type(window, patterns[1], "Mon-Fri 09:00-17:00");
+
+        Find<ComboBox>(window, "Open in").SelectedIndex = 1;
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+
+        var rule = Assert.Single(app.Config.Current.Rules);
+        Assert.Equal(ConditionField.Time, rule.Conditions[1].Field);
+        Assert.Equal(["Mon-Fri 09:00-17:00"], rule.Conditions[1].Values);
+        var summary = window.GetVisualDescendants().OfType<ConditionSummary>().Single(s => s.IsEffectivelyVisible);
+        Assert.Equal("github.com   and   during Mon-Fri 09:00-17:00", InlineText(summary));
+    }
+
+    [AvaloniaFact]
     public void Building_youtube_or_youtu_be_from_teams_in_the_editor()
     {
         var app = new Harness();

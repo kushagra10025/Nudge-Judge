@@ -10,10 +10,11 @@ internal sealed class LinkInput
 {
     private string? _absoluteUri;
 
-    public LinkInput(Uri url, SourceApp? source)
+    public LinkInput(Uri url, SourceApp? source, DateTime? localTime = null)
     {
         Url = url;
         Source = source;
+        LocalTime = localTime ?? DateTime.Now;
         // Lower-cased once here so every host pattern (already lower case) can compare ordinally.
         var idn = url.IdnHost;
         Host = idn.TrimEnd('.').ToLowerInvariant();
@@ -25,6 +26,9 @@ internal sealed class LinkInput
 
     public Uri Url { get; }
     public SourceApp? Source { get; }
+
+    /// <summary>The local wall-clock time the link is being matched at, for time conditions.</summary>
+    public DateTime LocalTime { get; }
 
     /// <summary>The ASCII (punycode) host in lower case, without a trailing dot.</summary>
     public string Host { get; }
