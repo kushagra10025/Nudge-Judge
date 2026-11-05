@@ -389,6 +389,20 @@ public class SourceAppDetectorTests
     }
 
     [Fact]
+    public void A_link_opened_from_our_own_window_is_not_from_the_tray_host()
+    {
+        // Settings → About → Releases, with NudgeJudge as the default browser: the window's parent is the tray host.
+        var table = new Table()
+            .Add(1, 0, "systemd")
+            .Add(100, 1, "NudgeJudge.Tray", "/opt/nudgejudge/NudgeJudge.Tray")
+            .Add(200, 100, "NudgeJudge.Desktop", "/opt/nudgejudge/NudgeJudge.Desktop")
+            .Add(300, 200, "xdg-open")
+            .Add(500, 300, "NudgeJudge.Desktop");
+
+        Assert.Null(new SourceAppDetector(table).Detect(500));
+    }
+
+    [Fact]
     public void Windows_names_and_brokers()
     {
         var table = new Table()

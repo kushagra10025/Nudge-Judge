@@ -42,10 +42,12 @@ public sealed class JsonConfigStore : IConfigStore
     /// The file as we last read or wrote it; null when we haven't seen a readable file. Kept whole rather than
     /// hashed: it's a few KB, and a hash would load the crypto library on every start.
     /// </summary>
+    /// <remarks>
+    /// After a failed write, memory holds a change the file doesn't (<see cref="SaveError"/> says so). It's retried
+    /// with the next update, unless another process saves first: its file then wins, because it may hold far more
+    /// (rules edited for hours in the window while the tray host sat on one failed toggle).
+    /// </remarks>
     private byte[]? _diskBytes;
-
-    /// <summary>Memory holds changes the file doesn't (a failed write). They win over a newer file and are retried.</summary>
-    private bool _unsaved;
 
     /// <summary>The file came from a newer NudgeJudge. Nothing is written, so it isn't silently downgraded.</summary>
     private bool _readOnly;
@@ -73,7 +75,7 @@ public sealed class JsonConfigStore : IConfigStore
                 try { fileLock = FileLock.Acquire(_lockPath); }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
 
-                if (!_unsaved && !_readOnly) PickUpExternalChanges();
+                if (!_readOnly) PickUpExternalChanges();
                 mutate(Current);
                 TrySave();
             }
@@ -94,7 +96,7 @@ public sealed class JsonConfigStore : IConfigStore
         bool changed;
         lock (_gate)
         {
-            if (_unsaved || _readOnly) return false;
+            if (_readOnly) return false;
             var before = Current;
             PickUpExternalChanges();
             changed = !ReferenceEquals(before, Current);
@@ -171,8 +173,9 @@ public sealed class JsonConfigStore : IConfigStore
         config.Upgrade();
         Current = config;
         _diskBytes = bytes;
-        // A previous load failure no longer describes what's in memory.
+        // A previous load failure no longer describes what's in memory, and any unsaved change gave way to the file.
         LoadError = null;
+        SaveError = null;
     }
 
     /// <summary>Reads while letting another process's atomic rename replace the file (Windows needs delete sharing for that).</summary>
@@ -219,7 +222,6 @@ public sealed class JsonConfigStore : IConfigStore
     {
         if (_readOnly)
         {
-            _unsaved = true;
             SaveError = "Changes aren't being saved: the config file is from a newer version of NudgeJudge.";
             return;
         }
@@ -229,13 +231,11 @@ public sealed class JsonConfigStore : IConfigStore
             var bytes = JsonSerializer.SerializeToUtf8Bytes(Current, ConfigJsonContext.Default.AppConfig);
             AppPaths.WritePrivateFileAtomic(_path, bytes);
             _diskBytes = bytes;
-            _unsaved = false;
             SaveError = null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Memory keeps the change and the next update tries again.
-            _unsaved = true;
             SaveError = "Couldn't save your changes: " + ex.Message;
         }
     }

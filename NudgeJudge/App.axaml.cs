@@ -25,12 +25,9 @@ public partial class App : Application
     /// </summary>
     public InstanceClaim? Instance { get; init; }
 
-    /// <summary>The app that opened the links on this launch's command line, when the entry point could tell.</summary>
-    public NudgeJudge.Core.Models.SourceApp? LaunchSource { get; init; }
-
     /// <summary>
-    /// Config, rules and router, when the entry point already built them to route this launch's links before
-    /// the UI started. Null means the links (if any) haven't been routed yet, and the app builds its own.
+    /// Config, rules and router, built by the entry point (which already routed this launch's links). Null for a
+    /// <c>--ui</c> process, the designer and tests, which have no links of their own; the app then builds its own.
     /// </summary>
     public CoreServices? Core { get; init; }
 
@@ -125,7 +122,13 @@ public partial class App : Application
             // The tray host would otherwise keep running the old version (and start old windows) after the update.
             if (launch.Ui) TellResidentHostToQuit();
         };
-        if (launch.Urls.Count == 0 || serving)
+
+        // Started by the tray host with its first order on the command line.
+        var order = launch.Ui ? InstanceProtocol.DecodeOrder(desktop.Args ?? []) : null;
+
+        // Only a process that opens the main window looks for updates (that's where they're shown). Each chooser is
+        // a short-lived process of its own; checking from every one would ask GitHub on most link clicks.
+        if (launch.Ui ? order?.Command == InstanceCommand.Show : launch.Urls.Count == 0)
         {
             var schedule = new CancellationTokenSource();
             desktop.Exit += (_, _) => schedule.Cancel();
@@ -134,10 +137,9 @@ public partial class App : Application
 
         if (launch.Ui)
         {
-            // Started by the tray host with its first order on the command line: act on it now, not after our
-            // server is up. Later orders come over the server. If nothing ever opens, don't linger invisibly.
-            if (InstanceProtocol.DecodeOrder(desktop.Args ?? []) is { } order)
-                HandleRequest(order, router, windows, chooser, settings);
+            // Act on the first order now, not after our server is up. Later orders come over the server.
+            // If nothing ever opens, don't linger invisibly.
+            if (order is not null) HandleRequest(order, router, windows, chooser, settings);
             DispatcherTimer.RunOnce(ExitIfIdle, UiOrderTimeout);
             return;
         }
@@ -148,22 +150,14 @@ public partial class App : Application
             return;
         }
 
-        // Launched with links (as the default browser is). Links forwarded by later launches join the same chooser.
-        if (Core is null)
-        {
-            foreach (var url in launch.Urls)
-                router.Route(url, LaunchSource);
-        }
-        else
-        {
-            // Routed by the entry point before the UI started; only the ones no rule took are left.
-            foreach (var link in PendingLinks)
-                dispatcher.Post(() =>
-                {
-                    chooser.Enqueue(link.Url, link.Source);
-                    windows.ShowChooser();
-                });
-        }
+        // Launched with links (as the default browser is), already routed by the entry point before the UI started:
+        // only the ones no rule took are left. Links forwarded by later launches join the same chooser.
+        foreach (var link in PendingLinks)
+            dispatcher.Post(() =>
+            {
+                chooser.Enqueue(link.Url, link.Source);
+                windows.ShowChooser();
+            });
 
         // The dispatcher loop hasn't started yet; shutting down synchronously here throws.
         Dispatcher.UIThread.Post(ExitIfIdle);

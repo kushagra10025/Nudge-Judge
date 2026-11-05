@@ -79,6 +79,30 @@ public sealed class ConfigStoreTests : IDisposable
     // ---- Failures ----
 
     [Fact]
+    public void A_failed_save_never_overwrites_what_another_process_saved_later()
+    {
+        // The tray host's toggle fails to save (file locked by a backup tool, say), then the window saves rules.
+        var host = new JsonConfigStore(ConfigPath);
+        var window = new JsonConfigStore(ConfigPath);
+        File.Delete(ConfigPath);
+        Directory.CreateDirectory(ConfigPath);
+        host.Update(c => c.Settings.RoutingEnabled = false);
+        Assert.NotNull(host.SaveError);
+        Directory.Delete(ConfigPath);
+        window.Update(c => c.Rules.Add(NamedRule("edited-in-window")));
+
+        // The host routes with the window's rules, and its next save keeps them.
+        Assert.True(host.Refresh());
+        Assert.Equal(["edited-in-window"], host.Current.Rules.Select(r => r.Name));
+        Assert.Null(host.SaveError);
+        host.Update(c => c.Settings.TemporaryRuleHours = 4);
+
+        var onDisk = new JsonConfigStore(ConfigPath).Current;
+        Assert.Equal(["edited-in-window"], onDisk.Rules.Select(r => r.Name));
+        Assert.Equal(4, onDisk.Settings.TemporaryRuleHours);
+    }
+
+    [Fact]
     public void A_failed_save_keeps_the_change_reports_it_and_retries()
     {
         var store = new JsonConfigStore(ConfigPath);

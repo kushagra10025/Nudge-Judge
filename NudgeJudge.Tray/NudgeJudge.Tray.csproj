@@ -38,5 +38,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NudgeJudge.Core\NudgeJudge.Core.csproj" />
+    <InternalsVisibleTo Include="NudgeJudge.Core.Tests" />
   </ItemGroup>
 </Project>

@@ -50,7 +50,7 @@ public sealed class SourceAppDetector(IProcessTable processes)
         "rundll32", "OpenWith", "svchost", "RuntimeBroker", "sihost", "dllhost", "ApplicationFrameHost",
         "LaunchWinApp", "browser_broker", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost",
         // Ourselves (a launch can be relayed by another copy)
-        "NudgeJudge", "NudgeJudge.Desktop", "dotnet",
+        "NudgeJudge", "NudgeJudge.Desktop", "NudgeJudge.Tray", "dotnet",
     };
 
     /// <summary>The desktop shell: a real source (a .url file, the Run box) but often just a stand-in for the actual app.</summary>

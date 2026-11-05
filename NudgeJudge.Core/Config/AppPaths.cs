@@ -55,10 +55,15 @@ public static class AppPaths
     }
 
     /// <summary>Writes a file atomically (temp file + rename) readable only by the current user.</summary>
-    public static void WritePrivateFileAtomic(string path, ReadOnlySpan<byte> contents)
+    /// <param name="privateDirectory">
+    /// Also make the folder owner-only. False for shared folders that aren't ours to lock down, such as
+    /// <c>~/.local/share/applications</c> or <c>~/.config/autostart</c>.
+    /// </param>
+    public static void WritePrivateFileAtomic(string path, ReadOnlySpan<byte> contents, bool privateDirectory = true)
     {
         var dir = Path.GetDirectoryName(path)!;
-        EnsurePrivateDirectory(dir);
+        if (privateDirectory) EnsurePrivateDirectory(dir);
+        else Directory.CreateDirectory(dir);
         var temp = Path.Combine(dir, "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp");
 
         var options = new FileStreamOptions

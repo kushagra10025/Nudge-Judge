@@ -52,7 +52,7 @@ internal sealed class Program
         // Not staying: every link opened, or a login launch with nothing to show. Done, no UI needed.
         if (launch.Urls.Count > 0 ? pending.Count == 0 : launch.Background) return 0;
 
-        var exit = BuildAvaloniaApp(claim, launch.Source, core, pending).StartWithClassicDesktopLifetime(args);
+        var exit = BuildAvaloniaApp(claim, core, pending).StartWithClassicDesktopLifetime(args);
 
         // "Keep running in the tray" was switched on while the window was open: hand over to the tray host.
         core.Config.Refresh();
@@ -149,7 +149,7 @@ internal sealed class Program
                     .GetAwaiter().GetResult();
             return 0;
         }
-        return BuildAvaloniaApp(claim, null, null, []).StartWithClassicDesktopLifetime(args);
+        return BuildAvaloniaApp(claim, null, []).StartWithClassicDesktopLifetime(args);
     }
 
     /// <summary>
@@ -196,11 +196,10 @@ internal sealed class Program
     }
 
     // Also used by the visual designer.
-    public static AppBuilder BuildAvaloniaApp() => BuildAvaloniaApp(null, null, null, []);
+    public static AppBuilder BuildAvaloniaApp() => BuildAvaloniaApp(null, null, []);
 
-    private static AppBuilder BuildAvaloniaApp(InstanceClaim? claim, NudgeJudge.Core.Models.SourceApp? source, CoreServices? core,
-        IReadOnlyList<IncomingLink> pending)
-        => AppBuilder.Configure(() => new App { Instance = claim, LaunchSource = source, Core = core, PendingLinks = pending })
+    private static AppBuilder BuildAvaloniaApp(InstanceClaim? claim, CoreServices? core, IReadOnlyList<IncomingLink> pending)
+        => AppBuilder.Configure(() => new App { Instance = claim, Core = core, PendingLinks = pending })
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();

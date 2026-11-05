@@ -39,7 +39,9 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
 
     public int Run()
     {
-        claim.StartServer(HandleAsync);
+        // No server means we've also let go of the lock: the next launch would start another tray host (and another
+        // icon) for every link. Leave instead; launches then run on their own, without the tray.
+        if (!claim.StartServer(HandleAsync)) return 1;
 
         var menu = new TrayMenu(
             Open: () => _ = ShowAsync(null),
@@ -184,9 +186,10 @@ internal sealed class ResidentHost(InstanceClaim claim, CoreServices core)
                 if (result != DeliveryResult.Unreachable) return true;
                 lastError = error;
 
-                // Unreachable while running: it's just starting (its server isn't up yet) or closing.
-                if (!startUi) return false;
-                if (!UiRunning) return StartUi(InstanceProtocol.EncodeOrder(command, urls, source, page));
+                // Unreachable while running: it's just starting (its server comes up in the background, after the
+                // first window) or closing. Wait for one or the other; giving up early would, say, leave a fresh
+                // chooser open after Quit.
+                if (!UiRunning) return startUi && StartUi(InstanceProtocol.EncodeOrder(command, urls, source, page));
                 if (DateTime.UtcNow >= deadline) break;
                 await Task.Delay(20);
             }

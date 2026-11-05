@@ -52,7 +52,16 @@ internal sealed class LinuxTray : ITrayIcon
             foreach (var size in new[] { 16, 32, 48 })
             {
                 var (actual, png) = TrayIconImage.Best(size);
-                if (actual == size) _pixmaps.Add(TrayIconImage.DecodeToArgb(png));
+                if (actual != size) continue;
+                // An image the small decoder can't read (re-saved as a palette PNG, say) costs that size, not the tray.
+                try
+                {
+                    _pixmaps.Add(TrayIconImage.DecodeToArgb(png));
+                }
+                catch (Exception e) when (e is NotSupportedException or InvalidDataException or ArgumentException or EndOfStreamException)
+                {
+                    Trace.TraceWarning($"NudgeJudge: tray icon size {size} couldn't be read: {e.Message}");
+                }
             }
             _routingShown = _menu.RoutingEnabled();
 
@@ -199,7 +208,9 @@ internal sealed class LinuxTray : ITrayIcon
             case "Title": writer.WriteVariantString("NudgeJudge"); break;
             case "Status": writer.WriteVariantString("Active"); break;
             case "WindowId": writer.WriteVariantInt32(0); break;
-            case "IconName" or "OverlayIconName" or "AttentionIconName": writer.WriteVariantString(""); break;
+            // No pixmap could be read: fall back to the theme's browser icon rather than show nothing.
+            case "IconName": writer.WriteVariantString(_pixmaps.Count == 0 ? "web-browser" : ""); break;
+            case "OverlayIconName" or "AttentionIconName": writer.WriteVariantString(""); break;
             case "ItemIsMenu": writer.WriteVariantBool(false); break;
             case "Menu": writer.WriteVariantObjectPath(MenuPath); break;
             case "IconPixmap":
