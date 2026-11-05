@@ -1,16 +1,8 @@
 import { browser, type Browser } from 'wxt/browser';
 import { matchesAny } from '@/utils/hosts';
-import {
-  checkReply,
-  explainNativeError,
-  HOST_NAME,
-  isUnreachable,
-  isWebUrl,
-  PROTOCOL_VERSION,
-  type NativeReply,
-  type NativeRequest,
-  type OpenMessage,
-} from '@/utils/protocol';
+import { sendNative as send } from '@/utils/native';
+import { isUnreachable, isWebUrl, PROTOCOL_VERSION, type NativeReply, type OpenMessage } from '@/utils/protocol';
+import { serialQueue } from '@/utils/serial';
 import { addRecord, recordFor, type Trigger } from '@/utils/sends';
 import { ALL_SITES, AUTO_ROUTE, autoHostsItem, recentSendsItem, settingsItem, tiedStartItem } from '@/utils/settings';
 
@@ -41,20 +33,22 @@ export default defineBackground(() => {
   });
 
   // From the gesture content script. Answered asynchronously: the page waits for "stay" before following the link.
-  browser.runtime.onMessage.addListener((message: unknown, sender) => {
+  // Through sendResponse and `return true`, which every browser supports; Chrome doesn't document a returned promise.
+  browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
     const open = message as OpenMessage;
-    if (open?.kind !== 'open' || !isWebUrl(open.url) || sender.id !== browser.runtime.id) return undefined;
-    return openLink(open.url, 'click', sender.tab?.id).then((reply) => {
-      if (!reply.ok) showError(reply, sender.tab?.id);
-      return reply;
+    if (open?.kind !== 'open' || !isWebUrl(open.url) || sender.id !== browser.runtime.id) return false;
+    void openLink(open.url, 'click', sender.tab?.id).then((reply) => {
+      if (!reply.ok) void showError(reply, sender.tab?.id);
+      sendResponse(reply);
     });
+    return true;
   });
 
   // The optional permissions and settings decide which features run.
-  browser.permissions.onAdded.addListener(() => void syncFeatures());
-  browser.permissions.onRemoved.addListener(() => void syncFeatures());
-  settingsItem.watch(() => void syncFeatures());
-  void syncFeatures();
+  browser.permissions.onAdded.addListener(() => void syncSerially());
+  browser.permissions.onRemoved.addListener(() => void syncSerially());
+  settingsItem.watch(() => void syncSerially());
+  void syncSerially();
 
   // webNavigation only exists once its optional permission is granted. Listeners must be added at startup for the
   // worker to be woken by them, so add it now when we can, and from syncFeatures right after a grant.
@@ -67,18 +61,14 @@ function createMenus() {
   });
 }
 
-async function send(request: NativeRequest): Promise<NativeReply> {
-  try {
-    return checkReply(await browser.runtime.sendNativeMessage(HOST_NAME, request));
-  } catch (error) {
-    return { v: PROTOCOL_VERSION, ok: false, error: explainNativeError(error) };
-  }
-}
+/** Storage writes that read the list first, one at a time, so two sends at once don't drop a line. */
+const recording = serialQueue();
 
 /** Sends a link, and keeps a line about what happened for the options page's "Recent links". */
 async function openLink(url: string, trigger: Trigger, tabId: number | undefined, auto = false): Promise<NativeReply> {
   const reply = await send({ v: PROTOCOL_VERSION, type: 'open', url, ...(auto ? { auto } : {}) });
-  await recentSendsItem.setValue(addRecord(await recentSendsItem.getValue(), recordFor(url, trigger, reply)));
+  const record = recordFor(url, trigger, reply);
+  await recording(async () => recentSendsItem.setValue(addRecord(await recentSendsItem.getValue(), record)));
   await noteHowItWasDelivered(reply, tabId);
   return reply;
 }
@@ -134,6 +124,10 @@ async function flashBadge(tabId: number | undefined, text: string, color: string
 
 // --- Features that depend on optional permissions ---
 
+/** A grant and a settings change fire together; checking and registering twice at once registers the script twice. */
+const syncing = serialQueue();
+const syncSerially = () => syncing(syncFeatures).catch((e) => console.warn('NudgeJudge: couldn\'t update features', e));
+
 async function syncFeatures() {
   const settings = await settingsItem.getValue();
   const allSites = await browser.permissions.contains(ALL_SITES);
@@ -175,14 +169,25 @@ function listenForNavigations() {
   browser.webNavigation.onBeforeNavigate.addListener((details) => void onBeforeNavigate(details));
 }
 
-async function refreshAutoHosts(force = false): Promise<string[]> {
-  const cached = await autoHostsItem.getValue();
-  if (!force && Date.now() - cached.fetchedAt < AUTO_HOSTS_TTL_MS) return cached.hosts;
-  const reply = await send({ v: PROTOCOL_VERSION, type: 'autoRoutes' });
-  // Keep the old list if NudgeJudge can't be reached, but try again next time.
-  const hosts = reply.ok ? (reply.hosts ?? []) : cached.hosts;
-  await autoHostsItem.setValue({ hosts, fetchedAt: reply.ok ? Date.now() : cached.fetchedAt });
-  return hosts;
+let refreshing: Promise<string[]> | null = null;
+
+/** One refresh at a time: page loads in several tabs at once share it. */
+function refreshAutoHosts(force = false): Promise<string[]> {
+  refreshing ??= (async () => {
+    try {
+      const cached = await autoHostsItem.getValue();
+      if (!force && Date.now() - cached.fetchedAt < AUTO_HOSTS_TTL_MS) return cached.hosts;
+      const reply = await send({ v: PROTOCOL_VERSION, type: 'autoRoutes' });
+      // Keep the old list if NudgeJudge can't be reached, and wait the usual time before asking again: retrying on
+      // every page load would start a failing process each time.
+      const hosts = reply.ok ? (reply.hosts ?? []) : cached.hosts;
+      await autoHostsItem.setValue({ hosts, fetchedAt: Date.now() });
+      return hosts;
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
 }
 
 async function onBeforeNavigate(details: Browser.webNavigation.WebNavigationBaseCallbackDetails) {

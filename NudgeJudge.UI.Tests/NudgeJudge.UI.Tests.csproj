@@ -16,5 +16,13 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\NudgeJudge\NudgeJudge.csproj" />
+    <!-- Built first (not referenced) so NativeHostProcessTests can run the real executable in host mode. -->
+    <ProjectReference Include="..\NudgeJudge.Desktop\NudgeJudge.Desktop.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>DesktopDll</_Parameter1>
+      <_Parameter2>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..\NudgeJudge.Desktop\bin\$(Configuration)\$(TargetFramework)\NudgeJudge.Desktop.dll'))</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

@@ -1,19 +1,13 @@
 import { browser } from 'wxt/browser';
 import { defaultGesture, describeGesture, GESTURES, type Gesture } from '@/utils/gesture';
-import { checkReply, explainNativeError, HOST_NAME, PROTOCOL_VERSION, type NativeReply } from '@/utils/protocol';
+import { sendNative } from '@/utils/native';
+import { PROTOCOL_VERSION } from '@/utils/protocol';
 import { OUTCOMES, TRIGGER_LABELS, type SendRecord } from '@/utils/sends';
 import { ALL_SITES, AUTO_ROUTE, autoHostsItem, recentSendsItem, settingsItem, tiedStartItem } from '@/utils/settings';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const mac = navigator.platform.toLowerCase().startsWith('mac');
 
-async function ask(request: { v: 1; type: 'ping' | 'autoRoutes' }): Promise<NativeReply> {
-  try {
-    return checkReply(await browser.runtime.sendNativeMessage(HOST_NAME, request));
-  } catch (error) {
-    return { v: PROTOCOL_VERSION, ok: false, error: explainNativeError(error) };
-  }
-}
 
 async function checkConnection() {
   const lamp = $('lamp');
@@ -22,7 +16,7 @@ async function checkConnection() {
   $('status-detail').textContent = '';
   $('retry').hidden = true;
 
-  const reply = await ask({ v: PROTOCOL_VERSION, type: 'ping' });
+  const reply = await sendNative({ v: PROTOCOL_VERSION, type: 'ping' });
   if (reply.ok) {
     lamp.className = 'lamp on';
     $('status-label').textContent = `Connected to NudgeJudge ${reply.app ?? ''}`.trim();
@@ -56,7 +50,7 @@ async function showAuto() {
     hostsLine.textContent = '';
     return;
   }
-  const reply = await ask({ v: PROTOCOL_VERSION, type: 'autoRoutes' });
+  const reply = await sendNative({ v: PROTOCOL_VERSION, type: 'autoRoutes' });
   if (!reply.ok) {
     hostsLine.textContent = reply.error ?? '';
     return;

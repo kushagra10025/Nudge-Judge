@@ -436,8 +436,12 @@ public sealed class LaunchSourceTests
     }
 }
 
-public sealed class TiedLauncherActivityTests
+public sealed class TiedLauncherActivityTests : IDisposable
 {
+    private readonly string _root = Directory.CreateTempSubdirectory("nj-tied-").FullName;
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+
     private sealed class Boot : ISystemBoot
     {
         public string CurrentBootId => "b";
@@ -449,10 +453,10 @@ public sealed class TiedLauncherActivityTests
         public void Launch(BrowserProfile browser, Uri url) { }
     }
 
-    private static (LinkRouter, ActivityLog) Router(bool tied)
+    private (LinkRouter, ActivityLog) Router(bool tied)
     {
         var chrome = new BrowserProfile { Name = "Chrome", ExecutablePath = "/usr/bin/chrome" };
-        var config = new JsonConfigStore(Path.Combine(Directory.CreateTempSubdirectory("nj-tied-").FullName, "config.json"));
+        var config = new JsonConfigStore(Path.Combine(_root, "config.json"));
         config.Update(c =>
         {
             c.Browsers.Add(chrome);
@@ -477,7 +481,7 @@ public sealed class TiedLauncherActivityTests
     [Fact]
     public void The_flag_survives_the_log_file_and_is_left_out_when_false()
     {
-        var path = Path.Combine(Directory.CreateTempSubdirectory("nj-tied-log-").FullName, "activity.log");
+        var path = Path.Combine(_root, "activity.log");
         var file = new ActivityLogFile(path);
         var log = new ActivityLog(file);
         log.Add(new ActivityEntry(DateTimeOffset.UtcNow, "https://a.example/", ActivityOutcome.Routed, TiedToLauncher: true));
