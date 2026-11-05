@@ -34,12 +34,25 @@ NudgeJudge/               Avalonia UI library
   Services/               IWindowService, IDialogService, IThemeService, IUiDispatcher + Avalonia implementations;
                           IUpdateService + its Velopack implementation (GitHub Releases), AppInfo (version, project links)
   Styles/                 Theme.axaml (colour and icon resources), Styles.axaml (shared styles)
-  App.axaml(.cs)          Composition root and tray icon
+  App.axaml(.cs)          Composition root
 
 NudgeJudge.Desktop/       Executable for Linux, Windows and macOS; routes launch links before starting the UI; publishes as Native AOT
+NudgeJudge.Tray/          Small native executable that stays in the tray: single-instance server, routing, a native tray icon
+                          (Win32 Shell_NotifyIcon, or StatusNotifierItem + dbusmenu over D-Bus), no Avalonia
 NudgeJudge.Core.Tests/    xUnit tests for matching, validation, ReDoS safety, argument building, browser discovery and registration
 NudgeJudge.UI.Tests/      Avalonia headless tests (xunit v3) that drive real views, e.g. the default-browser setup in Settings
 ```
+
+## Processes
+
+What runs depends on whether "keep running in tray" is on.
+
+- **Off.** One `NudgeJudge.Desktop` process per launch, as described above: links are routed before Avalonia starts, and the process exits when its windows close.
+- **On.** The launch that becomes the primary instance starts `NudgeJudge.Tray`, lets go of the single-instance lock for it, and hands over anything its own launch needs: links for the chooser, or a request for the main window. Then it exits. The tray host owns the tray icon and the single-instance server, and routes links with `CoreServices` itself. When a window is needed, it starts `NudgeJudge.Desktop --ui`, which it reaches over a second channel (`ui.lock`, `ui.token`, `nudgejudge-ui.sock`). That UI process has no tray icon and exits when its windows close. While it's running, the host forwards incoming links to it, so the chooser and the Activity page stay live.
+
+The split keeps memory low while the app waits in the tray (about 3–5 MB private on Linux, against about 32 MB of private memory and 127 MB resident before). Avalonia, Skia and the fonts are only loaded while a window is open. The tray host has to be its own executable: a native binary keeps type data for all of its code in private memory (the `.hydrated` section), and in `NudgeJudge.Desktop` that's 9 MB, most of it Avalonia's.
+
+Settings changed in the UI process reach the host through `config.json`. The host re-reads it (`JsonConfigStore.Refresh`) before routing each link, when the tray menu opens, and when the UI process exits. If "keep running in tray" was turned off by then, the host quits too. Inside an AppImage, the host is started as `$APPIMAGE --tray-host`, which replaces itself with the tray executable (`execv`), so the image stays mounted for as long as the host runs.
 
 ## Related docs
 

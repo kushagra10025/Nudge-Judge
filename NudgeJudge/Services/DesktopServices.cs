@@ -10,7 +10,10 @@ using NudgeJudge.Views;
 
 namespace NudgeJudge.Services;
 
-/// <summary>Owns the app's windows. The only place that creates or closes them.</summary>
+/// <summary>
+/// Owns the app's windows. The only place that creates or closes them. Closing a window really closes it: staying
+/// in the tray is the resident host's job, and this process exits once nothing is open.
+/// </summary>
 internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifetime lifetime) : IWindowService, IDialogService
 {
     private MainWindow? _main;
@@ -19,10 +22,6 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
 
     public MainWindowViewModel? Main { get; set; }
     public ChooserViewModel? Chooser { get; set; }
-    public Func<bool> KeepRunningInBackground { get; set; } = () => true;
-
-    /// <summary>True once the main window has been shown in this process.</summary>
-    public bool MainWindowShown { get; private set; }
 
     /// <summary>True while the main window is on screen or the chooser is open.</summary>
     public bool AnyWindowOpen => _main is { IsVisible: true } || _chooser is not null;
@@ -38,7 +37,6 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
         if (_main is null)
         {
             _main = new MainWindow { DataContext = Main };
-            _main.Closing += OnMainClosing;
             _main.Activated += (_, _) => Main?.OnActivated();
             _main.Closed += (_, _) =>
             {
@@ -48,7 +46,6 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
             lifetime.MainWindow = _main;
         }
 
-        MainWindowShown = true;
         _main.Show();
         if (_main.WindowState == WindowState.Minimized) _main.WindowState = WindowState.Normal;
         _main.Activate();
@@ -127,13 +124,6 @@ internal sealed class DesktopWindowService(IClassicDesktopStyleApplicationLifeti
             FileTypeFilter = [JsonFiles, FilePickerFileTypes.All],
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
-    }
-
-    private void OnMainClosing(object? sender, WindowClosingEventArgs e)
-    {
-        if (_quitting || !KeepRunningInBackground()) return;
-        e.Cancel = true;
-        _main?.Hide();
     }
 }
 

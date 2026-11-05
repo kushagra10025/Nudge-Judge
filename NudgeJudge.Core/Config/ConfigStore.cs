@@ -85,6 +85,24 @@ public sealed class JsonConfigStore : IConfigStore
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Picks up the file if another process rewrote it, raising <see cref="Changed"/> when it did. For a long-lived
+    /// process that only reads (the tray host routes with rules the UI process edits).
+    /// </summary>
+    public bool Refresh()
+    {
+        bool changed;
+        lock (_gate)
+        {
+            if (_unsaved || _readOnly) return false;
+            var before = Current;
+            PickUpExternalChanges();
+            changed = !ReferenceEquals(before, Current);
+        }
+        if (changed) Changed?.Invoke(this, EventArgs.Empty);
+        return changed;
+    }
+
     private AppConfig Load(Func<AppConfig>? seed)
     {
         byte[] bytes;

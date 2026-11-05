@@ -70,6 +70,30 @@ public sealed class InstanceProtocolTests
     }
 
     [Fact]
+    public void Check_allows_links_and_pages_only_where_they_mean_something()
+    {
+        InstanceRequest R(InstanceCommand c, string[] urls, string? page = null) => new(InstanceProtocol.Version, "t", c, urls, null, page);
+
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Choose, ["https://a.example/"])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Choose, [])));
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Quit, [])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Quit, ["https://a.example/"])));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.ToggleRouting, ["https://a.example/"])));
+        Assert.Null(InstanceProtocol.Check(R(InstanceCommand.Show, [], "rules")));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Open, ["https://a.example/"], "rules")));
+        Assert.NotNull(InstanceProtocol.Check(R(InstanceCommand.Show, [], new string('x', InstanceProtocol.MaxPageLength + 1))));
+    }
+
+    [Fact]
+    public async Task Page_round_trips()
+    {
+        using var stream = new MemoryStream();
+        await InstanceProtocol.WriteRequestAsync(stream, new(InstanceProtocol.Version, "t", InstanceCommand.Show, [], null, "activity"), default);
+        stream.Position = 0;
+        Assert.Equal("activity", (await InstanceProtocol.ReadRequestAsync(stream, default))?.Page);
+    }
+
+    [Fact]
     public void Tokens_are_random_and_compared_exactly()
     {
         var a = InstanceProtocol.NewToken();
@@ -89,6 +113,15 @@ public sealed class InstanceProtocolTests
         var launch = LaunchArguments.Parse(args);
         Assert.Equal(url is null ? [] : [url], launch.Urls);
         Assert.Equal(command, launch.ForwardCommand);
+    }
+
+    [Fact]
+    public void The_ui_flag_marks_a_window_process_and_is_not_a_link()
+    {
+        var launch = LaunchArguments.Parse(["--ui"]);
+        Assert.True(launch.Ui);
+        Assert.Empty(launch.Urls);
+        Assert.False(LaunchArguments.Parse([]).Ui);
     }
 }
 
@@ -273,6 +306,43 @@ public sealed class SingleInstanceTests : IDisposable
         Assert.Collection(_handled,
             r => Assert.Equal((InstanceCommand.Open, 2), (r.Command, r.Urls.Count)),
             r => Assert.Equal(InstanceCommand.Show, r.Command));
+    }
+
+    [Fact]
+    public void An_exclusive_claim_waits_for_the_holder_to_let_go()
+    {
+        var first = SingleInstance.ClaimExclusive(_endpoint);
+        Assert.NotNull(first);
+        Assert.Null(SingleInstance.ClaimExclusive(_endpoint, TimeSpan.FromMilliseconds(150)));
+
+        // The tray handover: the launch lets go while the tray host is already waiting for it.
+        var waiting = Task.Run(() => SingleInstance.ClaimExclusive(_endpoint, TimeSpan.FromSeconds(5)));
+        Thread.Sleep(200);
+        first.Dispose();
+        using var second = waiting.GetAwaiter().GetResult();
+        Assert.NotNull(second);
+        Assert.True(second.IsPrimary);
+    }
+
+    [Fact]
+    public async Task The_ui_channel_is_separate_from_the_main_one()
+    {
+        if (OperatingSystem.IsWindows()) return; // Pipe names are per user, not per directory: covered by the Unix case.
+        var ui = InstanceEndpoint.InDirectory(_dir, "ui");
+        Assert.NotEqual(_endpoint.LockFile, ui.LockFile);
+
+        using var main = SingleInstance.ClaimExclusive(_endpoint)!;
+        using var window = SingleInstance.ClaimExclusive(ui)!;
+        Assert.True(main.StartServer(_ => Task.FromResult(new InstanceReply(false, "main"))));
+        Assert.True(window.StartServer(request =>
+        {
+            _handled.Enqueue(request);
+            return Task.FromResult(InstanceReply.Success);
+        }));
+
+        var (result, _) = await InstanceClient.SendAsync(ui, InstanceCommand.Choose, ["https://a.example/"], page: null);
+        Assert.Equal(DeliveryResult.Delivered, result);
+        Assert.Equal(InstanceCommand.Choose, Assert.Single(_handled).Command);
     }
 
     [Fact]

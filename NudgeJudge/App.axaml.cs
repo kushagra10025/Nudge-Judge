@@ -90,8 +90,6 @@ public partial class App : Application
 
         windows.Main = main;
         windows.Chooser = chooser;
-        windows.KeepRunningInBackground = () => config.Current.Settings.RunInBackground;
-        DataContext = new AppViewModel(settings, windows);
 
         router.ChoiceRequested += (_, link) => dispatcher.Post(() =>
         {
@@ -101,15 +99,13 @@ public partial class App : Application
 
         var launch = LaunchArguments.Parse(desktop.Args ?? []);
         var serving = Instance?.StartServer(request =>
-            Dispatcher.UIThread.InvokeAsync(() => HandleForwarded(request, router, windows)).GetTask()) == true;
+            Dispatcher.UIThread.InvokeAsync(() => HandleRequest(request, router, windows, chooser, settings)).GetTask()) == true;
 
-        // Stay in the tray when the user wants that. A launch that only came to open links stays only if it's
-        // the server (so the next links are handled instantly) or the user opened the main window meanwhile.
-        bool StayResident() => config.Current.Settings.RunInBackground
-                               && (serving || launch.Urls.Count == 0 || windows.MainWindowShown);
+        // This process exists to show windows: once the last one closes, it's done. Staying in the tray is the
+        // resident host's job, which keeps none of this in memory.
         void ExitIfIdle()
         {
-            if (StayResident() || windows.AnyWindowOpen) return;
+            if (windows.AnyWindowOpen) return;
             // Later launches now find no server and take over, rather than queueing behind a closing process.
             Instance?.StopServer();
             desktop.Shutdown();
@@ -119,10 +115,12 @@ public partial class App : Application
         // Installing an update closes this process: save what's pending and let the next launch take over the server.
         updates.PreparingToRestart = () =>
         {
+            RestartingForUpdate = true;
             settings.FlushPendingSaves();
             Instance?.StopServer();
+            // The tray host would otherwise keep running the old version (and start old windows) after the update.
+            if (launch.Ui) TellResidentHostToQuit();
         };
-        // Only a process that sticks around checks; one that just routes a link and exits never touches the network.
         if (launch.Urls.Count == 0 || serving)
         {
             var schedule = new CancellationTokenSource();
@@ -130,9 +128,17 @@ public partial class App : Application
             _ = updates.RunScheduleAsync(schedule.Token);
         }
 
+        if (launch.Ui)
+        {
+            // Started by the tray host, which sends what to show as soon as our server is up. If that never
+            // comes (the host died in between), don't linger invisibly.
+            DispatcherTimer.RunOnce(ExitIfIdle, UiOrderTimeout);
+            return;
+        }
+
         if (launch.Urls.Count == 0)
         {
-            if (!launch.Background) windows.ShowMainWindow();
+            windows.ShowMainWindow();
             return;
         }
 
@@ -157,25 +163,67 @@ public partial class App : Application
         Dispatcher.UIThread.Post(ExitIfIdle);
     }
 
+    /// <summary>How long a <c>--ui</c> process waits for its first order before giving up.</summary>
+    private static readonly TimeSpan UiOrderTimeout = TimeSpan.FromSeconds(20);
+
+    /// <summary>Set while closing to install an update, so the entry point doesn't start the tray host again.</summary>
+    public static bool RestartingForUpdate { get; private set; }
+
+    private static void TellResidentHostToQuit()
+    {
+        try
+        {
+            InstanceClient.SendAsync(InstanceEndpoint.ForCurrentUser(), InstanceCommand.Quit, []).Wait(TimeSpan.FromSeconds(3));
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Trace.TraceWarning($"NudgeJudge: couldn't ask the tray host to quit: {e.Message}");
+        }
+    }
+
     /// <summary>
-    /// The primary instance's side of the single-instance channel. The request is already authenticated;
-    /// each URL is still validated by <see cref="LinkRouter.Route"/>, as any other incoming link is.
+    /// Requests from later launches (when this is the primary instance) or from the tray host (when this is its
+    /// <c>--ui</c> process). The request is already authenticated; each URL is still validated, as any other
+    /// incoming link is.
     /// </summary>
-    private static InstanceReply HandleForwarded(InstanceRequest request, LinkRouter router, DesktopWindowService windows)
+    private static InstanceReply HandleRequest(InstanceRequest request, LinkRouter router, DesktopWindowService windows,
+        ChooserViewModel chooser, SettingsViewModel settings)
     {
         switch (request.Command)
         {
             case InstanceCommand.Show:
-                windows.ShowMainWindow();
+                windows.ShowMainWindow(ParsePage(request.Page));
                 break;
             case InstanceCommand.Open:
                 // The source is the sender's say-so; Route sanitizes it like any other input.
                 foreach (var url in request.Urls)
                     router.Route(url, request.Source);
                 break;
+            case InstanceCommand.Choose:
+                // Already routed and logged by the tray host; only the chooser is left.
+                var source = NudgeJudge.Core.Models.SourceApp.Sanitize(request.Source);
+                foreach (var url in request.Urls)
+                    if (NudgeJudge.Core.Security.UrlValidator.Validate(url) is { IsValid: true, Url: { } valid })
+                        chooser.Enqueue(valid, source);
+                if (chooser.Tabs.Count > 0) windows.ShowChooser();
+                break;
+            case InstanceCommand.ToggleRouting:
+                settings.ToggleRoutingCommand.Execute(null);
+                break;
+            case InstanceCommand.Quit:
+                // After this reply goes out, so the sender hears back before the channel closes.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    settings.FlushPendingSaves();
+                    windows.Quit();
+                });
+                break;
         }
         return InstanceReply.Success;
     }
+
+    private static AppPage? ParsePage(string? page) =>
+        Enum.TryParse<AppPage>(page, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed) ? parsed : null;
 
     /// <summary>Keeps an existing startup entry pointing at this install, in case the app moved since it was added.</summary>
     private static void RefreshStartupEntry(ILaunchAtStartup startup)

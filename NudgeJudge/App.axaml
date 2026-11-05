@@ -1,9 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:NudgeJudge"
-             xmlns:vm="using:NudgeJudge.ViewModels"
              x:Class="NudgeJudge.App"
-             x:DataType="vm:AppViewModel"
              Name="NudgeJudge"
              RequestedThemeVariant="Default">
 
@@ -29,23 +27,4 @@
     <StyleInclude Source="/Styles/Styles.axaml" />
   </Application.Styles>
 
-  <TrayIcon.Icons>
-    <TrayIcons>
-      <TrayIcon Icon="/Assets/nudgejudge.png" ToolTipText="NudgeJudge" Command="{Binding OpenMainCommand}">
-        <TrayIcon.Menu>
-          <NativeMenu>
-            <NativeMenuItem Header="Open NudgeJudge" Command="{Binding OpenMainCommand}" />
-            <NativeMenuItemSeparator />
-            <NativeMenuItem Header="Route links by rules" ToggleType="CheckBox"
-                            IsChecked="{Binding Settings.RoutingEnabled, Mode=OneWay}"
-                            Command="{Binding Settings.ToggleRoutingCommand}" />
-            <NativeMenuItem Header="Rules…" Command="{Binding OpenRulesCommand}" />
-            <NativeMenuItem Header="Recent activity…" Command="{Binding OpenActivityCommand}" />
-            <NativeMenuItemSeparator />
-            <NativeMenuItem Header="Quit NudgeJudge" Command="{Binding QuitCommand}" />
-          </NativeMenu>
-        </TrayIcon.Menu>
-      </TrayIcon>
-    </TrayIcons>
-  </TrayIcon.Icons>
 </Application>

@@ -59,6 +59,23 @@ public sealed class ConfigStoreTests : IDisposable
         Assert.Equal(20, new JsonConfigStore(ConfigPath).Current.Rules.Count);
     }
 
+    [Fact]
+    public void Refresh_picks_up_another_process_and_says_so_only_when_something_changed()
+    {
+        // The tray host only reads; the UI process writes.
+        var host = new JsonConfigStore(ConfigPath);
+        var changes = 0;
+        host.Changed += (_, _) => changes++;
+
+        Assert.False(host.Refresh());
+        new JsonConfigStore(ConfigPath).Update(c => c.Rules.Add(NamedRule("from-ui")));
+
+        Assert.True(host.Refresh());
+        Assert.Equal(["from-ui"], host.Current.Rules.Select(r => r.Name));
+        Assert.False(host.Refresh());
+        Assert.Equal(1, changes);
+    }
+
     // ---- Failures ----
 
     [Fact]

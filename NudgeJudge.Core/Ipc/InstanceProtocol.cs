@@ -12,16 +12,23 @@ public enum InstanceCommand
 {
     /// <summary>Route the attached URLs.</summary>
     Open,
-    /// <summary>Bring the main window forward (the app was launched again without links).</summary>
+    /// <summary>Bring the main window forward (the app was launched again without links), on <see cref="InstanceRequest.Page"/> if set.</summary>
     Show,
+    /// <summary>Resident host → UI process: show the chooser for links the host already routed and logged.</summary>
+    Choose,
+    /// <summary>Resident host → UI process: flip "route links by rules" (the tray menu's toggle while the UI is open).</summary>
+    ToggleRouting,
+    /// <summary>Close down. Sent by the tray's Quit to the UI process, and by an updating UI process to the resident host.</summary>
+    Quit,
 }
 
 /// <param name="Source">
 /// The app that opened the links, as seen by the launch that received them (only that process can tell).
 /// Optional and untrusted: the receiver sanitizes it before use.
 /// </param>
+/// <param name="Page">With <see cref="InstanceCommand.Show"/>: the main window page to open ("rules", "activity", …).</param>
 public sealed record InstanceRequest(int Version, string Token, InstanceCommand Command, IReadOnlyList<string> Urls,
-    SourceApp? Source = null);
+    SourceApp? Source = null, string? Page = null);
 
 public sealed record InstanceReply(bool Ok, string? Error = null)
 {
@@ -41,6 +48,7 @@ public static class InstanceProtocol
 {
     public const int Version = 1;
     public const int MaxUrls = 64;
+    public const int MaxPageLength = 32;
 
     /// <summary>Reply to a request with the wrong token. Such a request was never acted on, so the sender may retry.</summary>
     public const string UnauthorizedError = "Not authorized.";
@@ -99,7 +107,11 @@ public static class InstanceProtocol
         if (request.Version != Version) return $"Unsupported protocol version {request.Version}.";
         if (!Enum.IsDefined(request.Command)) return "Unknown command.";
         if (request.Urls.Count > MaxUrls) return $"More than {MaxUrls} links in one message.";
-        if (request.Command == InstanceCommand.Show && request.Urls.Count > 0) return "Show takes no links.";
+        var takesLinks = request.Command is InstanceCommand.Open or InstanceCommand.Choose;
+        if (!takesLinks && request.Urls.Count > 0) return $"{request.Command} takes no links.";
+        if (request.Command == InstanceCommand.Choose && request.Urls.Count == 0) return "Choose needs links.";
+        if (request.Page is { } page && (request.Command != InstanceCommand.Show || page.Length > MaxPageLength))
+            return "Unexpected page.";
         return null;
     }
 

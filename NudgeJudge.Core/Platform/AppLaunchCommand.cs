@@ -22,6 +22,22 @@ public static class AppLaunchCommand
             HostSearchedLocations());
     }
 
+    /// <summary>
+    /// The argv that starts another of the app's executables, which ship side by side (the UI and the tray host).
+    /// Null when it isn't there. Inside an AppImage the files live on a mount that goes away with the process that
+    /// made it, so a program meant to outlive us is started through the image file with <paramref name="viaAppImage"/>,
+    /// which the main program passes on.
+    /// </summary>
+    public static IReadOnlyList<string>? Companion(string name, string? viaAppImage = null)
+    {
+        var appImage = Environment.GetEnvironmentVariable("APPIMAGE");
+        if (!string.IsNullOrEmpty(appImage) && Path.IsPathRooted(appImage))
+            return viaAppImage is null ? [appImage] : [appImage, viaAppImage];
+
+        var path = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? name + ".exe" : name);
+        return File.Exists(path) ? [path] : null;
+    }
+
     /// <param name="runtimeRoot">The .NET install this process runs on (the folder holding <c>shared/</c> and the <c>dotnet</c> host).</param>
     /// <param name="hostSearched">
     /// Where the app's native launcher looks for .NET when no environment variables help: the registered install

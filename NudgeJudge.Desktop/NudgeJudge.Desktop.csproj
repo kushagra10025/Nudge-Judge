@@ -31,5 +31,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NudgeJudge\NudgeJudge.csproj" />
+    <!-- The tray host, started from here. Referenced so a build puts its executable next to this one. -->
+    <ProjectReference Include="..\NudgeJudge.Tray\NudgeJudge.Tray.csproj" />
   </ItemGroup>
+
+  <!-- A publish of this app is both programs in one folder: publish the tray host (natively too) next to it. -->
+  <Target Name="PublishTrayHost" AfterTargets="Publish">
+    <MSBuild Projects="..\NudgeJudge.Tray\NudgeJudge.Tray.csproj" Targets="Publish"
+             Properties="PublishDir=$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(PublishDir)'))" />
+  </Target>
 </Project>

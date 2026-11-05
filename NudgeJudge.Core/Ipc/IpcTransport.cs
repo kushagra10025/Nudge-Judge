@@ -28,10 +28,11 @@ public interface IIpcListener : IDisposable
 
 public static class IpcTransport
 {
-    public static IIpcTransport ForCurrentPlatform(string runtimeDirectory) =>
+    /// <param name="role">Null for the main single-instance channel; otherwise a separate channel by that name.</param>
+    public static IIpcTransport ForCurrentPlatform(string runtimeDirectory, string? role = null) =>
         OperatingSystem.IsWindows()
-            ? new NamedPipeTransport(NamedPipeTransport.PipeNameForCurrentUser())
-            : new UnixSocketTransport(Path.Combine(runtimeDirectory, "nudgejudge.sock"));
+            ? new NamedPipeTransport(NamedPipeTransport.PipeNameForCurrentUser() + (role is null ? "" : "-" + role))
+            : new UnixSocketTransport(Path.Combine(runtimeDirectory, role is null ? "nudgejudge.sock" : $"nudgejudge-{role}.sock"));
 }
 
 /// <summary>
