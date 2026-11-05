@@ -24,6 +24,10 @@ public enum ActivityOutcome
 /// <param name="RulePattern">The matching rule's pattern. Only in entries written before rules had names.</param>
 /// <param name="RuleName">The matching rule's name.</param>
 /// <param name="Source">The app the link was opened from, when it could be told.</param>
+/// <param name="TiedToLauncher">
+/// Handled by a NudgeJudge that closes with the program that started it (inside its kill-on-close job, see
+/// <see cref="Platform.ProcessJob"/>), usually a browser whose extension started NudgeJudge.
+/// </param>
 public sealed record ActivityEntry(
     DateTimeOffset Timestamp,
     string Url,
@@ -34,7 +38,9 @@ public sealed record ActivityEntry(
     string? Detail = null,
     Guid? BrowserId = null,
     string? RuleName = null,
-    SourceApp? Source = null);
+    SourceApp? Source = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool TiedToLauncher = false);
 
 /// <summary>
 /// Thread-safe log of what happened to each link (newest last), capped at <see cref="Capacity"/> entries.

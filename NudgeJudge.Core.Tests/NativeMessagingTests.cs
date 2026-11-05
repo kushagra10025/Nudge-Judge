@@ -59,13 +59,16 @@ public sealed class NativeHostProtocolTests
     }
 
     [Theory]
-    [InlineData(NativeOpenOutcome.Sent, "sent")]
-    [InlineData(NativeOpenOutcome.Stay, "stay")]
-    public void Open_reports_what_the_backend_did(NativeOpenOutcome outcome, string action)
+    [InlineData(NativeOpenOutcome.Sent, "sent", "running")]
+    [InlineData(NativeOpenOutcome.Started, "sent", "started")]
+    [InlineData(NativeOpenOutcome.StartedTied, "sent", "startedTied")]
+    [InlineData(NativeOpenOutcome.Stay, "stay", null)]
+    public void Open_reports_what_the_backend_did(NativeOpenOutcome outcome, string action, string? via)
     {
         var backend = new FakeBackend { Outcome = outcome };
         var reply = Assert.Single(Serve(backend, Frame("""{"v":1,"type":"open","url":"https://example.com/a","auto":true}""")));
         Assert.Equal(action, reply.GetProperty("action").GetString());
+        Assert.Equal(via, reply.TryGetProperty("via", out var v) ? v.GetString() : null);
         Assert.Equal((new Uri("https://example.com/a"), true), Assert.Single(backend.Opened));
     }
 
@@ -174,7 +177,11 @@ public sealed class NativeHostBackendTests
     {
         var delivered = new List<(Uri, SourceApp?)>();
         var backend = new NativeHostBackend(new MemoryConfig(config), new RuleEngine(new Boot()), activity, caller, "1.0.0",
-            (url, source) => delivered.Add((url, source)));
+            (url, source) =>
+            {
+                delivered.Add((url, source));
+                return NativeOpenOutcome.Sent;
+            });
         return (backend, delivered);
     }
 
@@ -337,7 +344,7 @@ public sealed class NativeHostRegistrationTests : IDisposable
         reg.SetEnabled(true);
 
         Assert.True(reg.IsEnabled());
-        Assert.True((File.GetUnixFileMode(reg.LauncherPath) & UnixFileMode.UserExecute) != 0);
+        Assert.True(OperatingSystem.IsWindows() || (File.GetUnixFileMode(reg.LauncherPath) & UnixFileMode.UserExecute) != 0);
         var chrome = Read(Path.Combine(ConfigHome, "google-chrome", "NativeMessagingHosts", "com.nudgejudge.host.json"));
         Assert.Equal("com.nudgejudge.host", chrome.GetProperty("name").GetString());
         Assert.Equal(reg.LauncherPath, chrome.GetProperty("path").GetString());
@@ -401,9 +408,9 @@ public sealed class NativeHostRegistrationTests : IDisposable
     [Fact]
     public void The_Windows_launcher_escapes_percent_signs_and_refuses_quotes()
     {
-        var batch = WindowsNativeHostRegistration.WindowsBatch([@"C:\Users\a%b\NudgeJudge.Desktop.exe"])!;
+        var batch = NativeHostRegistration.WindowsBatch([@"C:\Users\a%b\NudgeJudge.Desktop.exe"])!;
         Assert.Contains("\"C:\\Users\\a%%b\\NudgeJudge.Desktop.exe\" --native-host %*", batch);
-        Assert.Null(WindowsNativeHostRegistration.WindowsBatch([@"C:\a""b.exe"]));
+        Assert.Null(NativeHostRegistration.WindowsBatch([@"C:\a""b.exe"]));
     }
 
     private static JsonElement Read(string path) => JsonDocument.Parse(File.ReadAllText(path)).RootElement.Clone();
@@ -426,5 +433,58 @@ public sealed class LaunchSourceTests
     public void A_bad_source_is_ignored(string arg)
     {
         Assert.Null(LaunchArguments.Parse([arg, "https://example.com/"]).Source);
+    }
+}
+
+public sealed class TiedLauncherActivityTests
+{
+    private sealed class Boot : ISystemBoot
+    {
+        public string CurrentBootId => "b";
+        public bool IsCurrentBoot(string bootId) => bootId == "b";
+    }
+
+    private sealed class Launcher : Browsers.IBrowserLauncher
+    {
+        public void Launch(BrowserProfile browser, Uri url) { }
+    }
+
+    private static (LinkRouter, ActivityLog) Router(bool tied)
+    {
+        var chrome = new BrowserProfile { Name = "Chrome", ExecutablePath = "/usr/bin/chrome" };
+        var config = new JsonConfigStore(Path.Combine(Directory.CreateTempSubdirectory("nj-tied-").FullName, "config.json"));
+        config.Update(c =>
+        {
+            c.Browsers.Add(chrome);
+            c.Rules.Add(new Rule { Name = "a", BrowserId = chrome.Id, Conditions = [RuleCondition.Link(MatchKind.Domain, "a.example")] });
+        });
+        var log = new ActivityLog();
+        return (new LinkRouter(config, new RuleEngine(new Boot()), new Launcher(), log) { TiedToLauncher = tied }, log);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Every_entry_says_whether_a_tied_NudgeJudge_handled_it(bool tied)
+    {
+        var (router, log) = Router(tied);
+        router.Route("https://a.example/");
+        router.Route("https://b.example/");
+        router.Route("not a link");
+        Assert.All(log.Snapshot(), e => Assert.Equal(tied, e.TiedToLauncher));
+    }
+
+    [Fact]
+    public void The_flag_survives_the_log_file_and_is_left_out_when_false()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("nj-tied-log-").FullName, "activity.log");
+        var file = new ActivityLogFile(path);
+        var log = new ActivityLog(file);
+        log.Add(new ActivityEntry(DateTimeOffset.UtcNow, "https://a.example/", ActivityOutcome.Routed, TiedToLauncher: true));
+        log.Add(new ActivityEntry(DateTimeOffset.UtcNow, "https://b.example/", ActivityOutcome.Routed));
+
+        var reread = new ActivityLog(new ActivityLogFile(path)).Snapshot();
+        Assert.Equal([true, false], reread.Select(e => e.TiedToLauncher));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(path), "tiedToLauncher", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
     }
 }

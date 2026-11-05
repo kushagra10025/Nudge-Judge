@@ -11,7 +11,8 @@ import {
   type NativeRequest,
   type OpenMessage,
 } from '@/utils/protocol';
-import { ALL_SITES, AUTO_ROUTE, autoHostsItem, settingsItem } from '@/utils/settings';
+import { addRecord, recordFor, type Trigger } from '@/utils/sends';
+import { ALL_SITES, AUTO_ROUTE, autoHostsItem, recentSendsItem, settingsItem, tiedStartItem } from '@/utils/settings';
 
 const MENU_LINK = 'open-link';
 const GESTURE_SCRIPT = 'nudgejudge-gesture';
@@ -43,7 +44,7 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message: unknown, sender) => {
     const open = message as OpenMessage;
     if (open?.kind !== 'open' || !isWebUrl(open.url) || sender.id !== browser.runtime.id) return undefined;
-    return send({ v: PROTOCOL_VERSION, type: 'open', url: open.url }).then((reply) => {
+    return openLink(open.url, 'click', sender.tab?.id).then((reply) => {
       if (!reply.ok) showError(reply, sender.tab?.id);
       return reply;
     });
@@ -74,9 +75,30 @@ async function send(request: NativeRequest): Promise<NativeReply> {
   }
 }
 
+/** Sends a link, and keeps a line about what happened for the options page's "Recent links". */
+async function openLink(url: string, trigger: Trigger, tabId: number | undefined, auto = false): Promise<NativeReply> {
+  const reply = await send({ v: PROTOCOL_VERSION, type: 'open', url, ...(auto ? { auto } : {}) });
+  await recentSendsItem.setValue(addRecord(await recentSendsItem.getValue(), recordFor(url, trigger, reply)));
+  await noteHowItWasDelivered(reply, tabId);
+  return reply;
+}
+
+/**
+ * When NudgeJudge wasn't running, sending a link starts it. Normally it then runs on its own; if this browser's
+ * process job wouldn't let it go, it closes with the browser, tray icon and all. Say so, once per start.
+ */
+async function noteHowItWasDelivered(reply: NativeReply, tabId: number | undefined) {
+  if (reply.via === 'started') await tiedStartItem.setValue(null);
+  if (reply.via !== 'startedTied') return;
+  await tiedStartItem.setValue(Date.now());
+  await flashBadge(tabId, '!', '#4B5B52',
+    'NudgeJudge: sent. NudgeJudge had to start inside this browser, so it will close when the browser does. ' +
+      'Start NudgeJudge yourself, or turn on Launch at startup in its Settings, so it runs on its own.');
+}
+
 /** Right-click → Open with NudgeJudge. If the rules keep it here, it opens like "Open link in new tab". */
 async function sendLinkFromMenu(url: string, tab: Browser.tabs.Tab | undefined) {
-  const reply = await send({ v: PROTOCOL_VERSION, type: 'open', url });
+  const reply = await openLink(url, 'menu', tab?.id);
   if (!reply.ok) return showError(reply, tab?.id, true);
   if (reply.action === 'stay')
     await browser.tabs.create({ url, active: false, openerTabId: tab?.id, index: tab ? tab.index + 1 : undefined });
@@ -85,7 +107,7 @@ async function sendLinkFromMenu(url: string, tab: Browser.tabs.Tab | undefined) 
 /** Toolbar button or Alt+Shift+N: the current page. If the rules keep it here, there's nothing to do. */
 async function sendPage(tab: Browser.tabs.Tab) {
   if (!isWebUrl(tab.url)) return showError({ v: PROTOCOL_VERSION, ok: false, error: 'Only web pages can be sent to NudgeJudge.' }, tab.id);
-  const reply = await send({ v: PROTOCOL_VERSION, type: 'open', url: tab.url });
+  const reply = await openLink(tab.url, 'page', tab.id);
   if (!reply.ok) return showError(reply, tab.id, true);
   if (reply.action === 'stay') await flashBadge(tab.id, '✓', '#1B7F4D', 'Your rules open this page in this browser.');
 }
@@ -185,7 +207,7 @@ async function onBeforeNavigate(details: Browser.webNavigation.WebNavigationBase
   recentlySent.set(details.url, Date.now());
   for (const [url, at] of recentlySent) if (Date.now() - at > AUTO_DEDUPE_MS) recentlySent.delete(url);
 
-  const reply = await send({ v: PROTOCOL_VERSION, type: 'open', url: details.url, auto: true });
+  const reply = await openLink(details.url, 'auto', details.tabId, true);
   if (!reply.ok || reply.action !== 'sent') return;
 
   if (!previous) {

@@ -20,6 +20,9 @@ The [browser extension](browser-extension.md) reaches the app through native mes
 - **Who can connect:** the browser only starts the host for the extension IDs listed in its manifest. The manifest and launcher are written per user (no admin), and the launcher quotes every argument.
 - **What the host accepts:** every URL is validated like any other link, and requests are capped at 64 KB. A malformed frame ends the session.
 - **Where links go:** the host never opens a browser itself. Links go to the running instance over the single-instance channel below, or to a fresh launch of the app with its own stdio, so the browser's pipe never leaks into another browser.
+- **Process isolation:** a NudgeJudge the host has to start is detached from the browser: its own session on Linux,
+  outside the browser's job on Windows, inheriting no handles. If a browser's job won't allow that, the extension and
+  Activity both say so (see [Is NudgeJudge tied to the browser?](browser-extension.md#is-nudgejudge-tied-to-the-browser)).
 - **In the page:** the extension only acts on trusted clicks (`event.isTrusted`), so a page can't script fake gestures. Its content script and navigation access are optional permissions, off until the user grants them.
 
 ## Single-instance messaging

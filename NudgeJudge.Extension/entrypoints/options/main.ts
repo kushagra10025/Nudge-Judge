@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import { defaultGesture, describeGesture, GESTURES, type Gesture } from '@/utils/gesture';
 import { checkReply, explainNativeError, HOST_NAME, PROTOCOL_VERSION, type NativeReply } from '@/utils/protocol';
-import { ALL_SITES, AUTO_ROUTE, autoHostsItem, settingsItem } from '@/utils/settings';
+import { OUTCOMES, TRIGGER_LABELS, type SendRecord } from '@/utils/sends';
+import { ALL_SITES, AUTO_ROUTE, autoHostsItem, recentSendsItem, settingsItem, tiedStartItem } from '@/utils/settings';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const mac = navigator.platform.toLowerCase().startsWith('mac');
@@ -92,9 +93,56 @@ $<HTMLInputElement>('auto').addEventListener('change', async (event) => {
 
 $('retry').addEventListener('click', () => void checkConnection());
 
+async function showTied() {
+  const at = await tiedStartItem.getValue();
+  $('tied').hidden = at === null;
+  if (at !== null) $('tied-when').textContent = `At ${new Date(at).toLocaleString()}`;
+}
+
+function showRecent(records: SendRecord[]) {
+  const list = $('recent');
+  list.replaceChildren(
+    ...records.map((r) => {
+      const outcome = OUTCOMES[r.outcome];
+      const li = document.createElement('li');
+      li.title = outcome.explain;
+
+      const lamp = document.createElement('span');
+      lamp.className = `lamp ${outcome.lamp === 'ring' ? '' : outcome.lamp}`;
+      const host = document.createElement('span');
+      host.className = 'host';
+      host.textContent = r.host;
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = new Date(r.at).toLocaleTimeString();
+      const how = document.createElement('span');
+      how.className = 'how';
+      const label = document.createElement('b');
+      label.textContent = outcome.label;
+      how.append(label, ` · ${TRIGGER_LABELS[r.trigger]}${r.error ? ` · ${r.error}` : ''}`);
+
+      li.append(lamp, host, time, how);
+      return li;
+    }),
+  );
+  $('recent-empty').hidden = records.length > 0;
+  $('recent-clear').hidden = records.length === 0;
+}
+
+$('recent-clear').addEventListener('click', () => void recentSendsItem.setValue([]));
+recentSendsItem.watch((records) => showRecent(records ?? []));
+// The tied notice changes when a send starts NudgeJudge while this page is open.
+tiedStartItem.watch(() => void showTied());
+
+$('tied-dismiss').addEventListener('click', async () => {
+  await tiedStartItem.setValue(null);
+  await showTied();
+});
+
 void (async () => {
   const commands = await browser.commands.getAll();
   const shortcut = commands.find((c) => c.name === 'send-page')?.shortcut;
   $('shortcut').textContent = shortcut || 'a keyboard shortcut (set one in the browser’s extension shortcuts)';
-  await Promise.all([checkConnection(), showGesture(), showAuto()]);
+  showRecent(await recentSendsItem.getValue());
+  await Promise.all([checkConnection(), showGesture(), showAuto(), showTied()]);
 })();

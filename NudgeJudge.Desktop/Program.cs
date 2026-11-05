@@ -154,11 +154,11 @@ internal sealed class Program
         return 0;
     }
 
-    private static void DeliverFromExtension(Uri url, NudgeJudge.Core.Models.SourceApp? source)
+    private static NativeOpenOutcome DeliverFromExtension(Uri url, NudgeJudge.Core.Models.SourceApp? source)
     {
         var (result, error) = InstanceClient.SendAsync(InstanceEndpoint.ForCurrentUser(), InstanceCommand.Open, [url.AbsoluteUri], source)
             .GetAwaiter().GetResult();
-        if (result == DeliveryResult.Delivered) return;
+        if (result == DeliveryResult.Delivered) return NativeOpenOutcome.Sent;
         if (result == DeliveryResult.Refused) throw new IOException(error ?? "NudgeJudge didn't take the link.");
 
         // Nothing running: start the app with the link, as if the OS had opened it. It becomes the primary instance
@@ -169,7 +169,8 @@ internal sealed class Program
         List<string> argv = [.. command];
         if (source is not null) argv.Add(LaunchArguments.EncodeSource(source));
         argv.Add(url.AbsoluteUri);
-        DetachedProcess.Start(argv);
+        // Tied: it couldn't leave the browser's job. It works, but closes with the browser; the extension says so.
+        return DetachedProcess.Start(argv) ? NativeOpenOutcome.Started : NativeOpenOutcome.StartedTied;
     }
 
     [DllImport("libc", SetLastError = true)]

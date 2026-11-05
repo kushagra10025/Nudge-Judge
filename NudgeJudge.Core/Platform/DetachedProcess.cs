@@ -22,16 +22,21 @@ public static class DetachedProcess
     internal const string UnixScript =
         "exec </dev/null >/dev/null 2>&1; if command -v setsid >/dev/null; then exec setsid \"$0\" \"$@\"; fi; exec \"$0\" \"$@\"";
 
+    /// <summary>Starts <paramref name="argv"/>. Returns false when it started, but still tied to the caller (see the platform notes).</summary>
     /// <exception cref="IOException">It couldn't be started.</exception>
-    public static void Start(IReadOnlyList<string> argv)
+    public static bool Start(IReadOnlyList<string> argv)
     {
         if (argv.Count == 0) throw new ArgumentException("Nothing to start.", nameof(argv));
-        if (OperatingSystem.IsWindows()) StartWindows(argv);
-        else StartUnix(argv);
+        return OperatingSystem.IsWindows() ? StartWindows(argv) : StartUnix(argv);
     }
 
+    /// <summary>Whether setsid(1) is on PATH, which the script looks up the same way.</summary>
+    internal static bool HasSetsid() =>
+        (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries)
+            .Any(dir => File.Exists(Path.Combine(dir, "setsid")));
+
     [UnsupportedOSPlatform("windows")]
-    private static void StartUnix(IReadOnlyList<string> argv)
+    private static bool StartUnix(IReadOnlyList<string> argv)
     {
         // Redirected so the shell never even briefly holds our stdio (the browser's pipes); it swaps in /dev/null at once.
         var start = new ProcessStartInfo("/bin/sh")
@@ -48,6 +53,7 @@ public static class DetachedProcess
         {
             using var shell = Process.Start(start) ?? throw new IOException($"Couldn't start {argv[0]}.");
             shell.StandardInput.Close();
+            return HasSetsid();
         }
         catch (Exception e) when (e is Win32Exception or InvalidOperationException)
         {
@@ -66,11 +72,12 @@ public static class DetachedProcess
     /// program starts inside it rather than not at all.
     /// </summary>
     [SupportedOSPlatform("windows")]
-    private static void StartWindows(IReadOnlyList<string> argv)
+    private static bool StartWindows(IReadOnlyList<string> argv)
     {
         var commandLine = WindowsCommandLine(argv);
-        if (TryCreate(commandLine, DetachedProcessFlag | CreateNewProcessGroup | CreateBreakawayFromJob, out var error)) return;
-        if (error == ErrorAccessDenied && TryCreate(commandLine, DetachedProcessFlag | CreateNewProcessGroup, out error)) return;
+        if (TryCreate(commandLine, DetachedProcessFlag | CreateNewProcessGroup | CreateBreakawayFromJob, out var error)) return true;
+        // Refused when the caller's job doesn't allow breakaway. Without one, the flag is ignored and this isn't reached.
+        if (error == ErrorAccessDenied && TryCreate(commandLine, DetachedProcessFlag | CreateNewProcessGroup, out error)) return false;
         throw new IOException($"Couldn't start {argv[0]}: {new Win32Exception(error).Message}");
     }
 

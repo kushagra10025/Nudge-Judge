@@ -25,6 +25,21 @@
         </div>
       </section>
 
+      <section class="card notice" id="tied" hidden>
+        <div class="row">
+          <div class="text">
+            <p class="label">NudgeJudge is running inside this browser</p>
+            <p class="muted">
+              <span id="tied-when">Recently</span>, NudgeJudge wasn't running, so sending a link started it. This browser
+              wouldn't let it run separately, so it will close when the browser does, tray icon included. To avoid
+              that, start NudgeJudge yourself, or turn on <b>Launch at startup</b> in its Settings. Links it handled
+              are marked in its Activity.
+            </p>
+          </div>
+          <button type="button" id="tied-dismiss">Dismiss</button>
+        </div>
+      </section>
+
       <h2>Send a link</h2>
       <section class="card">
         <div class="row">
@@ -46,6 +61,18 @@
           </div>
           <select id="gesture"></select>
         </div>
+      </section>
+
+      <h2 class="with-action">
+        <span>Recent links</span>
+        <button type="button" class="link" id="recent-clear" hidden>Clear</button>
+      </h2>
+      <section class="card">
+        <p class="muted empty" id="recent-empty">
+          Nothing sent yet. Links you send show here with what happened to them: kept in this browser, handed to a
+          running NudgeJudge, or NudgeJudge started for them.
+        </p>
+        <ol class="recent" id="recent"></ol>
       </section>
 
       <h2>Automatic routing</h2>

@@ -16,6 +16,11 @@ export interface NativeReply {
   error?: string;
   app?: string;
   hosts?: string[];
+  /**
+   * With "sent": how. "running" went to a running NudgeJudge; "started" started one, separate from the browser;
+   * "startedTied" started one that couldn't leave the browser's process job, so it closes when the browser does.
+   */
+  via?: 'running' | 'started' | 'startedTied';
 }
 
 /** What a content script asks the background for. */

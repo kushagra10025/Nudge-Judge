@@ -9,8 +9,12 @@ namespace NudgeJudge.Core.NativeMessaging;
 public sealed record NativeRequest(int V, string? Type, string? Url = null, bool Auto = false);
 
 /// <summary>The reply to a <see cref="NativeRequest"/>.</summary>
+/// <param name="Via">
+/// With <c>sent</c>: <c>running</c> (handed to a running NudgeJudge), <c>started</c> (NudgeJudge was started, detached
+/// from the browser) or <c>startedTied</c> (started, but it couldn't leave the browser's job and closes with it).
+/// </param>
 public sealed record NativeReply(int V, bool Ok, string? Action = null, string? Error = null, string? App = null,
-    IReadOnlyList<string>? Hosts = null)
+    IReadOnlyList<string>? Hosts = null, string? Via = null)
 {
     public static NativeReply Fail(string error) => new(NativeHost.ProtocolVersion, false, Error: error);
     public static NativeReply Done(string action) => new(NativeHost.ProtocolVersion, true, action);
@@ -82,8 +86,12 @@ public enum NativeOpenOutcome
 {
     /// <summary>The rules pick the browser it came from: the extension should let it open there.</summary>
     Stay,
-    /// <summary>NudgeJudge has it.</summary>
+    /// <summary>Handed to the running NudgeJudge.</summary>
     Sent,
+    /// <summary>Nothing was running: NudgeJudge was started with it, detached from the browser.</summary>
+    Started,
+    /// <summary>Started, but still tied to the browser (its job wouldn't let go), so it closes when the browser does.</summary>
+    StartedTied,
 }
 
 /// <summary>What the native host needs from the rest of the app. Faked in tests.</summary>
@@ -159,7 +167,13 @@ public static class NativeHost
                 case "open":
                     var validation = Security.UrlValidator.Validate(request.Url);
                     if (!validation.IsValid) return NativeReply.Fail(validation.Error ?? "Not a link NudgeJudge can open.");
-                    return NativeReply.Done(backend.Open(validation.Url!, request.Auto) == NativeOpenOutcome.Stay ? "stay" : "sent");
+                    return backend.Open(validation.Url!, request.Auto) switch
+                    {
+                        NativeOpenOutcome.Stay => NativeReply.Done("stay"),
+                        NativeOpenOutcome.Started => NativeReply.Done("sent") with { Via = "started" },
+                        NativeOpenOutcome.StartedTied => NativeReply.Done("sent") with { Via = "startedTied" },
+                        _ => NativeReply.Done("sent") with { Via = "running" },
+                    };
                 default:
                     return NativeReply.Fail("Unknown message type.");
             }

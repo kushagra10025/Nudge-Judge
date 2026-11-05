@@ -66,6 +66,20 @@ The options page lets you pick any of <kbd>Alt</kbd>+<kbd>Shift</kbd>, <kbd>Ctrl
 <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> or off, and marks your platform's default. A gesture matches only its
 exact modifiers, so it never fires alongside one of the browser's.
 
+The options page's **Recent links** list shows the last 20 links the extension sent, newest first. Each line has the
+site (only the host is kept), what sent it (right-click, toolbar or shortcut, modifier-click, automatic) and what
+happened:
+
+| Lamp | Label | Meaning |
+|---|---|---|
+| hollow ring | Stayed here | Your rules pick this browser; the link opened here as usual. |
+| green | Sent to running NudgeJudge | NudgeJudge was already running (window or tray) and routed it. |
+| filled ink | Started NudgeJudge | NudgeJudge wasn't running, so the link started it, separately from the browser. |
+| red ring | Started NudgeJudge, tied to this browser | Started, but it closes when this browser does (see [below](#is-nudgejudge-tied-to-the-browser)). |
+| red | Failed | Couldn't be sent; the reason follows. |
+
+Hover a line for the explanation. The list updates live while the page is open, and **Clear** empties it.
+
 When a send fails, a red **!** shows on the toolbar button, and its tooltip says why. If NudgeJudge can't be reached
 after something you did on purpose (toolbar, shortcut, menu), the options page opens with setup instructions.
 
@@ -169,8 +183,27 @@ There are two processes to think about: the host, and the NudgeJudge it may star
 - **Closing the browser leaves NudgeJudge running in the tray,** exactly as if a link from another app had started
   it. Quit it from the tray menu as usual.
 
-A browser whose job doesn't allow breakaway would refuse the flag. NudgeJudge is then started inside the job rather than
-not at all, and could close with that browser. Firefox allows breakaway; this path hasn't been tested on Windows yet.
+### Is NudgeJudge tied to the browser?
+
+A browser whose job doesn't allow breakaway refuses the flag. NudgeJudge is then started inside the job rather than not
+at all, and it closes when that browser does. The tray host and window processes it starts end up in the same job.
+Firefox allows breakaway; this path hasn't been tested on Windows yet. When it happens, you can tell from either side:
+
+- **In the extension.** The host knows it couldn't break away and replies `via: "startedTied"`. The send shows in
+  **Recent links** as *Started NudgeJudge, tied to this browser*. A grey **!** appears on
+  the toolbar button, with a tooltip explaining what happened. The options page shows *NudgeJudge is running inside this
+  browser*, with the time, until NudgeJudge is next started separately or you dismiss it.
+- **In Activity.** Every NudgeJudge process checks once at start-up whether it's inside a kill-on-close job
+  (`ProcessJob.ClosesWithLauncher`, using `QueryInformationJobObject`). If it is, every link it handles is marked
+  *Handled by a NudgeJudge that closes with the program that started it*. Links handled by a NudgeJudge running on its
+  own carry no mark. The check covers any launcher with such a job, so a terminal or IDE that starts NudgeJudge this
+  way is caught too.
+
+To avoid it, start NudgeJudge yourself, or turn on **Launch at startup**. A NudgeJudge started at sign-in is never in a
+browser's job, and every later link goes to it (`via: "running"`).
+
+On Linux the same thing would only happen without `setsid(1)`. That's part of util-linux, which every mainstream distro
+installs. The extension reports it the same way, but Activity doesn't mark it.
 
 ## Protocol
 
@@ -180,7 +213,7 @@ every platform we ship). Requests from the browser are capped at 64 KB.
 | Request | Reply |
 |---|---|
 | `{ "v": 1, "type": "ping" }` | `{ "v": 1, "ok": true, "action": "pong", "app": "1.4.0" }` |
-| `{ "v": 1, "type": "open", "url": "https://…", "auto": false }` | `{ "v": 1, "ok": true, "action": "sent" \| "stay" }` |
+| `{ "v": 1, "type": "open", "url": "https://…", "auto": false }` | `{ "v": 1, "ok": true, "action": "stay" }`, or `{ "v": 1, "ok": true, "action": "sent", "via": "running" \| "started" \| "startedTied" }` |
 | `{ "v": 1, "type": "autoRoutes" }` | `{ "v": 1, "ok": true, "action": "autoRoutes", "hosts": ["*.zoom.us", "meet.google.com"] }` |
 | Anything invalid | `{ "v": 1, "ok": false, "error": "…" }` |
 
@@ -188,6 +221,9 @@ every platform we ship). Requests from the browser are capped at 64 KB.
   (Chrome, Firefox, Edge…), started with no extra arguments. A private window, a named profile, or any other argument
   never counts: the app can't tell which profile the click came from, so it opens those explicitly. The caller is
   found from the native host's parent process.
+- **`via`** (with `sent`) says how the link got there: `running` means handed to a running NudgeJudge, `started` means
+  NudgeJudge was started separately from the browser, and `startedTied` means it was started but couldn't leave the
+  browser's job (see [below](#is-nudgejudge-tied-to-the-browser)).
 - **`sent`:** NudgeJudge has the link. The running instance routes it, or the app is started with it. Activity logs
   it with the calling browser as its source, so "opened from" conditions match on it (e.g. *links from Firefox*).
 

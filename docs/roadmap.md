@@ -21,7 +21,7 @@
 - [x] Launch at startup, switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings
 - [x] Update checks and one-click updates from GitHub Releases (Velopack), with a sidebar notice and Settings → Updates / About
 - [x] Browser extension (Chrome, Edge, Brave, Vivaldi, Firefox): a modifier-click (Ctrl+Alt on Linux, Alt+Shift on Windows), right-click and toolbar send links to NudgeJudge over native messaging; links the rules keep in that browser just open there; opt-in automatic routing for rules marked "Also catch in the browser". See [Browser extension](browser-extension.md)
-- [x] 948 core test cases and 66 headless UI tests, plus the extension's unit tests
+- [x] 954 core test cases and 66 headless UI tests, plus the extension's unit tests
 
 ## Limitations right now
 

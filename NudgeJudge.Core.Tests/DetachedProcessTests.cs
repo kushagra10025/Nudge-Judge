@@ -13,7 +13,7 @@ public sealed class DetachedProcessTests
             var done = Path.Combine(dir, "done");
             // Arguments with spaces and shell syntax reach the program untouched.
             var script = "readlink /proc/$$/fd/0 > \"$1/stdin\"; cut -d' ' -f6 /proc/$$/stat > \"$1/sid\"; printf %s \"$2\" > \"$1/arg\"; touch \"$1/done\"";
-            DetachedProcess.Start(["/bin/sh", "-c", script, "sh", dir, "a b; $(rm -rf /) 'q'"]);
+            Assert.True(DetachedProcess.Start(["/bin/sh", "-c", script, "sh", dir, "a b; $(rm -rf /) 'q'"]), "setsid wasn't found");
 
             for (var i = 0; i < 100 && !File.Exists(done); i++) await Task.Delay(50);
             Assert.True(File.Exists(done), "the detached program didn't run");
@@ -27,6 +27,12 @@ public sealed class DetachedProcessTests
         {
             Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [LinuxFact]
+    public void A_process_outside_any_job_isnt_tied_to_its_launcher()
+    {
+        Assert.False(ProcessJob.ClosesWithLauncher());
     }
 
     [Theory]

@@ -83,6 +83,16 @@ public static class NativeHostRegistration
         return Encoding.UTF8.GetString(buffer.ToArray()) + "\n";
     }
 
+    /// <summary>A batch file that runs the app in native-host mode, passing on the browser's arguments.</summary>
+    internal static string? WindowsBatch(IReadOnlyList<string>? command)
+    {
+        // Windows paths can't contain quotes; '%' would expand inside a batch file even when quoted.
+        if (command is not { Count: > 0 } c || c.Any(a => a.Length == 0 || a.Contains('"') || a.Any(char.IsControl))) return null;
+        var line = string.Join(' ', c.Select(a => "\"" + a.Replace("%", "%%", StringComparison.Ordinal) + "\""));
+        return "@echo off\r\nrem Started by your browser for the NudgeJudge extension. Written by NudgeJudge; don't edit.\r\n" +
+               line + " " + NativeHost.Flag + " %*\r\n";
+    }
+
     /// <summary>Writes <paramref name="text"/> unless the file already holds exactly that.</summary>
     internal static void WriteIfChanged(string path, string text, bool privateDirectory, bool executable = false)
     {
@@ -215,17 +225,7 @@ public sealed class WindowsNativeHostRegistration(string appConfigDir, IReadOnly
 
     public bool IsSupported => Script is not null;
 
-    internal string? Script => WindowsBatch(launchCommand);
-
-    /// <summary>A batch file that runs the app in native-host mode, passing on the browser's arguments.</summary>
-    internal static string? WindowsBatch(IReadOnlyList<string>? command)
-    {
-        // Windows paths can't contain quotes; '%' would expand inside a batch file even when quoted.
-        if (command is not { Count: > 0 } c || c.Any(a => a.Length == 0 || a.Contains('"') || a.Any(char.IsControl))) return null;
-        var line = string.Join(' ', c.Select(a => "\"" + a.Replace("%", "%%", StringComparison.Ordinal) + "\""));
-        return "@echo off\r\nrem Started by your browser for the NudgeJudge extension. Written by NudgeJudge; don't edit.\r\n" +
-               line + " " + NativeHost.Flag + " %*\r\n";
-    }
+    internal string? Script => NativeHostRegistration.WindowsBatch(launchCommand);
 
     public bool IsEnabled() => File.Exists(LauncherPath);
 

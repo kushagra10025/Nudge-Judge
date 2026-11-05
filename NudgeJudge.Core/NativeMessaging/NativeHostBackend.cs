@@ -12,14 +12,17 @@ namespace NudgeJudge.Core.NativeMessaging;
 /// instance or starts the app with it.
 /// </summary>
 /// <param name="caller">The browser that started this host (its process), when it could be told.</param>
-/// <param name="deliver">Hands a link over with its source. Throws <see cref="IOException"/> when it can't.</param>
+/// <param name="deliver">
+/// Hands a link over with its source and says how (sent, started or started tied). Throws <see cref="IOException"/>
+/// when it can't.
+/// </param>
 public sealed class NativeHostBackend(
     IConfigStore config,
     RuleEngine engine,
     ActivityLog? activity,
     SourceApp? caller,
     string appVersion,
-    Action<Uri, SourceApp?> deliver,
+    Func<Uri, SourceApp?, NativeOpenOutcome> deliver,
     TimeProvider? time = null) : INativeHostBackend
 {
     /// <summary>
@@ -36,8 +39,7 @@ public sealed class NativeHostBackend(
     {
         if (WouldOpenInCaller(url)) return NativeOpenOutcome.Stay;
         if (auto && RecentlyOpened(url)) return NativeOpenOutcome.Stay;
-        deliver(url, caller);
-        return NativeOpenOutcome.Sent;
+        return deliver(url, caller);
     }
 
     public IReadOnlyList<string> AutoRouteHosts()

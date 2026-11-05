@@ -39,7 +39,7 @@ public sealed class CoreServices
             config.Update(c => c.Rules.RemoveAll(r => r.IsExpired(now, boot)));
         var engine = new RuleEngine(boot);
         var activity = ActivityLog.FollowingSettings(config, new ActivityLogFile(AppPaths.ActivityLogFile));
-        var router = new LinkRouter(config, engine, new BrowserLauncher(), activity);
+        var router = new LinkRouter(config, engine, new BrowserLauncher(), activity) { TiedToLauncher = ProcessJob.ClosesWithLauncher() };
         return new CoreServices(boot, config, engine, activity, router);
     }
 
