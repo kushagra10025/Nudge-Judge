@@ -105,26 +105,41 @@ public sealed class LinuxRegistrarTests : IDisposable
     [InlineData("/opt/NudgeJudge/NudgeJudge.Desktop")]
     [InlineData("/home/me/$weird`dir\"/back\\slash/100%/NudgeJudge")]
     [InlineData("/home/me/a;b&c|d(e)*?#~/nj")]
-    public async Task Exec_line_round_trips_through_the_desktop_entry_parser(string executable)
+    public void Exec_line_round_trips_through_the_desktop_entry_parser(string executable)
     {
-        await Registrar([executable]).RegisterAsync();
-        var exec = IniFile.TryLoad(Registrar().DesktopFilePath)!.Get("Desktop Entry", "Exec")!;
+        var exec = DesktopExec.Build([executable, "--flag"])!;
 
         var argv = LinuxBrowserDiscovery.ParseExec(LinuxBrowserDiscovery.Unescape(exec));
 
-        Assert.Equal([executable, BrowserLauncher.UrlPlaceholder], argv);
+        Assert.Equal([executable, "--flag", BrowserLauncher.UrlPlaceholder], argv);
     }
 
-    [LinuxFact]
-    public async Task Program_path_with_spaces_goes_through_a_wrapper_xdg_utils_can_read()
+    [LinuxTheory]
+    [InlineData("/home/me/My Apps/NudgeJudge")]
+    // A second download of the AppImage: Exec quotes it, and xdg-utils then can't find the program.
+    [InlineData("/home/me/Downloads/NudgeJudge(1).AppImage")]
+    [InlineData("/home/me/100%/NudgeJudge")]
+    [InlineData("/home/me/a;b/NudgeJudge")]
+    public async Task A_program_path_exec_would_quote_goes_through_a_wrapper_xdg_utils_can_read(string program)
     {
-        var registrar = Registrar(["/home/me/My Apps/NudgeJudge"]);
+        var registrar = Registrar([program]);
 
         var status = await registrar.RegisterAsync();
         var exec = IniFile.TryLoad(registrar.DesktopFilePath)!.Get("Desktop Entry", "Exec")!;
 
         Assert.Equal(RegistrationState.Registered, status.State);
         Assert.Equal($"{registrar.LauncherPath} %u", exec);
+        Assert.Contains(LinuxDefaultBrowserRegistrar.ShellQuote(program), File.ReadAllText(registrar.LauncherPath));
+    }
+
+    [Theory]
+    [InlineData("/opt/NudgeJudge/NudgeJudge.Desktop", false)]
+    [InlineData("/home/me/Applications/NudgeJudge.AppImage", false)]
+    [InlineData("/home/me/Downloads/NudgeJudge(1).AppImage", true)]
+    [InlineData("/home/me/My Apps/NudgeJudge", true)]
+    public void Only_paths_exec_would_quote_need_the_wrapper(string program, bool wrapped)
+    {
+        Assert.Equal(wrapped, LinuxDefaultBrowserRegistrar.NeedsWrapper(program));
     }
 
     [LinuxFact]

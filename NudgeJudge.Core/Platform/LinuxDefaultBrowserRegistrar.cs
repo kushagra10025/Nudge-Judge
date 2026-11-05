@@ -47,14 +47,19 @@ public sealed class LinuxDefaultBrowserRegistrar(
 
     /// <summary>
     /// A shell wrapper for the launch command, or null when Exec can run it directly. xdg-utils (1.1.x) finds an
-    /// entry's program by cutting <c>Exec</c> at the first space, ignoring quotes, so a program path with a space
-    /// looks uninstalled and <c>xdg-mime</c>/<c>xdg-open</c> skip the entry on desktops without their own handler.
+    /// entry's program by cutting <c>Exec</c> at the first space and taking that literally, without removing quotes
+    /// or escapes. So a program path Exec has to quote looks uninstalled, and <c>xdg-mime</c>/<c>xdg-open</c> skip the
+    /// entry and fall back to another browser: a space, but also the "(1)" a browser adds to a second download
+    /// (<c>NudgeJudge(1).AppImage</c>), or any other character the Desktop Entry spec reserves.
     /// </summary>
     private string? Launcher =>
-        launchCommand is { Count: > 0 } c && c[0].Any(char.IsWhiteSpace) && !LauncherPath.Any(char.IsWhiteSpace)
+        launchCommand is { Count: > 0 } c && NeedsWrapper(c[0]) && !NeedsWrapper(LauncherPath)
             ? "#!/bin/sh\n# Written by NudgeJudge when registering as the default browser.\nexec " +
               string.Join(' ', c.Select(ShellQuote)) + " \"$@\"\n"
             : null;
+
+    /// <summary>True when <c>Exec</c> would quote or escape <paramref name="program"/>, which xdg-utils can't read back.</summary>
+    internal static bool NeedsWrapper(string program) => DesktopExec.Build([program], withUrl: false) != program;
 
     public async Task<RegistrationStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
@@ -143,7 +148,7 @@ public sealed class LinuxDefaultBrowserRegistrar(
 
     private static string EscapeValue(string value) => value.Replace("\\", @"\\");
 
-    private static string ShellQuote(string arg) => "'" + arg.Replace("'", @"'\''") + "'";
+    internal static string ShellQuote(string arg) => "'" + arg.Replace("'", @"'\''") + "'";
 
     private static string? ReadOrNull(string path)
     {
