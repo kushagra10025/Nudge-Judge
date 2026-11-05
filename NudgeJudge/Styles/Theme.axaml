@@ -167,6 +167,8 @@
   <StreamGeometry x:Key="Icon.Refresh">M19.5 12A7.5 7.5 0 1 1 17.3 6.7 M19 3.5V7.5H15</StreamGeometry>
   <StreamGeometry x:Key="Icon.Folder">M3.5 6.5V18.5H20.5V8.5H11.5L9.5 6.5Z</StreamGeometry>
   <StreamGeometry x:Key="Icon.Star">M12 4L14.4 9.1L20 9.7L15.8 13.4L17 19L12 16.2L7 19L8.2 13.4L4 9.7L9.6 9.1Z</StreamGeometry>
+  <!-- Two overlapping sheets: "clone" -->
+  <StreamGeometry x:Key="Icon.Copy">M9 9H19V19H9Z M15 9V5H5V15H9</StreamGeometry>
   <StreamGeometry x:Key="Icon.Clock">M12 4A8 8 0 1 0 12 20A8 8 0 1 0 12 4Z M12 8V12L15 14</StreamGeometry>
   <StreamGeometry x:Key="Icon.Shield">M12 3.5L19 6.5V11.5C19 15.5 16 18.8 12 20.5C8 18.8 5 15.5 5 11.5V6.5Z</StreamGeometry>
   <!-- An app window with its own content: "opened from this app" -->

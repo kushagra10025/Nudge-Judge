@@ -392,10 +392,11 @@
             </Border>
           </StackPanel>
 
-          <ItemsControl ItemsSource="{Binding Rules}" Classes.paused="{Binding ShowRoutingOff}">
+          <ItemsControl x:Name="RuleList" ItemsSource="{Binding Rules}" Classes.paused="{Binding ShowRoutingOff}">
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="vm:RuleItemViewModel">
-                <Border Classes="row" Classes.match="{Binding IsTestMatch}" Classes.editing="{Binding IsEditing}" Margin="0,0,0,2">
+                <Border Classes="row" Classes.match="{Binding IsTestMatch}" Classes.editing="{Binding IsEditing}"
+                        Classes.highlight="{Binding IsHighlighted}" Margin="0,0,0,2">
                   <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
 
                     <Border Classes="junction" Classes.lit="{Binding IsTestMatch}" Margin="0,0,14,0">
@@ -419,6 +420,12 @@
                         <Border Classes="badge" IsVisible="{Binding IsSample}">
                           <TextBlock Text="Sample" />
                         </Border>
+                        <Button Classes="badge-button" Command="{Binding ShowOriginalCommand}" IsVisible="{Binding IsDuplicate}"
+                                ToolTip.Tip="{Binding DuplicateTip}" AutomationProperties.Name="Show original rule">
+                          <Border Classes="badge route">
+                            <TextBlock Text="{Binding DuplicateOfNumber, StringFormat='Duplicate of {0}'}" />
+                          </Border>
+                        </Button>
                       </WrapPanel>
                       <TextBlock Classes="error" Margin="0,1,0,0" Text="{Binding RuleError}" TextWrapping="NoWrap"
                                  TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding RuleError}" IsVisible="{Binding HasRuleError}" />
@@ -453,6 +460,9 @@
                       </Button>
                       <Button Classes="ghost icon" Command="{Binding EditCommand}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit rule">
                         <c:Icon Data="{StaticResource Icon.Edit}" />
+                      </Button>
+                      <Button Classes="ghost icon" Command="{Binding CloneCommand}" ToolTip.Tip="Clone" AutomationProperties.Name="Clone rule">
+                        <c:Icon Data="{StaticResource Icon.Copy}" />
                       </Button>
                       <Button Classes="ghost icon danger" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete"
                               AutomationProperties.Name="Delete rule">

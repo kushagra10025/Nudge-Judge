@@ -17,5 +17,18 @@ public partial class RulesView : UserControl
             if (e.Property == IsVisibleProperty && TesterDock.IsVisible)
                 Dispatcher.UIThread.Post(() => TestUrlBox.Focus(), DispatcherPriority.Loaded);
         };
+
+        // A duplicate's badge points at its original: make sure that row is on screen.
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is RulesViewModel vm)
+            {
+                vm.RuleRevealRequested -= OnRevealRequested;
+                vm.RuleRevealRequested += OnRevealRequested;
+            }
+        };
     }
+
+    private void OnRevealRequested(object? sender, RuleItemViewModel item) =>
+        RuleList.ContainerFromItem(item)?.BringIntoView();
 }

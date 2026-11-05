@@ -16,6 +16,7 @@ public sealed partial class RulesViewModel : ViewModelBase
     private readonly ISystemBoot _boot;
     private readonly ChooserViewModel _chooser;
     private readonly IWindowService _windows;
+    private readonly IUiDispatcher _dispatcher;
 
     public RulesViewModel(IConfigStore config, RuleEngine engine, ISystemBoot boot, ChooserViewModel chooser,
         IWindowService windows, IUiDispatcher dispatcher, SettingsViewModel settings)
@@ -27,6 +28,7 @@ public sealed partial class RulesViewModel : ViewModelBase
         _boot = boot;
         _chooser = chooser;
         _windows = windows;
+        _dispatcher = dispatcher;
         // The editor only compares against the test link while the tester is showing it.
         Editor = new RuleEditorViewModel(config, engine, Browsers, () =>
             IsTesterOpen && UrlValidator.Validate(TestUrl).Url is { } url ? new LinkContext(url, TestSourceApp) : null);
@@ -202,6 +204,44 @@ public sealed partial class RulesViewModel : ViewModelBase
         SyncEditingFlags();
     }
 
+    /// <summary>Copies a rule to just below it and opens the copy in the editor.</summary>
+    internal void Clone(RuleItemViewModel item)
+    {
+        if (_config.Current.Rules.Find(r => r.Id == item.Id) is not { } original) return;
+        var copy = original.CloneAsNew();
+        // By id: the update may first pick up another process's changes and shift the list.
+        _config.Update(c =>
+        {
+            var at = c.Rules.FindIndex(r => r.Id == original.Id);
+            c.Rules.Insert(at < 0 ? c.Rules.Count : at + 1, copy);
+        });
+        Reload();
+        if (_config.Current.Rules.Find(r => r.Id == copy.Id) is { } saved)
+        {
+            Editor.OpenExisting(saved);
+            SyncEditingFlags();
+        }
+    }
+
+    /// <summary>Raised with the row to scroll to when a duplicate badge points at its original.</summary>
+    public event EventHandler<RuleItemViewModel>? RuleRevealRequested;
+
+    private int _highlightGeneration;
+
+    /// <summary>Lights up the original of a duplicate for a moment and scrolls it into view.</summary>
+    internal void ShowOriginal(RuleItemViewModel item)
+    {
+        if (Rules.FirstOrDefault(r => r.Id == item.DuplicateOfId) is not { } original) return;
+        foreach (var r in Rules) r.IsHighlighted = false;
+        original.IsHighlighted = true;
+        RuleRevealRequested?.Invoke(this, original);
+        var generation = ++_highlightGeneration;
+        _ = Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(_ => _dispatcher.Post(() =>
+        {
+            if (generation == _highlightGeneration) original.IsHighlighted = false;
+        }), TaskScheduler.Default);
+    }
+
     internal void Delete(RuleItemViewModel item)
     {
         if (Editor.EditingId == item.Id) Editor.Close();
@@ -245,8 +285,15 @@ public sealed partial class RulesViewModel : ViewModelBase
             var browser = cfg.FindBrowser(rule.BrowserId);
             var compiled = _engine.Compile(rule);
             var expired = rule.IsExpired(now, _boot);
+            // Still a duplicate only while the original exists and routes exactly the same.
+            var originalIndex = rule.ClonedFromId is { } from ? cfg.Rules.FindIndex(r => r.Id == from) : -1;
+            var duplicateOf = originalIndex >= 0 && rule.RoutesLike(cfg.Rules[originalIndex]) ? cfg.Rules[originalIndex] : null;
             Rules.Add(new RuleItemViewModel(this, rule, i + 1, cfg.Rules.Count,
-                browser?.Name, compiled.Error, expired ? "Expired" : ExpiryText(rule, now), expired));
+                browser?.Name, compiled.Error, expired ? "Expired" : ExpiryText(rule, now), expired)
+            {
+                DuplicateOfId = duplicateOf?.Id,
+                DuplicateOfNumber = originalIndex + 1,
+            });
         }
         if (KnownSources?.Invoke() is { } known)
         {
@@ -386,7 +433,13 @@ public sealed partial class RuleItemViewModel : ViewModelBase
     public string? ExpiryText { get; }
     public bool IsTemporary => ExpiryText is not null;
     public bool IsSample { get; }
-    public bool HasBadges => IsTemporary || IsSample;
+    public bool HasBadges => IsTemporary || IsSample || IsDuplicate;
+
+    /// <summary>The rule this is an unchanged clone of, if any.</summary>
+    public Guid? DuplicateOfId { get; init; }
+    public int DuplicateOfNumber { get; init; }
+    public bool IsDuplicate => DuplicateOfId is not null;
+    public string DuplicateTip => $"Does exactly what rule {DuplicateOfNumber} does. Click to show it.";
     public bool HasRuleError => RuleError is not null;
     public bool ShowBrowserFix => BrowserMissing && RuleError is null;
     public bool IsExpired { get; }
@@ -401,6 +454,9 @@ public sealed partial class RuleItemViewModel : ViewModelBase
     [ObservableProperty] public partial bool IsTestMatch { get; set; }
     [ObservableProperty] public partial bool IsEditing { get; set; }
 
+    /// <summary>Briefly lit when a duplicate's badge points here.</summary>
+    [ObservableProperty] public partial bool IsHighlighted { get; set; }
+
     partial void OnIsEnabledChanged(bool value)
     {
         if (!_loading) _owner.SetEnabled(this, value);
@@ -408,6 +464,8 @@ public sealed partial class RuleItemViewModel : ViewModelBase
 
     [RelayCommand] private void Edit() => _owner.Edit(this);
     [RelayCommand] private void Delete() => _owner.Delete(this);
+    [RelayCommand] private void Clone() => _owner.Clone(this);
+    [RelayCommand] private void ShowOriginal() => _owner.ShowOriginal(this);
     [RelayCommand] private void MoveUp() => _owner.Move(this, -1);
     [RelayCommand] private void MoveDown() => _owner.Move(this, +1);
 }

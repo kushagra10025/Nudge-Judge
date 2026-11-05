@@ -254,7 +254,7 @@ public sealed class RuleEngine(ISystemBoot boot, TimeProvider? time = null)
     /// Whether two condition lists would compile the same. Unchanged strings are the same objects, so this is quick.
     /// Compares every field <see cref="RuleCondition.Clone"/> copies; a new condition field needs adding to both.
     /// </summary>
-    private static bool SameConditions(List<RuleCondition>? a, List<RuleCondition>? b)
+    public static bool SameConditions(List<RuleCondition>? a, List<RuleCondition>? b)
     {
         if (ReferenceEquals(a, b)) return true;
         if (a is null || b is null || a.Count != b.Count) return false;

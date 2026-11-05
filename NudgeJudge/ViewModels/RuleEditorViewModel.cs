@@ -205,6 +205,11 @@ public sealed partial class RuleEditorViewModel : ViewModelBase
             rule.ExpiresAfterBootId = _expiresAfterBootId;
             // Saving a sample makes it the user's own, so cleaning up samples leaves it alone.
             rule.IsSample = false;
+            // A clone stops being a duplicate for good once it, or its original, does something different.
+            if (rule.ClonedFromId is { } from && (c.Rules.Find(r => r.Id == from) is not { } original || !rule.RoutesLike(original)))
+                rule.ClonedFromId = null;
+            foreach (var clone in c.Rules)
+                if (clone.ClonedFromId == rule.Id && !clone.RoutesLike(rule)) clone.ClonedFromId = null;
         });
         Close();
     }

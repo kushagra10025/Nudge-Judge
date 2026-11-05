@@ -68,6 +68,48 @@ public sealed class CompoundRuleUiTests : IDisposable
     // ---- The editor ----
 
     [AvaloniaFact]
+    public void Cloning_a_rule_marks_the_copy_as_a_duplicate_until_it_changes()
+    {
+        var app = new Harness(withYouTubeRules: true);
+        var window = Show(app, AppPage.Rules);
+        var rules = app.Main.Rules;
+
+        Click(window, Finds<Button>(window, "Clone rule")[0]);
+        Settle(window);
+
+        // The copy sits right below its original and opens in the editor.
+        Assert.Equal(["YouTube from Teams", "YouTube from Teams (copy)", "YouTube"], app.Config.Current.Rules.Select(r => r.Name));
+        Assert.True(rules.Editor.IsOpen);
+        Assert.Equal(app.Config.Current.Rules[1].Id, rules.Editor.EditingId);
+
+        // Unchanged: a badge on the copy, and only on the copy.
+        Assert.Equal([false, true, false], rules.Rules.Select(r => r.IsDuplicate));
+        Assert.Contains(VisibleTextBlocks(window), t => t.Text == "Duplicate of 1");
+
+        // The badge lights up the original.
+        Click(window, Find<Button>(window, "Show original rule"));
+        Settle(window);
+        Assert.True(rules.Rules[0].IsHighlighted);
+        Assert.False(rules.Rules[1].IsHighlighted);
+
+        // Renaming alone doesn't make it different...
+        Type(window, Find<TextBox>(window, "Rule name"), "Teams YouTube, again");
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+        Assert.True(rules.Rules[1].IsDuplicate);
+
+        // ...but changing what it does removes the badge for good.
+        Click(window, Finds<Button>(window, "Edit rule")[1]);
+        Settle(window);
+        Find<ComboBox>(window, "Open in").SelectedIndex = 0; // Firefox instead of Chrome
+        Click(window, Find<Button>(window, "Save rule", byContent: true));
+        Settle(window);
+        Assert.False(rules.Rules[1].IsDuplicate);
+        Assert.Null(app.Config.Current.Rules[1].ClonedFromId);
+        Assert.DoesNotContain(VisibleTextBlocks(window), t => t.Text?.StartsWith("Duplicate of") == true);
+    }
+
+    [AvaloniaFact]
     public void Building_a_time_condition_in_the_editor()
     {
         var app = new Harness();

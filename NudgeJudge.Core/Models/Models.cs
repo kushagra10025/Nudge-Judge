@@ -134,6 +134,13 @@ public sealed class Rule
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
+    /// The rule this one was cloned from, while it still does the same thing. Cleared once either rule is
+    /// saved with different conditions or browser.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? ClonedFromId { get; set; }
+
+    /// <summary>
     /// True: came with the first-run sample config. False: saved by the user. Null: written before this
     /// flag existed (sample cleanup then compares the rule with the sample templates).
     /// </summary>
@@ -163,6 +170,23 @@ public sealed class Rule
 
     /// <summary>Every link and app condition, including those inside groups.</summary>
     public IEnumerable<RuleCondition> Leaves() => Conditions.SelectMany(c => c.Leaves());
+
+    /// <summary>Same conditions, join and browser: the two rules route links identically. Name and lifetime don't count.</summary>
+    public bool RoutesLike(Rule other) =>
+        Join == other.Join && BrowserId == other.BrowserId && Rules.RuleEngine.SameConditions(Conditions, other.Conditions);
+
+    /// <summary>A copy with a new id, placed and named as a separate rule, remembering where it came from.</summary>
+    public Rule CloneAsNew()
+    {
+        var copy = Clone();
+        copy.Id = Guid.NewGuid();
+        copy.Name = $"{Name} (copy)";
+        copy.CreatedAt = DateTimeOffset.UtcNow;
+        copy.IsSample = false;
+        copy.ClonedFromId = Id;
+        copy.Compiled = null;
+        return copy;
+    }
 
     public bool IsExpired(DateTimeOffset now, ISystemBoot boot) =>
         (ExpiresAt is { } at && now >= at) ||

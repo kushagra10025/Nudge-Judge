@@ -34,6 +34,10 @@ These match the local time a link is opened: hours (`09:00-17:00`, `9am-5pm`), d
 
 For example, *GitHub at work*: link is `github.com` **and** time is within `Mon-Fri 09:00-17:00`, opens in Chrome. A plain *GitHub* rule below it sends GitHub links to Firefox the rest of the time. The tester checks time conditions against the current time.
 
+### Cloning rules
+
+**Clone** (on a rule's hover actions) copies the rule to just below the original as "*name* (copy)" and opens it in the editor. While the copy still does exactly what the original does (same conditions and browser), it shows a **Duplicate of *n*** badge; clicking it scrolls to the original and highlights it. Renaming doesn't count as a change. Once either rule is saved with different conditions or a different browser, the badge goes away for good.
+
 ## Source app detection
 
 When an app opens a link, NudgeJudge walks up its own process tree past openers and shells (`xdg-open`, `gio`, `sh`, `OpenWith.exe`, …) to the app that started it. If that chain is broken (the opener exited first), it falls back to the app that owns the foreground window (Windows), then to the `CHROME_DESKTOP` hint Electron apps leave in the environment (Linux).
