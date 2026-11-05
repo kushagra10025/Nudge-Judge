@@ -84,7 +84,7 @@
           <StackPanel Spacing="2">
             <TextBlock Classes="label" Text="Take links from the browser extension" />
             <TextBlock Classes="body muted" TextWrapping="Wrap" IsVisible="{Binding CanConnectExtension}"
-                       Text="Lets the NudgeJudge extension send links you click inside Chrome, Edge, Brave, Vivaldi or Firefox here. Alt+Shift+click a link, or right-click it and pick Open with NudgeJudge." />
+                       Text="{Binding ExtensionDetail}" />
             <TextBlock Classes="body muted" Text="The browser extension isn't available on this system yet."
                        IsVisible="{Binding !CanConnectExtension}" />
             <TextBlock Classes="body" Foreground="{DynamicResource StopBrush}" Text="{Binding ExtensionMessage}"

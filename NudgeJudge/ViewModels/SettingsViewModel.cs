@@ -109,6 +109,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public bool CanConnectExtension => _extension.IsSupported;
     public Uri ExtensionHelpUrl { get; } = new(AppInfo.RepositoryUrl + "/blob/main/docs/browser-extension.md");
 
+    /// <summary>What the extension's switch says about it, with the click that's the default on this platform.</summary>
+    public string ExtensionDetail { get; } =
+        "Lets the NudgeJudge extension send links you click inside Chrome, Edge, Brave, Vivaldi or Firefox here. " +
+        (OperatingSystem.IsMacOS() ? "⌥⇧-click" : OperatingSystem.IsWindows() ? "Alt+Shift+click" : "Ctrl+Alt+click") +
+        " a link, or right-click it and pick Open with NudgeJudge.";
+
     [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
 
     [ObservableProperty]

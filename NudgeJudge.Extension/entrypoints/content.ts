@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { DEFAULT_GESTURE, linkFromPath, matchesGesture, type Gesture } from '@/utils/gesture';
+import { defaultGesture, linkFromPath, matchesGesture, type Gesture } from '@/utils/gesture';
 import { isWebUrl, type NativeReply, type OpenMessage } from '@/utils/protocol';
 import { settingsItem } from '@/utils/settings';
 
@@ -8,7 +8,7 @@ import { settingsItem } from '@/utils/settings';
 export default defineContentScript({
   registration: 'runtime',
   main(ctx) {
-    let gesture: Gesture = DEFAULT_GESTURE;
+    let gesture: Gesture = defaultGesture(navigator.platform);
     void settingsItem.getValue().then((s) => (gesture = s.gesture));
     const unwatch = settingsItem.watch((s) => (gesture = s.gesture));
     ctx.onInvalidated(unwatch);

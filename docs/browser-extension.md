@@ -13,8 +13,8 @@ It's built to stay out of the way. Ordinary clicks are never touched; only an ex
 1. In NudgeJudge, open **Settings → Browser extension** and turn on **Take links from the browser extension**. This
    tells your browsers where to find NudgeJudge.
 2. Install the extension in each browser you use: Chrome, Edge, Brave, Vivaldi, Chromium or Firefox.
-3. Open the extension's options page. It should say **Connected to NudgeJudge**. To use the modifier-click, pick it
-   there and allow access to all sites.
+3. Open the extension's options page. It should say **Connected to NudgeJudge**. To use the modifier-click, click
+   **Allow** under *Click with* to give it access to all sites, then reload tabs that were already open.
 
 **From source:** run `npm install` and `npm run build` in `NudgeJudge.Extension/`. Then:
 - **Chromium browsers:** turn on developer mode in `chrome://extensions`, click *Load unpacked* and pick
@@ -49,15 +49,22 @@ We ruled out the other two options:
 | Gesture | What it sends | If the rules keep it in this browser |
 |---|---|---|
 | **Right-click → Open with NudgeJudge** | The link | It opens in a new background tab, like *Open link in new tab*. |
-| **Modifier + click** (default <kbd>Alt</kbd>+<kbd>Shift</kbd>+click, <kbd>⌥</kbd><kbd>⇧</kbd>+click on macOS) | The link | It's followed like a plain click (same tab, or its own target). |
+| **Modifier + click**: by default <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click on Linux, <kbd>Alt</kbd>+<kbd>Shift</kbd>+click on Windows, <kbd>⌥</kbd><kbd>⇧</kbd>+click on macOS | The link | It's followed like a plain click (same tab, or its own target). |
 | **Toolbar button** or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | The current page | Nothing happens; a green ✓ shows on the button. |
 
-The browser already uses these modifier clicks: <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+click opens a new tab,
-<kbd>Shift</kbd>+click a new window, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click a foreground tab, <kbd>Alt</kbd>+click
-downloads (Chrome), and <kbd>Ctrl</kbd>+click right-clicks on macOS. <kbd>Alt</kbd>+<kbd>Shift</kbd> is free in
-browsers. Some Linux desktops grab <kbd>Alt</kbd>+click to move windows, so the options page offers alternatives:
-<kbd>Ctrl</kbd>+<kbd>Alt</kbd>, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>, or off. A gesture matches only
-its exact modifiers, so it never fires alongside one of the browser's.
+Why the defaults differ:
+
+- **The browser already uses these modifier clicks:** <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+click opens a new tab,
+  <kbd>Shift</kbd>+click a new window, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click a foreground tab, <kbd>Alt</kbd>+click
+  downloads (Chrome), and <kbd>Ctrl</kbd>+click right-clicks on macOS.
+- **<kbd>Alt</kbd>+<kbd>Shift</kbd> is free in every browser, but not on many Linux desktops.** GNOME, Cinnamon and
+  Xfce use <kbd>Alt</kbd>+click to move windows and <kbd>Alt</kbd>+<kbd>Shift</kbd>+click to snap them, so the click
+  never reaches the page. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click is free there.
+- **macOS can't use <kbd>Ctrl</kbd>,** because <kbd>Ctrl</kbd>+click is right-click.
+
+The options page lets you pick any of <kbd>Alt</kbd>+<kbd>Shift</kbd>, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>,
+<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd> or off, and marks your platform's default. A gesture matches only its
+exact modifiers, so it never fires alongside one of the browser's.
 
 When a send fails, a red **!** shows on the toolbar button, and its tooltip says why. If NudgeJudge can't be reached
 after something you did on purpose (toolbar, shortcut, menu), the options page opens with setup instructions.
@@ -80,24 +87,90 @@ Two features need optional permissions, which the options page requests when you
 
 ## Automatic routing (opt-in)
 
-In NudgeJudge, a rule can be marked **Also catch in the browser** (in the rule editor, under *Open in*).
+The gestures send a link when *you* decide to. Automatic routing sends it when *a rule* says to, for the sites you've
+marked, with no special keys. It's made of two switches, and both are off by default:
 
-1. **The extension gets a list of sites.** It asks for the hosts of the marked rules (`{type: "autoRoutes"}`), keeps
-   the list for the browser session and refreshes it every 5 minutes. Only host-based rules qualify: domain,
-   wildcard or path-prefix links. If a rule has a regex, or a wildcard that could match any host, the editor says so
-   and the rule isn't watched.
-2. **A navigation to one of those sites is checked.** This covers link clicks, typed addresses and redirects in the
-   top frame of a tab. The extension sends the URL to NudgeJudge with `auto: true`, and NudgeJudge runs its full
-   rules on it.
-3. **If the link went elsewhere, the tab is put back.** It goes back in history, or returns to the previous page if
-   the new one hadn't loaded yet. A tab opened just for that link is closed. If the rules pick this browser, nothing
-   happens.
+| Where | Switch | What it means |
+|---|---|---|
+| NudgeJudge, rule editor (under *Open in*) | **Also catch in the browser** | "Enforce this rule even for links I open inside a browser." |
+| Extension, options page | **Catch links for rules marked "Also catch in the browser"** | "This browser may watch where its tabs are going." |
 
-Two guards keep a link from bouncing between browsers:
-- **The extension leaves alone tabs that came from outside the browser.** A tab with no page before this one and no
-  opener tab is one NudgeJudge or another app opened.
-- **NudgeJudge answers "stay" for an automatic request about a link it opened in the last 15 seconds.** It checks
-  this against the Activity log, so the guard relies on the log being on.
+### An example
+
+You have a rule **`*.zoom.us` → Firefox** with *Also catch in the browser* ticked, and you're in Chrome with automatic
+routing on. You click a Zoom link in Gmail, a plain click:
+
+1. **The extension already knows which sites to watch.** It asked NudgeJudge earlier (`{type: "autoRoutes"}`) and got
+   `*.zoom.us`. It keeps the list for the browser session and refreshes it every 5 minutes.
+2. **Chrome starts going to `us02web.zoom.us/j/…`.** That host is on the list.
+3. **The extension sends the link to NudgeJudge,** which runs **all** your rules on it, not just the marked one. The
+   list only decides what's worth asking about.
+4. **The link opens in Firefox, and the Chrome tab goes back to Gmail.** If the new page had already loaded, the tab
+   goes back in history; if not, it returns to the previous page. A tab opened just for that link is closed.
+
+If the rules had picked Chrome, nothing would happen and the page would load normally.
+
+### Which rules can be caught
+
+Only rules that can be narrowed to sites: domain, wildcard or path-prefix link conditions. For a rule with a regex,
+a wildcard that could match any host (like `*` or `*/meeting`), or only an "opened from" or time condition, the
+extension would have to ask about every page you visit. The editor shows a red note under the checkbox, and the rule
+isn't watched.
+
+### What it leaves alone
+
+- **Pages inside frames.** Only the top frame of a tab is watched.
+- **Tabs that came from outside the browser.** A tab with no earlier page and no opener tab was opened by an app,
+  usually NudgeJudge itself. Sending its link back could bounce it between browsers.
+- **A link NudgeJudge opened in the last 15 seconds.** NudgeJudge answers "stay" for it. This check uses the Activity
+  log, so it only works while the log is on.
+- **The same link twice in 10 seconds,** for redirect chains and reloads.
+
+### What it needs
+
+The extension's options page asks for access to all sites and for `webNavigation` (to see navigations as they
+start) when you turn it on. NudgeJudge has to be reachable, but doesn't have to be running (see below).
+
+## When NudgeJudge isn't running
+
+The extension works even when NudgeJudge is closed and not in the tray, because the browser starts NudgeJudge itself.
+
+Turning on **Settings → Browser extension** saved a launcher script and told each browser where it is. Those files stay
+after you quit NudgeJudge; only turning the setting off (or uninstalling) removes them. On every send, the browser runs
+the launcher, which starts a short-lived **host** process that reads your rules, answers, and exits:
+
+| Situation | What happens |
+|---|---|
+| The rules keep the link in this browser ("stay") | The host answers "stay" and exits. Nothing else starts. |
+| NudgeJudge is running (window or tray) | The host hands the link to it over the single-instance channel and exits. |
+| NudgeJudge isn't running, *keep running in the tray* on (the default) | The host starts NudgeJudge with the link and exits. NudgeJudge routes it, becomes the primary instance and moves to the tray, so it's the server for links from other apps and from the extension from then on. |
+| NudgeJudge isn't running, *keep running in the tray* off | The same, but NudgeJudge exits once the link is routed (or once you've chosen in the chooser), as it does for a link from any other app. You asked for nothing to stay running. |
+| Two links arrive while NudgeJudge is still starting | Both hosts may start it; the second launch finds the first holding the single-instance lock and hands its link over. Nothing opens twice. |
+
+The first link after a cold start is a little slower, the time it takes NudgeJudge to start.
+
+### Nothing is left orphaned or tied to the browser
+
+There are two processes to think about: the host, and the NudgeJudge it may start.
+
+- **The host never outlives its request.** The browser sends one message and closes the host's stdin, and the host
+  exits on that. If the browser crashes, stdin closes too. The longest a host can wait is the 15-second reply timeout
+  of a running NudgeJudge that stopped answering.
+- **A NudgeJudge started by the host belongs to no one.** The host exits at once, so NudgeJudge is re-parented by the
+  OS like any background app, and it's started detached from the browser on purpose. Browsers clean up after native
+  programs: they may kill the host's whole process group (Linux), and Firefox runs them in a Windows job that kills
+  everything in it when it closes. NudgeJudge mustn't go down with the host, or closing the browser would close
+  NudgeJudge. So it's started (`DetachedProcess`):
+  - **On Linux,** in a session of its own (`setsid`), with stdin, stdout and stderr on `/dev/null`.
+  - **On Windows,** outside the browser's job (`CREATE_BREAKAWAY_FROM_JOB`, which Firefox's job allows), in its own
+    process group, inheriting no handles.
+
+  Either way the browser's pipes never reach NudgeJudge or the browsers it opens.
+- **Closing the browser leaves NudgeJudge running in the tray,** exactly as if a link from another app had started
+  it. Quit it from the tray menu as usual.
+
+A browser whose job doesn't allow breakaway would refuse the flag. NudgeJudge is then started inside the job rather than
+not at all, and could close with that browser. Firefox allows breakaway; this path hasn't been tested on Windows yet.
 
 ## Protocol
 
@@ -153,8 +226,8 @@ How host mode handles a request:
 - **Its own output:** it runs before Velopack, clears trace listeners and swaps `Console.Out`, so only protocol frames
   reach stdout.
 - **Handing links over:** it never opens a browser itself. If no instance is running, it starts the app with the link
-  and a `--source=` argument carrying the calling browser. That app gets fresh stdio, and on Windows the host's own
-  handles are made non-inheritable first, so the extension's pipe never leaks into a browser.
+  and a `--source=` argument carrying the calling browser, fully detached (`DetachedProcess`, see
+  [below](#when-nudgejudge-isnt-running)).
 
 ### Limitations
 

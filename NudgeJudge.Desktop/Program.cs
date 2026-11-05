@@ -161,40 +161,16 @@ internal sealed class Program
         if (result == DeliveryResult.Delivered) return;
         if (result == DeliveryResult.Refused) throw new IOException(error ?? "NudgeJudge didn't take the link.");
 
-        // Nothing running: start the app with the link, as if the OS had opened it, on its own stdio.
+        // Nothing running: start the app with the link, as if the OS had opened it. It becomes the primary instance
+        // (and, with "keep running in the tray", the resident server), so it's started detached from this short-lived
+        // host and from the browser: when the browser cleans up after us, it must not take NudgeJudge with it.
         if (AppLaunchCommand.Current() is not { Count: > 0 } command)
             throw new IOException("NudgeJudge can't tell how it was started, so it can't start itself.");
-        var start = new ProcessStartInfo(command[0])
-        {
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var arg in command.Skip(1)) start.ArgumentList.Add(arg);
-        if (source is not null) start.ArgumentList.Add(LaunchArguments.EncodeSource(source));
-        start.ArgumentList.Add(url.AbsoluteUri);
-
-        // Windows hands every inheritable handle to a child: keep the browser's pipes from leaking into the app.
-        if (OperatingSystem.IsWindows())
-            foreach (var std in new[] { -10, -11, -12 }) SetHandleInformation(GetStdHandle(std), 1 /* HANDLE_FLAG_INHERIT */, 0);
-        try
-        {
-            using var started = Process.Start(start) ?? throw new IOException("NudgeJudge didn't start.");
-            started.StandardInput.Close();
-        }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            throw new IOException($"Couldn't start NudgeJudge: {e.Message}", e);
-        }
+        List<string> argv = [.. command];
+        if (source is not null) argv.Add(LaunchArguments.EncodeSource(source));
+        argv.Add(url.AbsoluteUri);
+        DetachedProcess.Start(argv);
     }
-
-    [DllImport("kernel32.dll")]
-    private static extern nint GetStdHandle(int stdHandle);
-
-    [DllImport("kernel32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetHandleInformation(nint handle, uint mask, uint flags);
 
     [DllImport("libc", SetLastError = true)]
     private static extern int execv(nint path, nint[] argv);

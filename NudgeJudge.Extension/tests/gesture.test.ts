@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeGesture, linkFromPath, matchesGesture, type ModifierState } from '../utils/gesture';
+import { defaultGesture, describeGesture, linkFromPath, matchesGesture, type ModifierState } from '../utils/gesture';
 
 const click = (mods: Partial<ModifierState>): ModifierState => ({
   altKey: false, shiftKey: false, ctrlKey: false, metaKey: false, button: 0, ...mods,
@@ -23,6 +23,17 @@ describe('matchesGesture', () => {
     expect(matchesGesture(click({ altKey: true, shiftKey: true, metaKey: true }), 'alt-shift')).toBe(false);
     expect(matchesGesture(click({ altKey: true, shiftKey: true, button: 1 }), 'alt-shift')).toBe(false);
     expect(matchesGesture(click({ altKey: true, shiftKey: true }), 'off')).toBe(false);
+  });
+});
+
+describe('defaultGesture', () => {
+  it('avoids Alt+click on Linux, where desktops use it to move windows', () => {
+    expect(defaultGesture('Linux x86_64')).toBe('ctrl-alt');
+    expect(defaultGesture('FreeBSD amd64')).toBe('ctrl-alt');
+    expect(defaultGesture('Win32')).toBe('alt-shift');
+    expect(defaultGesture('MacIntel')).toBe('alt-shift');
+    expect(defaultGesture('Linux armv8l Android')).toBe('alt-shift');
+    expect(defaultGesture('')).toBe('alt-shift');
   });
 });
 

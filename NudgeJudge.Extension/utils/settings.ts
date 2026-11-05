@@ -1,6 +1,6 @@
 import { storage } from '#imports';
 import type { Browser } from 'wxt/browser';
-import { DEFAULT_GESTURE, type Gesture } from './gesture';
+import { defaultGesture, type Gesture } from './gesture';
 
 export interface Settings {
   /** The modifier-click. Only active once the "all sites" permission is granted. */
@@ -9,7 +9,8 @@ export interface Settings {
   autoRoute: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { gesture: DEFAULT_GESTURE, autoRoute: false };
+/** Ctrl+Alt+click on Linux, Alt+Shift+click (⌥⇧ on macOS) elsewhere. A choice the user saved wins. */
+export const DEFAULT_SETTINGS: Settings = { gesture: defaultGesture(globalThis.navigator?.platform ?? ''), autoRoute: false };
 
 export const settingsItem = storage.defineItem<Settings>('local:settings', { fallback: DEFAULT_SETTINGS });
 

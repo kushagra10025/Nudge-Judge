@@ -1,9 +1,14 @@
 // The modifier-click that sends a link to NudgeJudge. Browsers already use Ctrl/⌘ (new tab), Shift (new window),
-// Ctrl+Shift (foreground tab), Alt (download, in Chrome) and, on macOS, Ctrl (right-click). Alt+Shift is free.
+// Ctrl+Shift (foreground tab), Alt (download, in Chrome) and, on macOS, Ctrl (right-click). Alt+Shift is free in
+// browsers, but many Linux desktops (GNOME, Cinnamon, Xfce) take Alt+click and Alt+Shift+click to move and snap
+// windows, so the click never reaches the page. Ctrl+Alt is free there.
 
 export type Gesture = 'alt-shift' | 'ctrl-alt' | 'ctrl-alt-shift' | 'off';
 
-export const DEFAULT_GESTURE: Gesture = 'alt-shift';
+/** The default for a platform, from `navigator.platform` ("Linux x86_64", "Win32", "MacIntel"). */
+export function defaultGesture(platform: string): Gesture {
+  return /linux|bsd|sunos/i.test(platform) && !/android/i.test(platform) ? 'ctrl-alt' : 'alt-shift';
+}
 
 export interface ModifierState {
   altKey: boolean;

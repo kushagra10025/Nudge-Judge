@@ -36,7 +36,7 @@ You set NudgeJudge as your system's default browser. When an app opens a link, N
 |---|---|
 | 🚦 **Rules, top to bottom** | Named rules with compound conditions (all/any, negation, alternatives). Match by wildcard, exact domain, path prefix or regex, and by time of day or day of week. |
 | 🪟 **Knows where a link came from** | "Opened from" conditions match the app you clicked in, e.g. *YouTube from Teams → Chrome Work*. |
-| 🧩 **Browser extension** | <kbd>Alt</kbd>+<kbd>Shift</kbd>+click a link inside Chrome, Edge or Firefox to route it too. Ordinary clicks are never touched. [Details](docs/browser-extension.md) |
+| 🧩 **Browser extension** | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click (Linux) or <kbd>Alt</kbd>+<kbd>Shift</kbd>+click (Windows) a link inside Chrome, Edge or Firefox to route it too. Ordinary clicks are never touched. [Details](docs/browser-extension.md) |
 | 🧪 **Live rule tester** | Paste a link (<kbd>Ctrl</kbd>+<kbd>T</kbd>) and watch it run past each rule on a route diagram. |
 | 🗂️ **Chooser for the rest** | Unmatched links queue as tabs. Press <kbd>1</kbd>–<kbd>9</kbd> to pick, and save the choice for N hours, until restart, or for good. |
 | 👤 **Profiles and private windows** | Each browser entry is a program plus arguments. Scanning finds installed browsers, Firefox and Chromium profiles. |

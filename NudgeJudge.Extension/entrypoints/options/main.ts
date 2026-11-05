@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { describeGesture, GESTURES, type Gesture } from '@/utils/gesture';
+import { defaultGesture, describeGesture, GESTURES, type Gesture } from '@/utils/gesture';
 import { checkReply, explainNativeError, HOST_NAME, PROTOCOL_VERSION, type NativeReply } from '@/utils/protocol';
 import { ALL_SITES, AUTO_ROUTE, autoHostsItem, settingsItem } from '@/utils/settings';
 
@@ -38,7 +38,8 @@ async function showGesture() {
   const settings = await settingsItem.getValue();
   const select = $<HTMLSelectElement>('gesture');
   if (select.options.length === 0) {
-    for (const g of GESTURES) select.add(new Option(describeGesture(g, mac), g));
+    const usual = defaultGesture(navigator.platform);
+    for (const g of GESTURES) select.add(new Option(describeGesture(g, mac) + (g === usual ? ' (default)' : ''), g));
   }
   select.value = settings.gesture;
   const allowed = await browser.permissions.contains(ALL_SITES);

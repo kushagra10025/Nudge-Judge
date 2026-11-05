@@ -125,7 +125,7 @@ Status is checked whenever the main window comes forward, and catches a half reg
 
 ## Browser extension
 
-Links you click *inside* a browser can go to NudgeJudge too, with the companion extension for Chrome, Edge, Brave, Vivaldi and Firefox. Turn on **Settings → Browser extension**, then <kbd>Alt</kbd>+<kbd>Shift</kbd>+click a link, or right-click it and pick **Open with NudgeJudge**. The toolbar button sends the page you're on. If your rules pick the browser you're already in, the link just opens there. Rules marked **Also catch in the browser** can be routed automatically. See [Browser extension](browser-extension.md).
+Links you click *inside* a browser can go to NudgeJudge too, with the companion extension for Chrome, Edge, Brave, Vivaldi and Firefox. Turn on **Settings → Browser extension**, then <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+click a link (<kbd>Alt</kbd>+<kbd>Shift</kbd>+click on Windows), or right-click it and pick **Open with NudgeJudge**. The toolbar button sends the page you're on. If your rules pick the browser you're already in, the link just opens there. Rules marked **Also catch in the browser** are routed automatically, with no special keys, once automatic routing is on in the extension. It works even when NudgeJudge isn't running: the browser starts it. See [Browser extension](browser-extension.md).
 
 ## Launch at startup
 
