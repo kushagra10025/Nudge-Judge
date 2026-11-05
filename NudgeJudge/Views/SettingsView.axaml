@@ -235,7 +235,7 @@
             <StackPanel Spacing="2">
               <TextBlock Classes="label" Text="Import rules and browsers" />
               <TextBlock Classes="body muted" TextWrapping="Wrap"
-                         Text="Adds them from an export. Ones with the same id as yours replace them, so a backup restores in place. Only import files you trust: a browser entry runs a program." />
+                         Text="Shows you everything in the file before anything changes. Only import files you trust: a browser entry runs a program." />
             </StackPanel>
             <Button Grid.Column="1" Command="{Binding ImportDataCommand}" VerticalAlignment="Center" Margin="16,0,0,0"
                     AutomationProperties.Name="Import rules and browsers">
@@ -247,6 +247,102 @@
           </Grid>
           <TextBlock Classes="body" Margin="20,0,20,16" TextWrapping="Wrap" Text="{Binding TransferMessage}"
                      IsVisible="{Binding HasTransferMessage}" Classes.error="{Binding TransferFailed}" />
+          <!-- Import review: nothing changes until Import is pressed -->
+          <Border IsVisible="{Binding IsReviewingImport}" Margin="20,0,20,20" Padding="16" CornerRadius="6"
+                  Background="{DynamicResource SurfaceSunkenBrush}">
+            <StackPanel DataContext="{Binding ImportReview}" x:DataType="vm:ImportReviewViewModel" Spacing="14">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="label" Text="{Binding FileName, StringFormat='Review {0}'}" />
+                <TextBlock Classes="body muted" TextWrapping="Wrap">
+                  <Run Text="{Binding Contents}" /><Run Text="  ·  " /><Run Text="{Binding ExportedText}" />
+                </TextBlock>
+                <TextBlock Classes="body muted" Text="That file has no rules or browsers." IsVisible="{Binding IsEmpty}" />
+              </StackPanel>
+
+              <StackPanel Spacing="6">
+                <RadioButton GroupName="ImportMode" IsChecked="{Binding IsAddAsNew}" AutomationProperties.Name="Add as new">
+                  <TextBlock Text="Add as new (for rules someone shared with you)" />
+                </RadioButton>
+                <RadioButton GroupName="ImportMode" IsChecked="{Binding IsRestore}" AutomationProperties.Name="Restore backup">
+                  <TextBlock Text="Restore a backup (replace matching rules and browsers)" />
+                </RadioButton>
+                <TextBlock Classes="small muted" Text="{Binding ModeHint}" TextWrapping="Wrap" />
+              </StackPanel>
+
+              <TextBlock Classes="error" TextWrapping="Wrap" IsVisible="{Binding HasAttention}"
+                         Text="Some items below need a careful look. Check the programs are what you expect." />
+
+              <StackPanel Spacing="8" IsVisible="{Binding HasBrowsers}">
+                <TextBlock Classes="label" Text="Browsers" />
+                <!-- Long files scroll here, so the panel stays a manageable size -->
+                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Imported browsers">
+                  <ItemsControl ItemsSource="{Binding Browsers}" Margin="0,0,14,0">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:BrowserReviewRow">
+                        <StackPanel Spacing="3">
+                          <WrapPanel ItemSpacing="8" LineSpacing="4">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
+                            <Border Classes="badge stop" IsVisible="{Binding WillNeedReview}"><TextBlock Text="Needs review" /></Border>
+                          </WrapPanel>
+                          <TextBlock Classes="mono small" TextWrapping="Wrap" Text="{Binding Program}" />
+                          <TextBlock Classes="small muted" TextWrapping="Wrap" IsVisible="{Binding ChangesProgram}">
+                            <Run Text="Yours runs now: " /><Run Text="{Binding CurrentProgram}" FontFamily="{DynamicResource MonoFont}" />
+                          </TextBlock>
+                          <ItemsControl ItemsSource="{Binding Warnings}" IsVisible="{Binding HasWarnings}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String">
+                                <TextBlock Classes="error" Text="{Binding}" TextWrapping="Wrap" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <CheckBox IsVisible="{Binding ChangesProgram}" IsChecked="{Binding AllowProgramChange}"
+                                    AutomationProperties.Name="Allow program change">
+                            <TextBlock Text="{Binding AllowLabel}" TextWrapping="Wrap" />
+                          </CheckBox>
+                          <TextBlock Classes="small muted" Text="{Binding ReviewNote}" TextWrapping="Wrap" IsVisible="{Binding HasReviewNote}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding HasRules}">
+                <TextBlock Classes="label" Text="Rules" />
+                <!-- Long files scroll here, so the panel stays a manageable size -->
+                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Imported rules">
+                  <ItemsControl ItemsSource="{Binding Rules}" Margin="0,0,14,0">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:RuleReviewRow">
+                        <StackPanel Spacing="2">
+                          <WrapPanel ItemSpacing="8" LineSpacing="4">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Border Classes="badge"><TextBlock Text="{Binding ActionText}" /></Border>
+                          </WrapPanel>
+                          <TextBlock Classes="small muted" TextWrapping="Wrap">
+                            <Run Text="{Binding Summary}" /><Run Text="  →  " /><Run Text="{Binding Destination}" FontWeight="SemiBold" />
+                          </TextBlock>
+                          <TextBlock Classes="error" Text="{Binding Redirect}" TextWrapping="Wrap" IsVisible="{Binding IsRedirect}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button Content="Cancel" Command="{Binding CancelCommand}" AutomationProperties.Name="Cancel import" />
+                <Button Classes="accent" Content="Import" Command="{Binding ConfirmCommand}" AutomationProperties.Name="Confirm import" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </Border>
 

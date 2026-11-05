@@ -206,6 +206,14 @@ public sealed partial class BrowserItemViewModel(BrowsersViewModel owner, Browse
     public string? ProfileLabel { get; } = string.IsNullOrWhiteSpace(browser.ProfileLabel) ? null : browser.ProfileLabel;
     public bool HasProfile => ProfileLabel is not null && !Name.Contains(ProfileLabel, StringComparison.OrdinalIgnoreCase);
     public bool IsSample { get; } = browser.Source == BrowserSource.Sample;
+
+    /// <summary>Imported and suspicious: links don't open in it until it's opened in the editor and saved.</summary>
+    public bool NeedsReview { get; } = browser.NeedsReview;
+    public bool CanTry => !NeedsReview;
+    public string ReviewHint { get; } = browser.NeedsReview
+        ? string.Join(" ", Core.Browsers.BrowserRisk.Assess(browser).Describe()) +
+          " Links won't open in it until you check its program and arguments, then save it."
+        : "";
     public bool IsDiscovered { get; } = browser.Source == BrowserSource.Discovered;
     public bool IsPrimary { get; } = isPrimary;
     public bool IsNotPrimary => !IsPrimary;
@@ -254,6 +262,13 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
 
     public string Title => IsNew ? "Add browser" : "Edit browser";
 
+    /// <summary>Set while editing an imported browser that needs review: why, and that saving is the review.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasReviewWarning))]
+    public partial string? ReviewWarning { get; set; }
+
+    public bool HasReviewWarning => ReviewWarning is not null;
+
     /// <summary>How the command will actually be run, so flags and quoting can be checked.</summary>
     public string Preview
     {
@@ -283,6 +298,7 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
         Name = ExecutablePath = Arguments = ProfileLabel = "";
         IsPrivate = false;
         _source = BrowserSource.Manual;
+        ReviewWarning = null;
         IsOpen = true;
     }
 
@@ -296,6 +312,10 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
         IsPrivate = b.IsPrivate;
         ProfileLabel = b.ProfileLabel ?? "";
         _source = b.Source;
+        ReviewWarning = b.NeedsReview
+            ? "This browser was imported and needs review. " + string.Join(" ", Core.Browsers.BrowserRisk.Assess(b).Describe()) +
+              " Check the program and arguments are what you expect; saving marks it as reviewed."
+            : null;
         IsOpen = true;
     }
 
@@ -338,6 +358,8 @@ public sealed partial class BrowserEditorViewModel(IConfigStore config, IDialogS
             b.ProfileLabel = string.IsNullOrWhiteSpace(ProfileLabel) ? null : ProfileLabel.Trim();
             // Editing a sample makes it the user's own.
             b.Source = _source == BrowserSource.Sample ? BrowserSource.Manual : _source;
+            // Saving it here is the review an imported browser was waiting for.
+            b.NeedsReview = false;
         });
         Close();
     }

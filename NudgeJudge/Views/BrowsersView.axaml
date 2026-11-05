@@ -100,16 +100,20 @@
                         <Border Classes="badge" IsVisible="{Binding IsSample}">
                           <TextBlock Text="Sample" />
                         </Border>
+                        <Border Classes="badge stop" IsVisible="{Binding NeedsReview}" ToolTip.Tip="{Binding ReviewHint}">
+                          <TextBlock Text="Needs review" />
+                        </Border>
                       </WrapPanel>
                       <TextBlock Classes="mono faint small" TextTrimming="CharacterEllipsis">
                         <Run Text="{Binding ExecutablePath}" /><Run Text="{Binding ArgumentsSuffix}" Foreground="{DynamicResource InkMutedBrush}" />
                       </TextBlock>
+                      <TextBlock Classes="error" Text="{Binding ReviewHint}" TextWrapping="Wrap" IsVisible="{Binding NeedsReview}" />
                     </StackPanel>
 
                     <TextBlock Grid.Column="1" Classes="small muted" Text="{Binding UsageText}" VerticalAlignment="Center" Margin="16,0" />
 
                     <StackPanel Grid.Column="2" Classes="actions" Orientation="Horizontal" VerticalAlignment="Center">
-                      <Button Classes="ghost icon" Command="{Binding TryCommand}" ToolTip.Tip="Open example.com in this browser"
+                      <Button Classes="ghost icon" Command="{Binding TryCommand}" IsEnabled="{Binding CanTry}" ToolTip.Tip="Open example.com in this browser"
                               AutomationProperties.Name="Try browser">
                         <c:Icon Data="{StaticResource Icon.Open}" />
                       </Button>
@@ -152,6 +156,8 @@
             <c:Icon Data="{StaticResource Icon.Close}" />
           </Button>
         </Grid>
+
+        <TextBlock Classes="error" Text="{Binding ReviewWarning}" TextWrapping="Wrap" IsVisible="{Binding HasReviewWarning}" />
 
         <StackPanel Spacing="6">
           <TextBlock Classes="label" Text="Name" />

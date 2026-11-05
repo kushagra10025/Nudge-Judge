@@ -1,4 +1,9 @@
+using Avalonia.Automation;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using NudgeJudge.Views;
 using NudgeJudge.Core.Config;
 using NudgeJudge.Core.Models;
 using NudgeJudge.ViewModels;
@@ -30,11 +35,112 @@ public sealed class DataTransferUiTests : IDisposable
 
         var to = new MemoryConfigStore();
         var importing = Settings(to, new FakeWindows { OpenPath = path });
+        importing.ProgramExists = _ => true;
         await importing.ImportDataCommand.ExecuteAsync(null);
+
+        // Nothing changes until the review is confirmed.
+        var review = Assert.IsType<ImportReviewViewModel>(importing.ImportReview);
+        Assert.Empty(to.Current.Rules);
+        Assert.True(review.IsAddAsNew); // someone else's file
+        Assert.Equal("Chrome", Assert.Single(review.Browsers).Name);
+        Assert.Equal("Chrome", Assert.Single(review.Rules).Destination);
+
+        review.ConfirmCommand.Execute(null);
+        Assert.Null(importing.ImportReview);
         Assert.False(importing.TransferFailed);
         Assert.Equal("Imported 1 rule and 1 browser.", importing.TransferMessage);
         Assert.Equal("GitHub", Assert.Single(to.Current.Rules).Name);
-        Assert.Equal(browser.Id, Assert.Single(to.Current.Browsers).Id);
+        var imported = Assert.Single(to.Current.Browsers);
+        Assert.NotEqual(browser.Id, imported.Id);
+        Assert.False(imported.NeedsReview);
+    }
+
+    [AvaloniaFact]
+    public async Task A_tampered_backup_shows_the_program_change_and_needs_it_allowed()
+    {
+        var config = new MemoryConfigStore();
+        var chrome = new BrowserProfile { Name = "Chrome", ExecutablePath = "/usr/bin/google-chrome" };
+        config.Current.Browsers.Add(chrome);
+        config.Current.Rules.Add(new Rule { Name = "GitHub", Conditions = [RuleCondition.Link(MatchKind.Domain, "github.com")], BrowserId = chrome.Id });
+        var export = ConfigTransfer.Read(ConfigTransfer.Export(config.Current));
+        export.Browsers[0].ExecutablePath = "/home/me/evil.sh";
+        var path = Path.Combine(_dir, "backup.json");
+        await File.WriteAllBytesAsync(path, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(export, ExportJson.Options));
+
+        var vm = Settings(config, new FakeWindows { OpenPath = path });
+        vm.ProgramExists = _ => true;
+        await vm.ImportDataCommand.ExecuteAsync(null);
+        var review = vm.ImportReview!;
+
+        Assert.True(review.IsRestore); // shares ids: looks like a backup
+        Assert.True(review.HasAttention);
+        var row = Assert.Single(review.Browsers);
+        Assert.True(row.ChangesProgram);
+        Assert.Equal("/usr/bin/google-chrome", row.CurrentProgram);
+        Assert.Contains("script", row.Warnings[0]);
+        Assert.Equal("Added separately, yours unchanged", row.ActionText);
+        Assert.Contains("Chrome (imported) (needs review)", Assert.Single(review.Rules).Destination);
+        Assert.NotNull(review.Rules[0].Redirect);
+
+        review.ConfirmCommand.Execute(null);
+
+        Assert.Equal("/usr/bin/google-chrome", config.Current.FindBrowser(chrome.Id)!.ExecutablePath);
+        Assert.True(config.Current.Browsers.Single(b => b.Id != chrome.Id).NeedsReview);
+        Assert.Contains("needs review", vm.TransferMessage);
+    }
+
+    [AvaloniaFact]
+    public async Task A_big_import_scrolls_inside_the_review_instead_of_growing_the_page()
+    {
+        var from = new MemoryConfigStore();
+        var firefox = new BrowserProfile { Name = "Firefox", ExecutablePath = "/usr/bin/firefox" };
+        from.Current.Browsers.Add(firefox);
+        for (var i = 0; i < 40; i++)
+            from.Current.Browsers.Add(new BrowserProfile { Name = $"Browser {i}", ExecutablePath = $"/usr/bin/firefox{i}" });
+        for (var i = 0; i < 300; i++)
+            from.Current.Rules.Add(new Rule { Name = $"Rule {i}", Conditions = [RuleCondition.Link(MatchKind.Domain, $"site{i}.io")], BrowserId = firefox.Id });
+        var path = Path.Combine(_dir, "big.json");
+        await File.WriteAllBytesAsync(path, ConfigTransfer.Export(from.Current));
+
+        var vm = Settings(new MemoryConfigStore(), new FakeWindows { OpenPath = path });
+        vm.ProgramExists = _ => true;
+        await vm.ImportDataCommand.ExecuteAsync(null);
+        var window = new Window { Content = new SettingsView { DataContext = vm }, Width = 1000, Height = 800 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        try
+        {
+            foreach (var name in new[] { "Imported browsers", "Imported rules" })
+            {
+                var list = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => AutomationProperties.GetName(s) == name);
+                Assert.True(list.Bounds.Height <= 320, $"{name} is {list.Bounds.Height}px tall");
+                Assert.True(list.Extent.Height > list.Viewport.Height, $"{name} should scroll");
+            }
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Cancelling_the_review_changes_nothing()
+    {
+        var from = new MemoryConfigStore();
+        from.Current.Rules.Add(new Rule { Name = "r", Conditions = [RuleCondition.Link(MatchKind.Domain, "a.io")] });
+        var path = Path.Combine(_dir, "e.json");
+        await File.WriteAllBytesAsync(path, ConfigTransfer.Export(from.Current));
+
+        var config = new MemoryConfigStore();
+        var vm = Settings(config, new FakeWindows { OpenPath = path });
+        await vm.ImportDataCommand.ExecuteAsync(null);
+        vm.ImportReview!.CancelCommand.Execute(null);
+
+        Assert.Null(vm.ImportReview);
+        Assert.Null(vm.TransferMessage);
+        Assert.Empty(config.Current.Rules);
     }
 
     [AvaloniaFact]
@@ -60,4 +166,14 @@ public sealed class DataTransferUiTests : IDisposable
         await vm.ImportDataCommand.ExecuteAsync(null);
         Assert.Null(vm.TransferMessage);
     }
+}
+
+/// <summary>Writes a tampered export the way the app would (camelCase), without the app's internal JSON context.</summary>
+internal static class ExportJson
+{
+    public static readonly System.Text.Json.JsonSerializerOptions Options = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
+    };
 }

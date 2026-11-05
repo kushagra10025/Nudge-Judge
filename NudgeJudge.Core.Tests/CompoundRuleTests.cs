@@ -232,6 +232,29 @@ public class CompoundRuleTests
     }
 
     [Fact]
+    public void Router_never_opens_a_browser_that_needs_review()
+    {
+        var config = new AppConfig
+        {
+            Browsers = [new() { Id = Chrome, Name = "Imported", ExecutablePath = "/tmp/evil", NeedsReview = true }],
+            Rules = [new() { Name = "All", Conditions = [RuleCondition.Link(MatchKind.Wildcard, "*")], BrowserId = Chrome }],
+        };
+        config.Settings.PrimaryBrowserId = Chrome;
+        var log = new ActivityLog();
+        var launcher = new Launcher();
+        var router = new LinkRouter(new Store(config), new RuleEngine(new Boot()), launcher, log);
+
+        Assert.Equal(RouteKind.NeedsChoice, router.Route("https://example.com/").Kind);
+        Assert.Contains("needs review", log.Snapshot()[0].Detail);
+
+        config.Settings.RoutingEnabled = false; // the primary browser is skipped too
+        Assert.Equal(RouteKind.NeedsChoice, router.Route("https://example.com/").Kind);
+
+        Assert.Equal(RouteKind.Failed, router.OpenChosen(new Uri("https://example.com/"), config.Browsers[0]).Kind);
+        Assert.Empty(launcher.Launched);
+    }
+
+    [Fact]
     public void Saving_a_chooser_rule_removes_expired_ones()
     {
         var expired = new Rule { Name = "Old", ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1) };

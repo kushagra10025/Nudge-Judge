@@ -289,6 +289,13 @@ public sealed class BrowserProfile
     public string? ProfileLabel { get; set; }
     public BrowserSource Source { get; set; } = BrowserSource.Manual;
 
+    /// <summary>
+    /// Came from an import and looked suspicious (unknown program, script, missing file or risky arguments).
+    /// Links aren't opened in it until the user opens it in the browser editor and saves it.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool NeedsReview { get; set; }
+
     public BrowserProfile Clone() => (BrowserProfile)MemberwiseClone();
 }
 

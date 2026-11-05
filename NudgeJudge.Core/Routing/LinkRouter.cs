@@ -66,7 +66,7 @@ public sealed class LinkRouter
         {
             var primary = cfg.FindBrowser(cfg.Settings.PrimaryBrowserId);
             // No primary browser, or it wouldn't start: fall through to asking rather than dropping the link.
-            if (primary is not null && Launch(primary, url, source, ActivityOutcome.PassedThrough) is { Kind: not RouteKind.Failed } passed)
+            if (primary is { NeedsReview: false } && Launch(primary, url, source, ActivityOutcome.PassedThrough) is { Kind: not RouteKind.Failed } passed)
                 return passed;
         }
         else
@@ -78,6 +78,9 @@ public sealed class LinkRouter
                 if (browser is null)
                     Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, RuleNumber: index + 1, RuleName: rule.Name,
                         Detail: "The rule's browser no longer exists. Asking instead.", Source: source));
+                else if (browser.NeedsReview)
+                    Log(new(Now, url.AbsoluteUri, ActivityOutcome.Failed, browser.Name, index + 1, RuleName: rule.Name, BrowserId: browser.Id,
+                        Detail: $"{browser.Name} was imported and needs review on the Browsers page. Asking instead.", Source: source));
                 else if (Launch(browser, url, source, ActivityOutcome.Routed, index + 1, rule.Name) is { Kind: not RouteKind.Failed } routed)
                     return routed;
             }
@@ -101,7 +104,9 @@ public sealed class LinkRouter
 
     /// <summary>Opens a URL the user explicitly chose a browser for (chooser window).</summary>
     public RouteDecision OpenChosen(Uri url, BrowserProfile browser, SourceApp? source = null) =>
-        Launch(browser, url, SourceApp.Sanitize(source), ActivityOutcome.Chosen);
+        browser.NeedsReview
+            ? new RouteDecision(RouteKind.Failed, url, $"{browser.Name} needs review on the Browsers page first.")
+            : Launch(browser, url, SourceApp.Sanitize(source), ActivityOutcome.Chosen);
 
     /// <summary>
     /// Saves a rule made from a chooser decision. <paramref name="lifetime"/> null means permanent.

@@ -160,8 +160,10 @@ public sealed partial class ChooserViewModel : ViewModelBase
     {
         var cfg = _config.Current;
         Browsers.Clear();
-        for (var i = 0; i < cfg.Browsers.Count; i++)
-            Browsers.Add(new BrowserChoiceViewModel(cfg.Browsers[i], i + 1));
+        // Imported browsers awaiting review aren't offered: picking one would run a program nobody has looked at.
+        var usable = cfg.Browsers.Where(b => !b.NeedsReview).ToList();
+        for (var i = 0; i < usable.Count; i++)
+            Browsers.Add(new BrowserChoiceViewModel(usable[i], i + 1));
         OnPropertyChanged(nameof(HasBrowsers));
 
         var kind = Remember?.Kind ?? RememberKind.Once;

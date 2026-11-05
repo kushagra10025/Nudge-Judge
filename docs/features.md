@@ -84,9 +84,18 @@ Shows every link handled, the app it was opened from, and the rule or choice tha
 
 **Settings → Backup and sharing** saves your rules and browsers to a JSON file (**Export…**) and loads them back (**Import…**). App settings and temporary rules from the chooser aren't included.
 
-Importing merges by id. A rule or browser with the same id as one you have replaces it, so importing your own backup restores it in place. Anything new is added at the end of the list, so someone else's rules go below yours. Files from newer versions of NudgeJudge, and files that aren't exports, are refused without changing anything.
+Import shows a review first, and nothing changes until you press **Import** there. It lists every browser with the exact program and arguments it runs, and every rule with the browser it will send links to. Choose how the file is applied:
 
-Only import files you trust: each browser entry is a program and its arguments, and NudgeJudge runs it when a link is routed there.
+- **Add as new** (the default for someone else's file): everything gets a new id and goes below your own rules. Nothing you have can be replaced.
+- **Restore a backup** (the default when the file shares ids with your setup): rules and browsers with the same id as yours replace them.
+
+Either way:
+
+- **A browser's program never changes silently.** If a file would change the program or arguments behind one of your browsers, the review shows old and new side by side. Unless you tick the box to allow it, the import's version is added next to yours as "*name* (imported)" and yours is left alone.
+- **Identical browsers aren't duplicated.** An imported browser that runs exactly what one of yours does reuses yours.
+- **Suspicious browsers need review.** A browser is flagged if its program isn't a browser NudgeJudge recognises, is a script or interpreter (`.sh`, `.bat`, `powershell`, …), isn't installed, or has risky arguments (`--load-extension`, `--remote-debugging-port`, `--disable-web-security`, `--user-data-dir`, …). It's imported marked **Needs review**: rules that use it ask instead, the chooser doesn't offer it, and Try is off, until you open it on the Browsers page and save it.
+- **Redirected rules are called out.** When restoring would make one of your rules open in a different browser, the review says so.
+- **The file itself is checked.** Files that aren't exports, are from a newer version, are over 4 MB, or exceed the limits (200 browsers, 1,000 rules, 50 conditions per level, 100 alternatives per condition) are refused, as are program paths or arguments with control characters. Names lose control and text-direction characters and are cut to 200 characters.
 
 ## Tray menu
 

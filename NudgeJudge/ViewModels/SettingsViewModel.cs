@@ -163,15 +163,29 @@ public sealed partial class SettingsViewModel : ViewModelBase
             var info = new FileInfo(path);
             if (info.Length > ConfigTransfer.MaxFileBytes) throw new InvalidDataException("That file is too big to be a NudgeJudge export.");
             var export = ConfigTransfer.Read(await File.ReadAllBytesAsync(path));
-            ImportResult? result = null;
-            _config.Update(c => result = ConfigTransfer.Apply(c, export));
-            ShowTransfer(result!.Describe(), failed: false);
+            // Nothing changes yet: the review shows what would, and Import there applies it.
+            TransferMessage = null;
+            ImportReview = new ImportReviewViewModel(_config, export, Path.GetFileName(path), result =>
+            {
+                ImportReview = null;
+                if (result is not null) ShowTransfer(result.Describe(), failed: false);
+            }, ProgramExists);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             ShowTransfer(e is InvalidDataException ? e.Message : "Couldn't import: " + e.Message, failed: true);
         }
     }
+
+    /// <summary>The import being reviewed, if any.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReviewingImport))]
+    public partial ImportReviewViewModel? ImportReview { get; set; }
+
+    public bool IsReviewingImport => ImportReview is not null;
+
+    /// <summary>How the import review checks a program is installed. Tests replace it; null looks on disk and PATH.</summary>
+    public Func<string, bool>? ProgramExists { get; set; }
 
     private void ShowTransfer(string message, bool failed)
     {
