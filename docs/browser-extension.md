@@ -342,13 +342,17 @@ repository as the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. Signing an unli
 few minutes. A prerelease tag (`v0.3.0-beta.1`) signs as `0.3.0`, so two prereleases of the same version can't
 both be signed.
 
-`.github/workflows/extension.yml` checks every change under `NudgeJudge.Extension/` (type check, tests, store
-packages as a downloadable artifact).
+The same job also builds the **store packages** with the release's version and keeps them as that run's artifact,
+`nudgejudge-extension-store-<version>`. They aren't attached to the release: the Chromium store package has no key,
+so it would look installable but couldn't reach the app.
+
+`.github/workflows/extension.yml` is only a check. On every push or PR that touches `NudgeJudge.Extension/`, it runs
+the type check and tests and builds both browsers. It produces nothing to ship, and a tag never triggers it.
 
 ### In the stores, later
 
-1. Download the store packages from the extension workflow's artifact (`npm run zip` builds the Chromium one without
-   the key).
+1. Open the release workflow run for the version you're publishing and download the `nudgejudge-extension-store-<version>`
+   artifact. Each store needs a higher version than the last upload, which a new app release always gives.
 2. Upload them:
    - **Chrome Web Store** ([dashboard](https://chrome.google.com/webstore/devconsole)): the `chrome` zip. On first
      upload, copy the item ID into `NativeHostRegistration.ChromiumExtensionIds`.

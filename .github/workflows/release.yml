@@ -107,9 +107,9 @@ jobs:
           --upload-source-code ".output/nudgejudge-extension-$VERSION-sources.zip"
           --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
           && mv .output/signed/*.xpi ".output/nudgejudge-extension-$VERSION-firefox.xpi"
-      - name: Keep the unsigned Firefox build when it wasn't signed
+      - name: Attach the unsigned Firefox build when it wasn't signed
         if: env.AMO_JWT_ISSUER == ''
-        run: mv ".output/nudgejudge-extension-$VERSION-firefox.zip" ".output/nudgejudge-extension-$VERSION-firefox-unsigned.zip"
+        run: cp ".output/nudgejudge-extension-$VERSION-firefox.zip" ".output/nudgejudge-extension-$VERSION-firefox-unsigned.zip"
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -117,3 +117,14 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber
           ".output/nudgejudge-extension-$VERSION-chromium.zip"
           $(ls .output/nudgejudge-extension-$VERSION-firefox.xpi .output/nudgejudge-extension-$VERSION-firefox-unsigned.zip 2>/dev/null)
+      # Store packages for later uploads, with this release's version: the Chromium one without the development key
+      # (stores assign their own ID), the Firefox one with its sources. Kept as this run's artifact, not on the
+      # release, where the keyless Chromium build would look installable but couldn't reach the app.
+      - run: npm run zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nudgejudge-extension-store-${{ env.VERSION }}
+          path: |
+            NudgeJudge.Extension/.output/nudgejudge-extension-*-chrome.zip
+            NudgeJudge.Extension/.output/nudgejudge-extension-*-firefox.zip
+            NudgeJudge.Extension/.output/nudgejudge-extension-*-sources.zip

@@ -1,9 +1,7 @@
-# Builds the browser extension (NudgeJudge.Extension/) for Chromium browsers and Firefox on every change to it,
-# and keeps the store packages as the run's artifact. Uploading them to the Chrome Web Store, Edge Add-ons and
-# Firefox Add-ons is manual (docs/browser-extension.md#publishing).
-#
-# Deliberately no GitHub release: the app's updater reads this repository's releases, and one without Velopack's
-# feed in it must not become the latest.
+# Checks the browser extension (NudgeJudge.Extension/) on every change to it: type check, tests, and a build for
+# Chromium browsers and Firefox. A check only: what ships is built by release.yml's `extension` job, with the
+# release's version (the files users install, attached to the release, and the store packages, kept as that run's
+# artifact). See docs/browser-extension.md#publishing.
 name: Extension
 
 on:
@@ -33,11 +31,6 @@ jobs:
       - run: npm ci
       - run: npm run compile
       - run: npm test
-      # Store packages: no development key in the Chromium one; the Firefox one comes with the sources AMO asks for.
-      - run: npm run zip
-      - run: npm run zip:firefox
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nudgejudge-extension
-          path: NudgeJudge.Extension/.output/*.zip
+      - run: npm run build
+      - run: npm run build:firefox
 
