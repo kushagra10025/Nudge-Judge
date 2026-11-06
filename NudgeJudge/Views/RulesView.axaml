@@ -306,93 +306,27 @@
       <ScrollViewer Grid.Row="3" Padding="0,0,0,24">
         <Panel>
 
-          <!-- First run: the user decides whether to start from samples -->
-          <!-- Full width like the lists; only the text measure is capped -->
+          <!-- No rules yet: the setup steps live on Get started; here, just the way to add one -->
           <Border Classes="surface" Padding="24,22" Margin="0,8,0,0" VerticalAlignment="Top"
-                  IsVisible="{Binding ShowWelcome}">
+                  IsVisible="{Binding ShowSetup}">
             <StackPanel Spacing="16">
               <StackPanel Spacing="6" MaxWidth="640" HorizontalAlignment="Left">
-                <TextBlock Classes="h2" Text="How would you like to start?" />
-                <TextBlock Classes="body muted"
-                           Text="Rules decide which browser opens each link. Start with an empty list and build your own, or load a sample setup to see how rules and browsers work together first." />
-                <TextBlock Classes="body muted"
-                           Text="Samples are marked as such and can be removed at any time. Scanning for your installed browsers replaces them." />
+                <TextBlock Classes="h2" Text="No rules yet" />
+                <TextBlock Classes="body muted" TextWrapping="Wrap"
+                           Text="A rule pairs a pattern with the browser it opens in. New here? Get started walks through finding your browsers and making NudgeJudge your default browser." />
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Command="{Binding StartEmptyCommand}" Content="Start empty" />
-                <Button Command="{Binding LoadSamplesCommand}" Content="Load sample setup" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-
-          <!-- No rules yet: the three steps that get links routing -->
-          <StackPanel IsVisible="{Binding ShowSetup}" Margin="0,4,0,0" VerticalAlignment="Top">
-            <TextBlock Classes="h2" Text="Get links routing" Margin="12,0,0,4" />
-            <TextBlock Classes="body muted" Margin="12,0,0,16" MaxWidth="640" HorizontalAlignment="Left"
-                       Text="Three steps. After that, links from other apps go straight to the right browser." />
-
-            <Border Classes="row" Padding="12,12">
-              <Grid ColumnDefinitions="Auto,*,Auto">
-                <Border Classes="junction" Classes.done="{Binding HasBrowsers}" Margin="0,0,14,0" VerticalAlignment="Top">
-                  <Panel>
-                    <TextBlock Text="1" IsVisible="{Binding NeedsBrowsers}" />
-                    <c:Icon Data="{StaticResource Icon.Check}" IsVisible="{Binding HasBrowsers}" />
-                  </Panel>
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" MaxWidth="640" HorizontalAlignment="Left">
-                  <TextBlock Text="Find your browsers" FontWeight="SemiBold" />
-                  <TextBlock Classes="small muted" Text="{Binding BrowsersStepDetail}" TextWrapping="Wrap" />
-                </StackPanel>
-                <Panel Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center">
-                  <Button Classes="accent" Command="{Binding FindBrowsersCommand}" IsVisible="{Binding NeedsBrowsers}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <c:Icon Data="{StaticResource Icon.Browsers}" />
-                      <TextBlock Text="Find browsers" />
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Content="Scan again" Command="{Binding FindBrowsersCommand}" IsVisible="{Binding HasBrowsers}" />
-                </Panel>
-              </Grid>
-            </Border>
-
-            <Border Classes="row" Padding="12,12">
-              <Grid ColumnDefinitions="Auto,*,Auto">
-                <Border Classes="junction" Margin="0,0,14,0" VerticalAlignment="Top">
-                  <TextBlock Text="2" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" MaxWidth="640" HorizontalAlignment="Left">
-                  <TextBlock Text="Add your first rule" FontWeight="SemiBold" />
-                  <TextBlock Classes="small muted" TextWrapping="Wrap"
-                             Text="A pattern and the browser it opens in. The chooser can also save one when you pick ‘Always’." />
-                </StackPanel>
-                <Button Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center" Classes.accent="{Binding HasBrowsers}"
-                        Command="{Binding NewRuleCommand}" IsEnabled="{Binding HasBrowsers}" HotKey="Ctrl+N">
+                <Button Classes.accent="{Binding HasBrowsers}" Command="{Binding NewRuleCommand}" IsEnabled="{Binding HasBrowsers}"
+                        HotKey="Ctrl+N" ToolTip.Tip="New rule (Ctrl+N)">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:Icon Data="{StaticResource Icon.Plus}" />
                     <TextBlock Text="Add rule" />
                   </StackPanel>
                 </Button>
-              </Grid>
-            </Border>
-
-            <Border Classes="row" Padding="12,12">
-              <Grid ColumnDefinitions="Auto,*,Auto">
-                <Border Classes="junction" Classes.done="{Binding Settings.IsRegistered}" Margin="0,0,14,0" VerticalAlignment="Top">
-                  <Panel>
-                    <TextBlock Text="3" IsVisible="{Binding Settings.NeedsSetup}" />
-                    <c:Icon Data="{StaticResource Icon.Check}" IsVisible="{Binding Settings.IsRegistered}" />
-                  </Panel>
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center" MaxWidth="640" HorizontalAlignment="Left">
-                  <TextBlock Text="Make NudgeJudge your default browser" FontWeight="SemiBold" />
-                  <TextBlock Classes="small muted" TextWrapping="Wrap"
-                             Text="So links from mail, chat and the terminal come here first." />
-                </StackPanel>
-                <Button Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center" Content="Open setup"
-                        Command="{Binding OpenSetupCommand}" IsVisible="{Binding Settings.NeedsSetup}" />
-              </Grid>
-            </Border>
-          </StackPanel>
+                <Button Classes.accent="{Binding NeedsBrowsers}" Command="{Binding OpenGetStartedCommand}" Content="Get started" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
 
           <ItemsControl x:Name="RuleList" ItemsSource="{Binding Rules}" Classes.paused="{Binding ShowRoutingOff}">
             <ItemsControl.ItemTemplate>

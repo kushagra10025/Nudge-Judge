@@ -72,7 +72,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RoutingLabel), nameof(RoutingDetail), nameof(SignalLabel), nameof(SignalDetail),
-        nameof(SignalOn), nameof(SignalOff))]
+        nameof(SignalOn), nameof(SignalOff), nameof(RoutingSwitchTip))]
     public partial bool RoutingEnabled { get; set; }
 
     [ObservableProperty]
@@ -119,13 +119,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(CanRegister), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn),
-        nameof(SignalOff))]
+        nameof(SignalOff), nameof(RoutingSwitchTip))]
     public partial bool IsRegistered { get; set; }
 
     /// <summary>False until the OS has been asked once, so nothing claims "not default" before we know.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(CanRegister), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn),
-        nameof(SignalOff))]
+        nameof(SignalOff), nameof(RoutingSwitchTip))]
     public partial bool RegistrationChecked { get; set; }
 
     /// <summary>NudgeJudge isn't the system's default browser, so no links reach it whatever routing says.</summary>
@@ -138,7 +138,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public bool SignalOn => !NeedsSetup && RoutingEnabled;
     public bool SignalOff => !NeedsSetup && !RoutingEnabled;
     public string SignalLabel => NeedsSetup ? "Not default yet" : RoutingLabel;
-    public string SignalDetail => NeedsSetup ? "Links can't reach it" : RoutingDetail;
+
+    // Not default yet, the switch can still read "on" (routing is on out of the box), so say plainly that it has
+    // nothing to act on until links can reach NudgeJudge.
+    public string SignalDetail => NeedsSetup
+        ? $"Routing is {(RoutingEnabled ? "on" : "off")}, but no links reach NudgeJudge until it's your default browser"
+        : RoutingDetail;
+
+    public string RoutingSwitchTip => (NeedsSetup, RoutingEnabled) switch
+    {
+        (true, true) => "Routing is on, and takes effect once NudgeJudge is your default browser",
+        (true, false) => "Routing is off. Turn it on so links follow your rules once NudgeJudge is your default browser",
+        (false, true) => "Routing is on: links follow your rules. Turn off to pause them",
+        (false, false) => "Routing is off: rules are paused. Turn on to route links by rules",
+    };
 
     public string RoutingLabel => RoutingEnabled ? "Routing on" : "Routing off";
 

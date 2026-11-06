@@ -11,7 +11,8 @@ public interface IWindowService
     void Quit();
 }
 
-public enum AppPage { Rules, Browsers, Activity, Settings }
+/// <summary>Sidebar pages, in sidebar order (the index is the nav list's SelectedIndex).</summary>
+public enum AppPage { GetStarted, Rules, Browsers, Activity, Settings }
 
 public interface IThemeService
 {

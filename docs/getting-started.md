@@ -35,7 +35,9 @@ dotnet publish NudgeJudge.Desktop -c Release -r linux-x64   # or win-x64
 
 ## First run
 
-On first run, the Rules page asks how you want to start: empty, or with a **sample** setup of browsers and rules (marked "Sample" in the UI). Nothing is created unless you pick the samples. They can be removed from the Rules page at any time, and a browser scan replaces them with the browsers you have installed.
+On first run, NudgeJudge opens on the **Get started** page, which asks how you want to start: empty, or with a **sample** setup of browsers and rules (marked "Sample" in the UI). Nothing is created unless you pick the samples. They can be removed from the Rules page at any time, and a browser scan replaces them with the browsers you have installed.
+
+Get started then lists the four steps to routed links: find your browsers, add a rule, make NudgeJudge your default browser, and keep routing on. Routing is on out of the box, but it has nothing to act on until NudgeJudge is the default browser; the sidebar signal says so. Get started stays first in the sidebar until there are rules and NudgeJudge is the default browser.
 
 Then go to **Settings → Make default** so links reach NudgeJudge. See [Default-browser setup](features.md#default-browser-setup).
 

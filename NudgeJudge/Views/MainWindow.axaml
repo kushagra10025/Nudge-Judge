@@ -9,6 +9,13 @@
         Width="1200" Height="760" MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen">
 
+  <Window.Styles>
+    <!-- The routing switch while links can't reach NudgeJudge: still usable, but visibly not in effect -->
+    <Style Selector="ToggleSwitch.dormant">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+  </Window.Styles>
+
   <Grid ColumnDefinitions="224,*">
 
     <!-- Signalling panel -->
@@ -25,6 +32,16 @@
 
         <ListBox Grid.Row="1" Classes="nav" SelectedIndex="{Binding SelectedPageIndex}"
                  AutomationProperties.Name="Sections">
+          <!-- First in the list and selected on first launch; leaves once there's nothing left to set up -->
+          <ListBoxItem IsVisible="{Binding ShowGetStarted}">
+            <Grid ColumnDefinitions="10,Auto,*">
+              <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <c:Icon Data="{StaticResource Icon.Arrow}" />
+                <TextBlock Text="Get started" />
+              </StackPanel>
+            </Grid>
+          </ListBoxItem>
           <ListBoxItem>
             <Grid ColumnDefinitions="10,Auto,*">
               <Ellipse Classes="lamp" Width="5" Height="5" HorizontalAlignment="Left" />
@@ -95,7 +112,8 @@
             </Grid>
           </Border>
 
-          <!-- Routing signal: not receiving links, then on / off -->
+          <!-- Routing signal: not receiving links, then on / off. Not default yet, the switch is dimmed and the detail
+               says it has nothing to act on, so an "on" switch doesn't read as links being routed. -->
           <Border Background="{StaticResource PanelRaisedBrush}" CornerRadius="8" Padding="12">
             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
               <Panel Width="14" Height="14" Margin="0,2,10,0" VerticalAlignment="Top">
@@ -107,7 +125,8 @@
                          Foreground="{StaticResource PanelInkBrush}" />
               <ToggleSwitch Grid.Column="2" Grid.RowSpan="2" IsChecked="{Binding Settings.RoutingEnabled}"
                             OnContent="" OffContent="" MinWidth="0" Margin="0,-6,-8,0" VerticalAlignment="Top"
-                            ToolTip.Tip="Route links by rules" AutomationProperties.Name="Route links by rules">
+                            Classes.dormant="{Binding Settings.NeedsSetup}"
+                            ToolTip.Tip="{Binding Settings.RoutingSwitchTip}" AutomationProperties.Name="Route links by rules">
                 <!-- The panel is dark in every theme, so the switch uses panel ink rather than the page's -->
                 <ToggleSwitch.Resources>
                   <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#DCE8E1" />
@@ -127,7 +146,7 @@
               </ToggleSwitch>
               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.SignalDetail}" FontSize="12"
                          TextWrapping="Wrap" Foreground="{StaticResource PanelMutedBrush}" Margin="0,2,0,0" />
-              <Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="panel-link" Content="Set up"
+              <Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="panel-link" Content="Make default browser"
                       Command="{Binding OpenSetupCommand}" IsVisible="{Binding Settings.NeedsSetup}" Margin="0,8,0,0" />
             </Grid>
           </Border>

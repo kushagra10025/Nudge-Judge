@@ -37,7 +37,7 @@ The sidebar signal shows the one state that matters most, in this order:
 
 | State | Lamp | Label |
 |---|---|---|
-| Not the default browser | hollow ring | "Not default yet" + a **Set up** button to Settings |
+| Not the default browser | hollow ring | "Not default yet", a detail saying routing is on/off but no links reach NudgeJudge, a dimmed switch, and a **Make default browser** button to Settings |
 | Routing off | stop red | "Routing off" |
 | Routing on | proceed green | "Routing on" |
 
@@ -88,7 +88,7 @@ Stroke icons drawn by [Controls/Icon.cs](NudgeJudge/Controls/Icon.cs) from `Icon
 - **Activity outcomes:** a lamp and a word. Amber = a rule routed it, ink = you chose, hollow = the chooser asked, stop = failed or rejected.
 - **Needs review** (an imported browser that looked suspicious): a stop badge on the browser row with one trimmed line under the program ("Needs review: runs a script · risky arguments", full reasons in the tooltip). The editor opens with a `notice stop` listing one reason per line, risky arguments in mono, and the save button reads **Save as reviewed**. Activity rows held back by one show **Review browser** at rest, and the chooser notes how many it left out.
 - **Import review** (Settings): a counted `notice stop` ("1 browser would run a different program · 1 rule will open somewhere else"), then per section the items needing a look in full, then one ghost toggle ("7 rules more, nothing to check"). Rule lines reuse `ConditionSummary`; destinations that need review get a stop badge, not parentheses. Rows update in place when a choice changes, so nothing moves under the pointer. Radios, like checkboxes, are ink when on.
-- **Setup checklist:** with no rules, the Rules page shows three numbered junction steps (find browsers, first rule, default browser). Done steps show a proceed check in the junction; the next step's button is the accent.
+- **Setup checklist:** the **Get started** page (first in the sidebar, selected on launch while there are no rules, hidden once there are rules and NudgeJudge is the default browser) shows four numbered junction steps (find browsers, first rule, default browser, routing on). With no rules, the Rules page shows a short empty state with **Add rule** and **Get started**. Done steps show a proceed check in the junction; the next step's button is the accent.
 
 ## Chooser
 

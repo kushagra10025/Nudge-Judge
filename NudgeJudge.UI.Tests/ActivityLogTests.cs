@@ -348,7 +348,33 @@ public sealed class ActivityLogTests : IDisposable
         Assert.Single(CreateRuleButtons(window));
     }
 
-    // ---- Helpers ----
+    [AvaloniaFact]
+    public void First_launch_opens_on_get_started_and_later_launches_on_rules()
+    {
+        var fresh = new Harness(LogPath, withRule: false);
+        Assert.Equal((int)AppPage.GetStarted, fresh.Main.SelectedPageIndex);
+        Assert.IsType<GettingStartedViewModel>(fresh.Main.CurrentPage);
+        Assert.True(fresh.Main.ShowGetStarted);
+
+        var returning = new Harness(LogPath);
+        Assert.Equal((int)AppPage.Rules, returning.Main.SelectedPageIndex);
+    }
+
+    [AvaloniaFact]
+    public async Task Get_started_leaves_the_sidebar_once_there_are_rules_and_links_reach_nudgejudge()
+    {
+        var app = new Harness(LogPath);
+        app.Main.Navigate(AppPage.Rules);
+        await app.Settings.RefreshRegistrationCommand.ExecuteAsync(null);
+        Assert.True(app.Main.ShowGetStarted); // not the default browser yet
+        Assert.Contains("no links reach NudgeJudge", app.Settings.SignalDetail);
+
+        await app.Settings.RegisterCommand.ExecuteAsync(null);
+        Assert.False(app.Main.ShowGetStarted);
+        Assert.True(app.Main.GettingStarted.IsComplete);
+    }
+
+
 
     /// <summary>Everything the main window needs, wired as in App.Compose, with the log file at <paramref name="logPath"/>.</summary>
     private sealed class Harness

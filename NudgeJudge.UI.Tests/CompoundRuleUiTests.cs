@@ -146,7 +146,7 @@ public sealed class CompoundRuleUiTests : IDisposable
         Settle(window);
 
         // The browser opens in its editor with the reasons listed and a save that says what it does.
-        Assert.Equal(1, app.Main.SelectedPageIndex);
+        Assert.Equal((int)AppPage.Browsers, app.Main.SelectedPageIndex);
         var editor = app.Main.Browsers.Editor;
         Assert.Equal(imported.Id, editor.EditingId);
         Assert.Equal("Save as reviewed", editor.SaveLabel);

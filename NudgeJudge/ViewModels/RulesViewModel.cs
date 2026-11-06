@@ -50,8 +50,8 @@ public sealed partial class RulesViewModel : ViewModelBase
     /// <summary>First run: nothing configured yet and the user hasn't picked samples or an empty start.</summary>
     public bool ShowWelcome => _config.Current.Settings.OfferSamples && !HasRules && !HasBrowsers;
 
-    /// <summary>No rules yet: a three-step checklist (browsers, first rule, default browser) instead of a blank page.</summary>
-    public bool ShowSetup => !HasRules && !ShowWelcome;
+    /// <summary>No rules yet: a short empty state pointing at Get started, where the setup steps live.</summary>
+    public bool ShowSetup => !HasRules;
 
     public bool NeedsBrowsers => !HasBrowsers;
     public string BrowsersStepDetail => Browsers.Count switch
@@ -177,7 +177,7 @@ public sealed partial class RulesViewModel : ViewModelBase
     private void TurnOnRouting() => _config.Update(c => c.Settings.RoutingEnabled = true);
 
     [RelayCommand]
-    private void OpenSetup() => _windows.ShowMainWindow(AppPage.Settings);
+    private void OpenGetStarted() => _windows.ShowMainWindow(AppPage.GetStarted);
 
     [RelayCommand]
     private void FindBrowsers()
