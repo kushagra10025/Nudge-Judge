@@ -301,6 +301,9 @@
   <Style Selector="Border.notice.stop Ellipse.lamp">
     <Setter Property="Fill" Value="{DynamicResource StopBrush}" />
   </Style>
+  <Style Selector="Border.notice.proceed Ellipse.lamp">
+    <Setter Property="Fill" Value="{DynamicResource ProceedBrush}" />
+  </Style>
 
   <!-- Status lamps (Activity outcomes) -->
   <Style Selector="Ellipse.status">

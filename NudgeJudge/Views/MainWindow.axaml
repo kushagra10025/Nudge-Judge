@@ -10,9 +10,26 @@
         WindowStartupLocation="CenterScreen">
 
   <Window.Styles>
-    <!-- The routing switch while links can't reach NudgeJudge: still usable, but visibly not in effect -->
-    <Style Selector="ToggleSwitch.dormant">
-      <Setter Property="Opacity" Value="0.55" />
+    <!-- The routing switch on the signalling panel: dark in every theme, so it uses panel ink rather than the page's -->
+    <Style Selector="ToggleSwitch.panel">
+      <Setter Property="OnContent" Value="" />
+      <Setter Property="OffContent" Value="" />
+      <Setter Property="MinWidth" Value="0" />
+      <Style.Resources>
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#DCE8E1" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F2F7F4" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C3D3CA" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#DCE8E1" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#0F1F18" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#0F1F18" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#0F1F18" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#21382E" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#8DA89A" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#DCE8E1" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#8DA89A" />
+        <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#DCE8E1" />
+      </Style.Resources>
     </Style>
   </Window.Styles>
 
@@ -112,10 +129,11 @@
             </Grid>
           </Border>
 
-          <!-- Routing signal: not receiving links, then on / off. Not default yet, the switch is dimmed and the detail
-               says it has nothing to act on, so an "on" switch doesn't read as links being routed. -->
+          <!-- Routing signal: not receiving links, then on / off. Once links reach NudgeJudge the label names the
+               switch beside it. Before that the card leads with what's wrong and how to fix it, and the switch moves
+               to its own labelled row, so it never reads as the control for "not receiving links". -->
           <Border Background="{StaticResource PanelRaisedBrush}" CornerRadius="8" Padding="12">
-            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
               <Panel Width="14" Height="14" Margin="0,2,10,0" VerticalAlignment="Top">
                 <Ellipse Fill="{StaticResource PanelProceedBrush}" IsVisible="{Binding Settings.SignalOn}" />
                 <Ellipse Fill="{StaticResource PanelStopBrush}" IsVisible="{Binding Settings.SignalOff}" />
@@ -123,31 +141,30 @@
               </Panel>
               <TextBlock Grid.Column="1" Text="{Binding Settings.SignalLabel}" FontWeight="SemiBold" TextWrapping="Wrap"
                          Foreground="{StaticResource PanelInkBrush}" />
-              <ToggleSwitch Grid.Column="2" Grid.RowSpan="2" IsChecked="{Binding Settings.RoutingEnabled}"
-                            OnContent="" OffContent="" MinWidth="0" Margin="0,-6,-8,0" VerticalAlignment="Top"
-                            Classes.dormant="{Binding Settings.NeedsSetup}"
-                            ToolTip.Tip="{Binding Settings.RoutingSwitchTip}" AutomationProperties.Name="Route links by rules">
-                <!-- The panel is dark in every theme, so the switch uses panel ink rather than the page's -->
-                <ToggleSwitch.Resources>
-                  <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#DCE8E1" />
-                  <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F2F7F4" />
-                  <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C3D3CA" />
-                  <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#DCE8E1" />
-                  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#0F1F18" />
-                  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#0F1F18" />
-                  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#0F1F18" />
-                  <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
-                  <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#21382E" />
-                  <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="#8DA89A" />
-                  <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#DCE8E1" />
-                  <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#8DA89A" />
-                  <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#DCE8E1" />
-                </ToggleSwitch.Resources>
-              </ToggleSwitch>
+              <ToggleSwitch Grid.Column="2" Grid.RowSpan="2" Classes="panel" IsChecked="{Binding Settings.RoutingEnabled}"
+                            IsVisible="{Binding !Settings.NeedsSetup}" Margin="0,-6,-8,0" VerticalAlignment="Top"
+                            ToolTip.Tip="{Binding Settings.RoutingSwitchTip}" AutomationProperties.Name="Route links by rules" />
               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Settings.SignalDetail}" FontSize="12"
                          TextWrapping="Wrap" Foreground="{StaticResource PanelMutedBrush}" Margin="0,2,0,0" />
-              <Button Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="panel-link" Content="Make default browser"
-                      Command="{Binding OpenSetupCommand}" IsVisible="{Binding Settings.NeedsSetup}" Margin="0,8,0,0" />
+              <Panel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,8,0,0" IsVisible="{Binding Settings.NeedsSetup}">
+                <Button Classes="panel-link" Content="Make default browser" Command="{Binding Settings.RegisterCommand}"
+                        IsVisible="{Binding Settings.CanRegister}" />
+                <Button Classes="panel-link" Content="Set up" Command="{Binding OpenSetupCommand}"
+                        IsVisible="{Binding !Settings.CanRegister}" />
+              </Panel>
+
+              <!-- Not receiving links: the switch on its own row, saying when it takes effect -->
+              <Border Grid.Row="3" Grid.ColumnSpan="3" IsVisible="{Binding Settings.NeedsSetup}"
+                      BorderBrush="{StaticResource PanelLineBrush}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,10,0,0">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="24,0,0,0">
+                  <TextBlock Text="Routing" FontWeight="SemiBold" Foreground="{StaticResource PanelInkBrush}" />
+                  <TextBlock Grid.Row="1" Text="{Binding Settings.RoutingSwitchCaption}" FontSize="12" TextWrapping="Wrap"
+                             Foreground="{StaticResource PanelMutedBrush}" Margin="0,2,0,0" />
+                  <ToggleSwitch Grid.Column="1" Grid.RowSpan="2" Classes="panel" IsChecked="{Binding Settings.RoutingEnabled}"
+                                Margin="8,-6,-8,0" VerticalAlignment="Top"
+                                ToolTip.Tip="{Binding Settings.RoutingSwitchTip}" AutomationProperties.Name="Route links by rules" />
+                </Grid>
+              </Border>
             </Grid>
           </Border>
         </StackPanel>

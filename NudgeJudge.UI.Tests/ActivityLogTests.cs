@@ -367,14 +367,31 @@ public sealed class ActivityLogTests : IDisposable
         app.Main.Navigate(AppPage.Rules);
         await app.Settings.RefreshRegistrationCommand.ExecuteAsync(null);
         Assert.True(app.Main.ShowGetStarted); // not the default browser yet
-        Assert.Contains("no links reach NudgeJudge", app.Settings.SignalDetail);
+        Assert.Equal("Not receiving links", app.Settings.SignalLabel);
+        Assert.Equal("NudgeJudge isn't your default browser yet", app.Settings.SignalDetail);
+        Assert.Equal(3, app.Main.GettingStarted.NextStep);
 
         await app.Settings.RegisterCommand.ExecuteAsync(null);
         Assert.False(app.Main.ShowGetStarted);
+        Assert.Equal(0, app.Main.GettingStarted.NextStep);
         Assert.True(app.Main.GettingStarted.IsComplete);
     }
 
+    [AvaloniaFact]
+    public void Routing_is_a_step_only_while_it_is_off()
+    {
+        var app = new Harness(LogPath, withRule: false);
+        var steps = app.Main.GettingStarted;
+        Assert.False(steps.ShowRoutingStep);
+        Assert.StartsWith("Three steps", steps.StepsIntro);
+        Assert.Equal(2, steps.NextStep); // browsers are there; the rule is next
 
+        app.Settings.RoutingEnabled = false;
+        Assert.True(steps.ShowRoutingStep);
+        Assert.StartsWith("Four steps", steps.StepsIntro);
+    }
+
+    // ---- Helpers ----
 
     /// <summary>Everything the main window needs, wired as in App.Compose, with the log file at <paramref name="logPath"/>.</summary>
     private sealed class Harness

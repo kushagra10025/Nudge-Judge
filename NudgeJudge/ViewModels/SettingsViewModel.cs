@@ -72,7 +72,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RoutingLabel), nameof(RoutingDetail), nameof(SignalLabel), nameof(SignalDetail),
-        nameof(SignalOn), nameof(SignalOff), nameof(RoutingSwitchTip))]
+        nameof(SignalOn), nameof(SignalOff), nameof(RoutingSwitchTip), nameof(RoutingSwitchCaption))]
     public partial bool RoutingEnabled { get; set; }
 
     [ObservableProperty]
@@ -115,7 +115,17 @@ public sealed partial class SettingsViewModel : ViewModelBase
         (OperatingSystem.IsMacOS() ? "⌥⇧-click" : OperatingSystem.IsWindows() ? "Alt+Shift+click" : "Ctrl+Alt+click") +
         " a link, or right-click it and pick Open with NudgeJudge.";
 
-    [ObservableProperty] public partial string RegistrationMessage { get; set; } = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignalDetail))]
+    public partial string RegistrationMessage { get; set; } = "";
+
+    /// <summary>
+    /// Set once the user asks to register, so the sidebar and Get started show what happened ("Registering…", an
+    /// error, or Windows' "choose NudgeJudge there") instead of the plain "not default" line.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignalDetail))]
+    public partial bool HasTriedRegistering { get; private set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsSetup), nameof(CanRegister), nameof(SignalLabel), nameof(SignalDetail), nameof(SignalOn),
@@ -137,13 +147,17 @@ public sealed partial class SettingsViewModel : ViewModelBase
     // The sidebar signal shows the one state that matters most: not receiving links at all, then on/off.
     public bool SignalOn => !NeedsSetup && RoutingEnabled;
     public bool SignalOff => !NeedsSetup && !RoutingEnabled;
-    public string SignalLabel => NeedsSetup ? "Not default yet" : RoutingLabel;
+    public string SignalLabel => NeedsSetup ? "Not receiving links" : RoutingLabel;
 
-    // Not default yet, the switch can still read "on" (routing is on out of the box), so say plainly that it has
-    // nothing to act on until links can reach NudgeJudge.
     public string SignalDetail => NeedsSetup
-        ? $"Routing is {(RoutingEnabled ? "on" : "off")}, but no links reach NudgeJudge until it's your default browser"
+        ? HasTriedRegistering && RegistrationMessage.Length > 0 ? RegistrationMessage : "NudgeJudge isn't your default browser yet"
         : RoutingDetail;
+
+    /// <summary>
+    /// Under the sidebar's own "Routing" row while links can't arrive: the switch still works, but it has nothing
+    /// to act on yet, so it says when it takes effect rather than implying links are being routed.
+    /// </summary>
+    public string RoutingSwitchCaption => RoutingEnabled ? "On · takes effect once links arrive" : "Off · rules paused";
 
     public string RoutingSwitchTip => (NeedsSetup, RoutingEnabled) switch
     {
@@ -231,6 +245,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private async Task RegisterAsync()
     {
+        HasTriedRegistering = true;
         RegistrationMessage = "Registering…";
         try
         {

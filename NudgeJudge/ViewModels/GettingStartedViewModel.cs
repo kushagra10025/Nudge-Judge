@@ -12,7 +12,17 @@ public sealed partial class GettingStartedViewModel : ViewModelBase
     private static readonly string[] Derived =
     [
         nameof(ShowSteps), nameof(NeedsRule), nameof(IsComplete), nameof(ShowDone), nameof(HasWorkLeft),
-        nameof(RoutingStepTitle), nameof(RoutingStepDetail),
+        nameof(ShowRoutingStep), nameof(ShowRoutingNote), nameof(StepsIntro), nameof(RoutingStepDetail),
+        nameof(NextStep), nameof(BrowsersNext), nameof(RuleNext), nameof(DefaultNext), nameof(RoutingNext),
+        nameof(ShowRegistrationMessage), nameof(ShowOpenSetup),
+    ];
+
+    private static readonly HashSet<string> Inputs =
+    [
+        nameof(RulesViewModel.HasRules), nameof(RulesViewModel.HasBrowsers), nameof(RulesViewModel.ShowWelcome),
+        nameof(SettingsViewModel.IsRegistered), nameof(SettingsViewModel.NeedsSetup), nameof(SettingsViewModel.RoutingEnabled),
+        nameof(SettingsViewModel.PrimaryBrowser), nameof(SettingsViewModel.RegistrationMessage),
+        nameof(SettingsViewModel.CanRegister), nameof(SettingsViewModel.HasTriedRegistering),
     ];
 
     public GettingStartedViewModel(RulesViewModel rules, SettingsViewModel settings)
@@ -39,13 +49,38 @@ public sealed partial class GettingStartedViewModel : ViewModelBase
     /// <summary>Keeps the page in the sidebar while something still stands between the user and routed links.</summary>
     public bool HasWorkLeft => !Rules.HasRules || Settings.NeedsSetup;
 
-    public string RoutingStepTitle => Settings.RoutingEnabled ? "Routing is on" : "Turn routing on";
+    /// <summary>Routing is on out of the box, so it's only a step when someone has switched it off.</summary>
+    public bool ShowRoutingStep => !Settings.RoutingEnabled;
+
+    /// <summary>With routing on, one line under the steps says what the sidebar switch is for.</summary>
+    public bool ShowRoutingNote => Settings.RoutingEnabled && !IsComplete;
+
+    public string StepsIntro => (ShowRoutingStep ? "Four" : "Three") +
+                                " steps. After that, links from mail, chat and other apps go straight to the right browser.";
 
     public string RoutingStepDetail =>
-        (Settings.RoutingEnabled ? "It's on by default. " : "") +
-        "The switch at the bottom left pauses your rules without deleting them; while it's off, " +
-        (Settings.PrimaryBrowser is { } b ? $"every link opens in {b.Name}." : "every link goes to the chooser.") +
-        " It only has links to work on once NudgeJudge is your default browser.";
+        "Routing is off, so your rules are paused and " +
+        (Settings.PrimaryBrowser is { } b ? $"every link opens in {b.Name}." : "you're asked which browser to use for every link.");
+
+    /// <summary>The first step still to do (1–4), or 0 when nothing is left. Only its button is the accent.</summary>
+    public int NextStep =>
+        !Rules.HasBrowsers ? 1
+        : !Rules.HasRules ? 2
+        : !Settings.IsRegistered ? 3
+        : !Settings.RoutingEnabled ? 4
+        : 0;
+
+    public bool BrowsersNext => NextStep == 1;
+    public bool RuleNext => NextStep == 2;
+    public bool DefaultNext => NextStep == 3;
+    public bool RoutingNext => NextStep == 4;
+
+    /// <summary>What the last registration attempt said, under the step, while there's still something to do.</summary>
+    public bool ShowRegistrationMessage =>
+        Settings.NeedsSetup && Settings.HasTriedRegistering && !string.IsNullOrEmpty(Settings.RegistrationMessage);
+
+    /// <summary>This platform can't make NudgeJudge the default from here, so the step points at Settings instead.</summary>
+    public bool ShowOpenSetup => Settings.NeedsSetup && !Settings.CanRegister;
 
     /// <summary>Raised to open the rule editor, which lives on the Rules page.</summary>
     public event EventHandler? AddRuleRequested;
@@ -53,7 +88,7 @@ public sealed partial class GettingStartedViewModel : ViewModelBase
     /// <summary>Raised to leave for the Rules page.</summary>
     public event EventHandler? OpenRulesRequested;
 
-    /// <summary>Raised to open Settings, where NudgeJudge becomes the default browser.</summary>
+    /// <summary>Raised to open Settings, for platforms where NudgeJudge can't make itself the default.</summary>
     public event EventHandler? OpenSetupRequested;
 
     [RelayCommand] private void AddRule() => AddRuleRequested?.Invoke(this, EventArgs.Empty);
@@ -62,6 +97,7 @@ public sealed partial class GettingStartedViewModel : ViewModelBase
 
     private void Forward(object? sender, PropertyChangedEventArgs e)
     {
-        foreach (var name in Derived) OnPropertyChanged(name);
+        if (e.PropertyName is not { } name || !Inputs.Contains(name)) return;
+        foreach (var derived in Derived) OnPropertyChanged(derived);
     }
 }

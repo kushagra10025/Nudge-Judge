@@ -82,7 +82,7 @@ public sealed class DefaultBrowserSetupTests
         Assert.True(Shows(window, "Links open in another browser."));
         Assert.False(Shows(window, CheckingLabel));
         Assert.True(MakeDefault(window, vm).IsEffectivelyVisible);
-        Assert.Equal("Not default yet", vm.SignalLabel);
+        Assert.Equal("Not receiving links", vm.SignalLabel);
     }
 
     [AvaloniaFact]

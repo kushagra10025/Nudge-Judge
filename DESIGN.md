@@ -37,7 +37,7 @@ The sidebar signal shows the one state that matters most, in this order:
 
 | State | Lamp | Label |
 |---|---|---|
-| Not the default browser | hollow ring | "Not default yet", a detail saying routing is on/off but no links reach NudgeJudge, a dimmed switch, and a **Make default browser** button to Settings |
+| Not the default browser | hollow ring | "Not receiving links" / "NudgeJudge isn't your default browser yet" and **Make default browser** (registers in place; **Set up** opens Settings where it can't). Below a divider, the switch moves to its own **Routing** row with "On · takes effect once links arrive" / "Off · rules paused", so it never reads as the control for the state above |
 | Routing off | stop red | "Routing off" |
 | Routing on | proceed green | "Routing on" |
 
@@ -82,13 +82,13 @@ Stroke icons drawn by [Controls/Icon.cs](NudgeJudge/Controls/Icon.cs) from `Icon
 ## Components
 
 - **Buttons:** accent (amber) for the single primary action in view; secondary buttons are outlined on the surface (`Line` border), and disabled ones lose the fill and border so they never look like the enabled ones; ghost for row and inline actions.
-- **Notices** (`Border.notice`): a sunken strip with one lamp (faint for information, stop for routing off) and at most one inline action. No coloured fills and no coloured edges.
+- **Notices** (`Border.notice`): a sunken strip with one lamp (faint for information, stop for routing off, proceed for setup complete) and at most one inline action. No coloured fills and no coloured edges.
 - **Badges:** neutral by default (Sample, Private, profile, time left). Only "Primary" (proceed) and "Not secure" (stop) carry colour.
 - **Undo toast** (`UndoToast`, `UndoBar`): deleting a rule or browser and clearing Activity happen at once and offer **Undo** for 8 s in a panel-coloured slip at the page foot. No confirmation dialogs.
 - **Activity outcomes:** a lamp and a word. Amber = a rule routed it, ink = you chose, hollow = the chooser asked, stop = failed or rejected.
 - **Needs review** (an imported browser that looked suspicious): a stop badge on the browser row with one trimmed line under the program ("Needs review: runs a script · risky arguments", full reasons in the tooltip). The editor opens with a `notice stop` listing one reason per line, risky arguments in mono, and the save button reads **Save as reviewed**. Activity rows held back by one show **Review browser** at rest, and the chooser notes how many it left out.
 - **Import review** (Settings): a counted `notice stop` ("1 browser would run a different program · 1 rule will open somewhere else"), then per section the items needing a look in full, then one ghost toggle ("7 rules more, nothing to check"). Rule lines reuse `ConditionSummary`; destinations that need review get a stop badge, not parentheses. Rows update in place when a choice changes, so nothing moves under the pointer. Radios, like checkboxes, are ink when on.
-- **Setup checklist:** the **Get started** page (first in the sidebar, selected on launch while there are no rules, hidden once there are rules and NudgeJudge is the default browser) shows four numbered junction steps (find browsers, first rule, default browser, routing on). With no rules, the Rules page shows a short empty state with **Add rule** and **Get started**. Done steps show a proceed check in the junction; the next step's button is the accent.
+- **Setup checklist:** the **Get started** page (first in the sidebar, selected on launch while there are no rules, hidden once there are rules and NudgeJudge is the default browser) shows numbered junction steps: find browsers, first rule, default browser (registered in place with **Make default**; the result shows under the step), plus **Turn routing on** only while routing is off. Only the next step's button is the accent; done steps shrink to their title. When everything is done a `notice proceed` says so. With no rules, the Rules page shows a short empty state with **Add rule** and **Get started**.
 
 ## Chooser
 
