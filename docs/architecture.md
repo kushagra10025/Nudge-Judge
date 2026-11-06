@@ -31,7 +31,7 @@ NudgeJudge.Core/          Plain .NET library with no UI dependencies
 
 NudgeJudge/               Avalonia UI library
   ViewModels/             CommunityToolkit.Mvvm view models; they reach windows only through interfaces in Services/
-  Views/                  MainWindow, the Rules/Browsers/Activity/Settings pages, ChooserWindow
+  Views/                  MainWindow, the Get started/Rules/Browsers/Activity/Settings pages, ChooserWindow
   Controls/               RouteDiagram, MatchKindGlyph, Icon (custom-drawn controls)
   Services/               IWindowService, IDialogService, IThemeService, IUiDispatcher + Avalonia implementations;
                           IUpdateService + its Velopack implementation (GitHub Releases), AppInfo (version, project links)

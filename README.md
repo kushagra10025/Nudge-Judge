@@ -27,6 +27,26 @@ You set NudgeJudge as your system's default browser. When an app opens a link, N
 
 ![A link from Teams passing rules 1 to 3 and diverting at rule 4 to a Chrome work profile](docs/images/how-it-works.svg)
 
+## How to use
+
+![Set up once: find your browsers, add rules, make NudgeJudge your default browser, and optionally add the browser extension. Then every link, whether clicked in an app or sent from inside a browser by the extension, is checked against your rules: a match opens in that rule's browser, and no match opens the chooser, where "Always" turns the choice into a rule](docs/images/how-to-use.svg)
+
+**Set up once.** The first time you open NudgeJudge it starts on **Get started**:
+
+1. **Find your browsers.** NudgeJudge scans for installed browsers, their profiles and private windows. You can also load a sample setup first to see how everything fits together.
+2. **Add a rule.** A rule is a pattern (`*.atlassian.net`, `github.com/acme`, a regex…) and the browser it opens in. Add conditions such as *opened from Teams* or *weekdays 9 to 5* when you need them.
+3. **Make NudgeJudge your default browser** with the **Make default** button. Until you do, links from other apps skip NudgeJudge and the sidebar says **Not receiving links**.
+4. **Optional: add the browser extension** to route links you click *inside* a browser, too. Turn on **Settings → Browser extension**, then [install it](#installing-the-browser-extension).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/getstarted-dark.png">
+  <img alt="The Get started page: browsers found, 'Add your first rule' as the next step, and 'Make default'. The sidebar says Not receiving links, with the routing switch on its own row" src="docs/images/getstarted-light.png">
+</picture>
+
+**Then, for every link.** Click a link in Slack, Teams, mail or a terminal and the system hands it to NudgeJudge. Inside a browser, modifier-click it (<kbd>Ctrl</kbd>+<kbd>Alt</kbd> on Linux, <kbd>Alt</kbd>+<kbd>Shift</kbd> on Windows) or right-click → **Open with NudgeJudge**, and the extension sends it over. Either way, the first rule that matches picks the browser. If none matches, the chooser asks once (press <kbd>1</kbd>–<kbd>9</kbd>), and **Always** saves your answer as a rule.
+
+**Pausing.** The **Routing** switch at the foot of the sidebar pauses your rules without deleting them; while it's off, every link opens in your primary browser. **Activity** shows where each link went and which rule sent it.
+
 > [!IMPORTANT]
 > **Early development.** The UI, rule engine, browser scanning, default-browser registration, start on login (Linux and Windows), single-instance mode and the native (AOT) build work. Packaging and macOS support aren't built yet. See the [roadmap](docs/roadmap.md).
 
@@ -91,7 +111,7 @@ dotnet run --project NudgeJudge.Desktop -- https://example.com   # simulate the 
 dotnet publish NudgeJudge.Desktop -c Release -r linux-x64        # native build (or win-x64)
 ```
 
-Then open **Settings → Make default**. Full instructions, including the native build's toolchain and first-run samples, are in [Getting started](docs/getting-started.md).
+On first launch the app opens on **Get started**, which walks you through finding your browsers, adding a rule and making NudgeJudge your default browser (see [How to use](#how-to-use)). Full instructions, including the native build's toolchain and first-run samples, are in [Getting started](docs/getting-started.md).
 
 ## Installing the browser extension
 
@@ -138,7 +158,7 @@ More, including automatic routing, in [Browser extension](docs/browser-extension
 | Doc | What's in it |
 |---|---|
 | [Features](docs/features.md) | Rules, match types, source-app detection, chooser, activity, updates, default-browser setup |
-| [Getting started](docs/getting-started.md) | Build, run, test and first-run setup |
+| [Getting started](docs/getting-started.md) | Build, run, test and first-run setup (the Get started page) |
 | [Browser extension](docs/browser-extension.md) | Gestures, automatic routing, how it reaches the app, publishing |
 | [Security](docs/security.md) | How untrusted URLs and local messaging are handled |
 | [How data is saved](docs/data-storage.md) | Config paths, atomic writes, recovery, Windows gaps |

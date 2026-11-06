@@ -7,6 +7,15 @@
   <img alt="The Rules page with the link tester open, showing a YouTube link from Teams caught by rule 4" src="images/rules-light.png">
 </picture>
 
+## Get started
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/getstarted-dark.png">
+  <img alt="The Get started page with browsers found, adding the first rule as the next step, and Make default" src="images/getstarted-light.png">
+</picture>
+
+The first page on first launch. It asks whether to start empty or with a sample setup, then lists the steps that get links routing: **find your browsers**, **add your first rule**, and **make NudgeJudge your default browser** (done in place with **Make default**; the result shows under the step). **Turn routing on** appears as a fourth step only if routing has been switched off. Only the next step's button is highlighted, and finished steps shrink to their title. The page stays first in the sidebar until there are rules and NudgeJudge is the default browser, and leaves once you move on.
+
 ## Rules, checked top to bottom
 
 The first rule that matches picks the browser. Every rule has a name (shown in the list and in Activity) and one or more conditions, joined by **all** or **any**. Each condition can be negated ("doesn't match", "is not") and holds any number of alternatives, OR'd together.
@@ -97,6 +106,16 @@ Either way:
 - **Redirected rules are called out.** When restoring would make one of your rules open in a different browser, the review says so.
 - **The file itself is checked.** Files that aren't exports, are from a newer version, are over 4 MB, or exceed the limits (200 browsers, 1,000 rules, 50 conditions per level, 100 alternatives per condition) are refused, as are program paths or arguments with control characters. Names lose control and text-direction characters and are cut to 200 characters.
 
+## Routing switch
+
+The card at the foot of the sidebar shows the one state that matters most:
+
+| State | Shows |
+|---|---|
+| Not the default browser | **Not receiving links**, with **Make default browser**. The **Routing** switch sits on its own row below, saying it takes effect once links arrive |
+| Routing on | **Routing on** · links follow your rules |
+| Routing off | **Routing off** · every link opens in your primary browser (or the chooser, with none set) |
+
 ## Tray menu
 
 Turn routing on or off (when off, links go straight to your primary browser), open the app, or quit. The tray icon belongs to a small background program that holds a few MB. The window is a separate program that closes completely when you close it, giving its memory back.
@@ -116,7 +135,7 @@ Installed copies check GitHub Releases on startup, daily or weekly (**Settings �
   <img alt="The Settings page showing NudgeJudge registered as the default browser" src="images/settings-light.png">
 </picture>
 
-From **Settings → Make default**:
+From **Make default** on Get started, **Make default browser** in the sidebar, or **Settings → Make default**:
 
 - **Linux:** installs `~/.local/share/applications/nudgejudge.desktop` and makes it the `x-scheme-handler/http` and `https` default via `xdg-mime`. It deliberately does not claim `text/html`, so local HTML files keep opening in a real browser.
 - **Windows:** registers NudgeJudge per user (HKCU, no admin) as a browser with Capabilities, then opens *Default apps*. Windows only lets the user pick the default, so you click "Set default" there. NudgeJudge checks again when you return to its window.

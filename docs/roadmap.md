@@ -10,6 +10,7 @@
 - [x] URL validation, argv-only browser launch, ReDoS-safe matching
 - [x] Fast startup: launch links are routed before the UI loads (and the UI is skipped entirely when nothing needs it), with a Native AOT build that opens a routed link in about 20 ms
 - [x] JSON config with atomic, owner-only writes, a cross-process lock and reload-before-write, retried failed saves, backups before migration, and read-only mode for configs from newer versions; keeps a copy of a corrupt file and starts from defaults (see [How data is saved](data-storage.md))
+- [x] Get started page for first launch: start empty or from samples, then find browsers, add a first rule and make NudgeJudge the default browser in place; leaves the sidebar once setup is done
 - [x] Main window: Rules (live tester + route diagram + editor), Browsers (editor with a preview of the exact command it will run, "try" button), Activity (with filtering), Settings
 - [x] Chooser window: tabs for links that arrive together, number-key shortcuts, open once / for N hours / until restart / always
 - [x] Tray icon and menu, keep-running-in-tray setting, routing on/off with a primary browser for pass-through
@@ -21,7 +22,7 @@
 - [x] Launch at startup, switched in Settings: an XDG autostart entry on Linux, a per-user `Run` value on Windows. It starts in the tray (`--background`), follows the app if it moves, and reflects changes made in the system's own startup settings
 - [x] Update checks and one-click updates from GitHub Releases (Velopack), with a sidebar notice and Settings → Updates / About
 - [x] Browser extension (Chrome, Edge, Brave, Vivaldi, Firefox): a modifier-click (Ctrl+Alt on Linux, Alt+Shift on Windows), right-click and toolbar send links to NudgeJudge over native messaging; links the rules keep in that browser just open there; opt-in automatic routing for rules marked "Also catch in the browser". See [Browser extension](browser-extension.md)
-- [x] 954 core test cases and 66 headless UI tests, plus the extension's unit tests
+- [x] 966 core test cases and 72 headless UI tests, plus the extension's unit tests
 
 ## Limitations right now
 

@@ -39,7 +39,7 @@ On first run, NudgeJudge opens on the **Get started** page, which asks how you w
 
 Get started then lists the steps to routed links: find your browsers, add a rule, and make NudgeJudge your default browser (the **Make default** button does it in place). Routing is on out of the box, so turning it on only appears as a step if it's been switched off. Until NudgeJudge is the default browser, the sidebar says **Not receiving links** and shows the routing switch on its own row, which takes effect once links arrive. Get started stays first in the sidebar until there are rules and NudgeJudge is the default browser.
 
-Then go to **Settings → Make default** so links reach NudgeJudge. See [Default-browser setup](features.md#default-browser-setup).
+**Make default** on Get started (or **Settings → Make default**) is what lets links reach NudgeJudge; see [Default-browser setup](features.md#default-browser-setup) for what it changes on each system. To route links you click inside a browser too, add the [browser extension](browser-extension.md). The [How to use](../README.md#how-to-use) diagram shows the whole flow.
 
 Config file locations are listed in [How data is saved](data-storage.md#where).
 

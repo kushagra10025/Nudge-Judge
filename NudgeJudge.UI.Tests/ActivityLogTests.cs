@@ -378,6 +378,31 @@ public sealed class ActivityLogTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Get_started_is_hidden_in_the_sidebar_once_setup_is_done()
+    {
+        var app = new Harness(LogPath);
+        await app.Settings.RegisterCommand.ExecuteAsync(null);
+        var window = Show(app, AppPage.Rules);
+
+        var nav = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Classes.Contains("nav"));
+        var items = nav.GetVisualDescendants().OfType<ListBoxItem>().ToList();
+        Assert.False(items[(int)AppPage.GetStarted].IsEffectivelyVisible);
+        Assert.True(items[(int)AppPage.Rules].IsEffectivelyVisible);
+    }
+
+    [AvaloniaFact]
+    public void Rule_switches_keep_the_page_colours_not_the_sidebar_ones()
+    {
+        var app = new Harness(LogPath);
+        var window = Show(app, AppPage.Rules);
+
+        var ruleSwitch = window.GetVisualDescendants().OfType<RulesView>().Single()
+            .GetVisualDescendants().OfType<ToggleSwitch>().First();
+        Assert.True(ruleSwitch.TryFindResource("ToggleSwitchFillOn", window.ActualThemeVariant, out var fill));
+        Assert.NotEqual(Avalonia.Media.Color.Parse("#DCE8E1"), ((Avalonia.Media.ISolidColorBrush)fill!).Color);
+    }
+
+    [AvaloniaFact]
     public void Routing_is_a_step_only_while_it_is_off()
     {
         var app = new Harness(LogPath, withRule: false);

@@ -167,6 +167,13 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
+    <!-- Not virtualizing: a virtualizing panel owns its items' IsVisible, which would show Get started even after
+         it's been hidden -->
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel />
+      </ItemsPanelTemplate>
+    </Setter>
   </Style>
   <Style Selector="ListBox.nav ListBoxItem">
     <Setter Property="Padding" Value="10,9" />
