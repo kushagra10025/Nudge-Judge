@@ -163,7 +163,7 @@ public sealed class LinuxRegistrarTests : IDisposable
         Assert.Equal(["--from-handler", link], result.Output.TrimEnd('\n').Split('\n'));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task Edited_wrapper_counts_as_not_current()
     {
         var registrar = Registrar(["/home/me/My Apps/NudgeJudge"]);

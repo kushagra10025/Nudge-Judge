@@ -19,8 +19,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       - name: Version from tag
@@ -45,8 +45,8 @@ jobs:
     needs: windows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       # Native AOT's linker prerequisites; usually on the image already, but don't depend on it.
@@ -54,6 +54,8 @@ jobs:
       - name: Version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+      # Runs the [LinuxFact] tests the Windows job skips.
+      - run: dotnet test -c Release
       - run: dotnet publish NudgeJudge.Desktop -c Release -r linux-x64 -p:Version=${{ env.VERSION }} -o publish
       - run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
@@ -80,8 +82,8 @@ jobs:
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           # Node 24 ships npm 11, which wrote package-lock.json. npm 10 (Node 22) reads its optional per-platform
           # packages (lightningcss, an optional peer of Vite) as required and fails with EBADPLATFORM.
@@ -123,7 +125,7 @@ jobs:
       # (stores assign their own ID), the Firefox one with its sources. Kept as this run's artifact, not on the
       # release, where the keyless Chromium build would look installable but couldn't reach the app.
       - run: npm run zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: nudgejudge-extension-store-${{ env.VERSION }}
           path: |
